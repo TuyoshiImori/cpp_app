@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/ios/opencv2.framework/Headers",
+                "${workspaceFolder}/ios/opencv2.framework",
+                "/usr/local/Cellar/opencv/4.11.0_1/include/opencv4"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/ios/opencv2.framework/Headers",
+                    "${workspaceFolder}/ios/opencv2.framework"
+                ]
+            },
+            "defines": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-clang-arm64"
+        }
+    ],
+    "version": 4
+}
