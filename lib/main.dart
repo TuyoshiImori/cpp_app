@@ -34,6 +34,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
   Uint8List? _encodedImageBytes;
+  int? _encodedImageLength;
 
   void _incrementCounter() {
     setState(() {
@@ -44,21 +45,18 @@ class _MyHomePageState extends State<MyHomePage> {
   // 画像を選択し、C++でエンコードして表示
   Future<void> _pickAndEncodeImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100,
+      preferredCameraDevice: CameraDevice.rear,
+    );
     if (picked == null) return;
 
     final bytes = await picked.readAsBytes();
-    // 画像の幅・高さを取得（ここでは仮に512x512とする。実際は画像から取得してください）
-    // 例: https://pub.dev/packages/image などで画像サイズ取得可能
-    // ここでは仮の値
-    int width = 512;
-    int height = 512;
-
-    // 必要に応じて画像サイズを取得する処理を追加してください
-
-    final encoded = await encodeImageWithCpp(bytes, height, width);
+    final result = await encodeImageWithCpp(bytes);
     setState(() {
-      _encodedImageBytes = encoded;
+      _encodedImageBytes = result.bytes;
+      _encodedImageLength = result.length;
     });
   }
 
@@ -88,8 +86,8 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               if (_encodedImageBytes != null) ...[
                 const SizedBox(height: 16),
-                const Text('C++でエンコードした画像:'),
-                Image.memory(_encodedImageBytes!),
+                Text('C++でエンコードした画像: ($_encodedImageLength bytes)'),
+                Image.memory(_encodedImageBytes!, width: 200), // 画像を小さく表示
               ],
             ],
           ),

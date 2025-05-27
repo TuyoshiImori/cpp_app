@@ -24,12 +24,20 @@ testFunction(int rows, int cols)
 // Dartから呼び出すためのエクスポート設定
 extern "C" __attribute__((visibility("default"))) __attribute__((used))
 // 画像エンコード関数
-// h: 画像の高さ, w: 画像の幅, rawBytes: 入力画像の生データ, encodedOutput: エンコード後のデータへのポインタ
+// dataLen: 入力画像データのバイト数, rawBytes: 入力画像データ, encodedOutput: エンコード後のデータへのポインタ
 int
-encodeIm(int h, int w, unsigned char *rawBytes, unsigned char **encodedOutput)
+encodeIm(int dataLen, unsigned char *rawBytes, unsigned char **encodedOutput)
 {
-    // 入力データからOpenCVのMatを生成（ここでは3チャンネルRGB画像を想定）
-    cv::Mat img = cv::Mat(h, w, CV_8UC3, rawBytes);
+    // 入力データ（JPEG/PNG/HEICなど）をOpenCVでデコード
+    std::vector<uchar> inputVec(rawBytes, rawBytes + dataLen);
+    cv::Mat img = cv::imdecode(inputVec, cv::IMREAD_COLOR);
+
+    if (img.empty())
+    {
+        // デコード失敗時は0を返す
+        *encodedOutput = nullptr;
+        return 0;
+    }
 
     // エンコード結果を格納するバッファ
     std::vector<uchar> buf;
