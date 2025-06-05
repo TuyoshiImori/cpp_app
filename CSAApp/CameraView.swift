@@ -1,24 +1,18 @@
 import SwiftUI
 
-// CameraViewはカメラで撮影した画像を親Viewに渡すためのViewです
 public struct CameraView: UIViewControllerRepresentable {
-  // 撮影した画像を親Viewと共有するためのバインディング
   @Binding private var image: UIImage?
 
-  // 画面を閉じるための環境変数
   @Environment(\.dismiss) private var dismiss
 
-  // イニシャライザでバインディングを受け取る
   public init(image: Binding<UIImage?>) {
     self._image = image
   }
 
-  // Coordinatorの生成
   public func makeCoordinator() -> Coordinator {
     Coordinator(self)
   }
 
-  // UIKitのUIImagePickerControllerを生成
   public func makeUIViewController(context: Context) -> UIImagePickerController {
     let viewController = UIImagePickerController()
     viewController.delegate = context.coordinator
@@ -32,7 +26,6 @@ public struct CameraView: UIViewControllerRepresentable {
   {}
 }
 
-// Coordinatorクラスでデリゲート処理
 extension CameraView {
   public class Coordinator: NSObject, UIImagePickerControllerDelegate,
     UINavigationControllerDelegate
@@ -43,7 +36,6 @@ extension CameraView {
       self.parent = parent
     }
 
-    // 撮影完了時の処理
     public func imagePickerController(
       _ picker: UIImagePickerController,
       didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
