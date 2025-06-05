@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+    </array>
+    <!-- カメラ利用許可の説明文を追加 -->
+    <key>NSCameraUsageDescription</key>
+    <string>このアプリではカメラを使用します。</string>
+</dict>
+</plist>

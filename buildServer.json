@@ -1,0 +1,20 @@
+{
+	"name": "xcode build server",
+	"version": "0.2",
+	"bspVersion": "2.0",
+	"languages": [
+		"c",
+		"cpp",
+		"objective-c",
+		"objective-cpp",
+		"swift"
+	],
+	"argv": [
+		"/usr/local/bin/xcode-build-server"
+	],
+	"workspace": "/Users/iimoritsuyoshi/projects/CSAApp/CSAApp.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/iimoritsuyoshi/Library/Developer/Xcode/DerivedData/CSAApp-bqtqizffytfuqeazpseihqqmjkpl",
+	"scheme": "CSAApp",
+	"kind": "xcode",
+	"sweetpad.format.path": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-format"
+}
