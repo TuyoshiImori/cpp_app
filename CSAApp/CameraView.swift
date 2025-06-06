@@ -1,64 +1,104 @@
 import AVFoundation
 import SwiftUI
 
+// カメラ画面のメインView
 public struct CameraView: View {
+  // 撮影画像を親Viewとバインディング
   @Binding var image: UIImage?
+  // 画面を閉じるための環境変数
   @Environment(\.dismiss) private var dismiss
 
-  @State private var isCaptureButtonVisible = true
+  // 撮影ボタンの表示/非表示フラグ（手動＝表示、 自動＝非表示）
+  @State private var isManualMode = true
+  // カメラ制御用のモデル
   @StateObject private var cameraModel = CameraModel()
 
+  // イニシャライザ（親Viewから画像バインディングを受け取る）
   public init(image: Binding<UIImage?>) {
     self._image = image
   }
 
   public var body: some View {
     ZStack {
+      // カメラ映像のプレビュー
       CameraPreview(session: cameraModel.session)
         .ignoresSafeArea()
 
-      VStack {
+      VStack(spacing: 0) {
+        // ヘッダー（ダイナミックアイランドやノッチを避ける）
         HStack {
-          Spacer()
+          // 戻るボタン
           Button(action: {
-            isCaptureButtonVisible.toggle()
+            dismiss()
           }) {
-            Image(systemName: isCaptureButtonVisible ? "eye.slash" : "eye")
-              .font(.system(size: 30))
-              .padding()
-              .background(.ultraThinMaterial, in: Circle())
+            Image(systemName: "chevron.left")
+              .font(.system(size: 24))
+              .padding(.leading, 16)
+              .padding(.vertical, 8)
           }
-          .padding()
+          Spacer()
+          // 「自動/手動」切り替えボタン
+          Button(action: {
+            isManualMode.toggle()
+          }) {
+            Text(isManualMode ? "手動" : "自動")
+              .foregroundColor(.white)
+              .font(.headline)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 8)
+              .cornerRadius(16)
+          }
         }
+        .frame(height: 60)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.5))
+        .padding(.top, 0)
+        .ignoresSafeArea(edges: .horizontal)
+        .padding(.top, getSafeAreaTop())
+
         Spacer()
-        if isCaptureButtonVisible {
+        // 撮影ボタン（手動モード時のみ表示）
+        if isManualMode {
           Button(action: {
             cameraModel.capturePhoto()
           }) {
-            Circle()
-              .fill(Color.white)
-              .frame(width: 70, height: 70)
-              .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-              .shadow(radius: 4)
+            ZStack {
+              // 白いリング
+              Circle()
+                .stroke(Color.white, lineWidth: 4)
+                .frame(width: 74, height: 74)
+              // 透明な外円
+              Circle()
+                .fill(Color.black)
+                .frame(width: 70, height: 70)
+              // 白い内円
+              Circle()
+                .fill(Color.white)
+                .frame(width: 66, height: 66)
+                .shadow(radius: 2)
+            }
           }
-          .padding(.bottom, 40)
+          .padding(.bottom, 50)
         }
       }
     }
     .onAppear {
+      // 画面表示時にカメラセッション開始
       cameraModel.startSession()
+      // 撮影完了時のコールバック
       cameraModel.onPhotoCapture = { uiImage in
         self.image = uiImage
         dismiss()
       }
     }
     .onDisappear {
+      // 画面が閉じられたらカメラセッション停止
       cameraModel.stopSession()
     }
   }
 }
 
-// カメラプレビュー用UIView
+// カメラ映像を表示するUIViewラッパー
 struct CameraPreview: UIViewRepresentable {
   let session: AVCaptureSession
 
@@ -74,17 +114,27 @@ struct CameraPreview: UIViewRepresentable {
   func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
+// 画面上部のセーフエリア（ノッチ・ダイナミックアイランド等）分の高さを取得する関数
+private func getSafeAreaTop() -> CGFloat {
+  // 現在アクティブなシーンからセーフエリアを取得
+  let scenes = UIApplication.shared.connectedScenes
+  let windowScene = scenes.first { $0 is UIWindowScene } as? UIWindowScene
+  let window = windowScene?.windows.first
+  return window?.safeAreaInsets.top ?? 0
+}
+
 // カメラ制御用クラス
 class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
-  let session = AVCaptureSession()
-  private let output = AVCapturePhotoOutput()
-  var onPhotoCapture: ((UIImage) -> Void)?
+  let session = AVCaptureSession()  // カメラセッション
+  private let output = AVCapturePhotoOutput()  // 写真出力
+  var onPhotoCapture: ((UIImage) -> Void)?  // 撮影完了時のコールバック
 
   override init() {
     super.init()
     configure()
   }
 
+  // カメラの設定
   private func configure() {
     session.beginConfiguration()
     guard
@@ -101,6 +151,7 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     session.commitConfiguration()
   }
 
+  // カメラセッション開始
   func startSession() {
     if !session.isRunning {
       DispatchQueue.global(qos: .userInitiated).async {
@@ -109,17 +160,20 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     }
   }
 
+  // カメラセッション停止
   func stopSession() {
     if session.isRunning {
       session.stopRunning()
     }
   }
 
+  // 写真撮影
   func capturePhoto() {
     let settings = AVCapturePhotoSettings()
     output.capturePhoto(with: settings, delegate: self)
   }
 
+  // 撮影完了時のデータ処理
   func photoOutput(
     _ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?
   ) {
