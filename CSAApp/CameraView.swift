@@ -6,7 +6,7 @@ import Vision
 public struct CameraView: View {
   @Binding var image: UIImage?
   @Environment(\.dismiss) private var dismiss
-  @State private var isManualMode = true
+  @State private var isManualMode = true  // 手動撮影モード
   @StateObject private var cameraModel = CameraModel()
 
   public init(image: Binding<UIImage?>) {
@@ -154,7 +154,7 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
   @Published var detectedRect: CGRect? = nil
   @Published var detectedQuad: [CGPoint]? = nil
 
-  private var isAutoMode = false
+  private var isAutoMode = true
   private var autoCaptureCooldown = false
 
   override init() {
@@ -191,6 +191,10 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
     session.addInput(input)
     session.addOutput(output)
     session.addOutput(videoOutput)
+    // ★ ピクセルフォーマットを明示的に設定
+    videoOutput.videoSettings = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+    ]
     videoOutput.setSampleBufferDelegate(self, queue: queue)
     session.commitConfiguration()
   }
@@ -232,14 +236,17 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
     _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
     from connection: AVCaptureConnection
   ) {
+
     guard isAutoMode, !autoCaptureCooldown,
       let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
     else { return }
 
-    guard let processedCGImage = preprocess(pixelBuffer: pixelBuffer) else { return }
-
+    let handler = VNImageRequestHandler(
+      cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
     let request = VNDetectRectanglesRequest { [weak self] req, _ in
+
       guard let self = self else { return }
+
       if let result = req.results?.first as? VNRectangleObservation {
         // 四隅座標を保持（0:topLeft, 1:topRight, 2:bottomRight, 3:bottomLeft）
         let quad = [
@@ -248,6 +255,10 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
           result.bottomRight,
           result.bottomLeft,
         ]
+        // ★ 検出ログ
+        print(
+          "矩形検出: topLeft=\(result.topLeft), topRight=\(result.topRight), bottomRight=\(result.bottomRight), bottomLeft=\(result.bottomLeft)"
+        )
         DispatchQueue.main.async {
           self.detectedQuad = quad
           self.detectedRect = CGRect(
@@ -274,11 +285,14 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
         }
       }
     }
-    request.minimumConfidence = 0.5
-    request.minimumAspectRatio = 0.2
-    let handler = VNImageRequestHandler(
-      cgImage: processedCGImage, orientation: .up, options: [:])
-    try? handler.perform([request])
+    // ★ パラメータ
+    request.minimumConfidence = 0.7
+    request.minimumAspectRatio = 0.3
+    do {
+      try handler.perform([request])
+    } catch {
+      print("Visionリクエストエラー:", error)
+    }
   }
 
   // 撮影画像から矩形検出してクロップ
@@ -296,8 +310,8 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate,
         DispatchQueue.main.async { self.onPhotoCapture?(image) }
       }
     }
-    request.minimumConfidence = 0.7
-    request.minimumAspectRatio = 0.3
+    request.minimumConfidence = 0.5
+    request.minimumAspectRatio = 0.2
     let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
     try? handler.perform([request])
   }
