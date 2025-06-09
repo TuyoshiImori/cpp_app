@@ -208,6 +208,9 @@
 			);
 			mainGroup = 2D50A1B62DF1B4230023643B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D50A1C02DF1B4230023643B /* Products */;
 			projectDirPath = "";
@@ -575,6 +578,17 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TimOliver/TOCropViewController";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = 2D50A1B72DF1B4230023643B /* Project object */;
 }
