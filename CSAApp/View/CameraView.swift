@@ -5,6 +5,8 @@ public struct CameraView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var isManualMode = true
   @StateObject private var viewModel = CameraViewModel()
+  @State private var capturedImage: UIImage? = nil
+  @State private var isPreviewPresented = false
 
   public init(image: Binding<UIImage?>) {
     self._image = image
@@ -64,11 +66,46 @@ public struct CameraView: View {
           .padding(.bottom, 50)
         }
       }
+
+      // 左下サムネイル
+      VStack {
+        Spacer()
+        HStack {
+          if let capturedImage {
+            Button(action: {
+              isPreviewPresented = true
+            }) {
+              Image(uiImage: capturedImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white, lineWidth: 2))
+                .shadow(radius: 4)
+                .padding(.leading, 20)
+                .padding(.bottom, 60)
+            }
+            .sheet(isPresented: $isPreviewPresented) {
+              ZStack {
+                Color.black.ignoresSafeArea()
+                Image(uiImage: capturedImage)
+                  .resizable()
+                  .scaledToFit()
+                  .padding()
+              }
+            }
+          }
+          Spacer()
+        }
+      }
+      .ignoresSafeArea()
     }
     .onAppear {
       viewModel.onPhotoCapture = { uiImage in
-        self.image = uiImage
-        dismiss()
+        // サムネイル用に保持、ContentViewには戻らない
+        self.capturedImage = uiImage
+        self.image = uiImage  // 必要なら親にも渡す
+        // dismiss() は呼ばない
       }
       viewModel.startSession(isAuto: !isManualMode)
     }

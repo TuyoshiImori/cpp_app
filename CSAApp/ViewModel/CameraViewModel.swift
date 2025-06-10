@@ -158,33 +158,41 @@ public class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureD
       DispatchQueue.main.async { self.onPhotoCapture?(image) }
       return
     }
-    let width = CGFloat(cgImage.width)
-    let height = CGFloat(cgImage.height)
     let request = VNDetectRectanglesRequest { [weak self] req, _ in
       guard let self = self else { return }
       if let result = req.results?.first as? VNRectangleObservation {
         let cropped = self.perspectiveCrop(image: image, rect: result)
-        DispatchQueue.main.async { self.onPhotoCapture?(cropped ?? image) }
+        DispatchQueue.main.async {
+          self.onPhotoCapture?(cropped ?? image)
+        }
       } else {
         DispatchQueue.main.async { self.onPhotoCapture?(image) }
       }
     }
     request.minimumConfidence = 0.5
     request.minimumAspectRatio = 0.2
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    let orientation = CGImagePropertyOrientation(image.imageOrientation)
+    let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
     try? handler.perform([request])
   }
 
   private func perspectiveCrop(image: UIImage, rect: VNRectangleObservation) -> UIImage? {
     guard let cgImage = image.cgImage else { return nil }
-    let width = CGFloat(cgImage.width)
-    let height = CGFloat(cgImage.height)
-    let ciImage = CIImage(cgImage: cgImage)
-    let topLeft = CGPoint(x: rect.topLeft.x * width, y: (1 - rect.topLeft.y) * height)
-    let topRight = CGPoint(x: rect.topRight.x * width, y: (1 - rect.topRight.y) * height)
-    let bottomLeft = CGPoint(x: rect.bottomLeft.x * width, y: (1 - rect.bottomLeft.y) * height)
-    let bottomRight = CGPoint(x: rect.bottomRight.x * width, y: (1 - rect.bottomRight.y) * height)
+    let srcWidth = CGFloat(cgImage.width)
+    let srcHeight = CGFloat(cgImage.height)
+    // CIImage生成時に向きを補正
+    let ciImage = CIImage(cgImage: cgImage).oriented(.up)
 
+    // Visionの座標系（左下原点・正規化）→ CIImage座標系（左上原点・ピクセル単位）へ変換
+    func visionToCI(_ point: CGPoint) -> CGPoint {
+      CGPoint(x: point.x * srcWidth, y: (1 - point.y) * srcHeight)
+    }
+    let topLeft = visionToCI(rect.topLeft)
+    let topRight = visionToCI(rect.topRight)
+    let bottomLeft = visionToCI(rect.bottomLeft)
+    let bottomRight = visionToCI(rect.bottomRight)
+
+    // 射影変換フィルタ
     guard let filter = CIFilter(name: "CIPerspectiveCorrection") else { return nil }
     filter.setValue(ciImage, forKey: kCIInputImageKey)
     filter.setValue(CIVector(cgPoint: topLeft), forKey: "inputTopLeft")
@@ -193,10 +201,21 @@ public class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureD
     filter.setValue(CIVector(cgPoint: bottomLeft), forKey: "inputBottomLeft")
 
     let context = CIContext()
-    if let output = filter.outputImage,
-      let cgOutput = context.createCGImage(output, from: output.extent)
-    {
-      return UIImage(cgImage: cgOutput)
+    if let outputImage = filter.outputImage {
+      // 出力画像サイズを矩形のアスペクト比で決定
+      let widthA = topLeft.distance(to: topRight)
+      let widthB = bottomLeft.distance(to: bottomRight)
+      let outputWidth = max(widthA, widthB)
+      let heightA = topLeft.distance(to: bottomLeft)
+      let heightB = topRight.distance(to: bottomRight)
+      let outputHeight = max(heightA, heightB)
+
+      let cropped = outputImage.cropped(
+        to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+      if let cgOutput = context.createCGImage(cropped, from: cropped.extent) {
+        // orientation: .up で反転・回転問題を防ぐ
+        return UIImage(cgImage: cgOutput, scale: image.scale, orientation: .up)
+      }
     }
     return nil
   }
