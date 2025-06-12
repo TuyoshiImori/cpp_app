@@ -1,60 +1,122 @@
 import CoreGraphics
-import Vision
+import UIKit
 
-public struct RectangleFeature: Equatable {
-  public let topLeft: CGPoint
-  public let topRight: CGPoint
-  public let bottomRight: CGPoint
-  public let bottomLeft: CGPoint
+public struct RectangleFeature {
+  let topLeft: CGPoint
+  let topRight: CGPoint
+  let bottomLeft: CGPoint
+  let bottomRight: CGPoint
 
-  public init(topLeft: CGPoint, topRight: CGPoint, bottomRight: CGPoint, bottomLeft: CGPoint) {
+  // 通常のイニシャライザ
+  public init(
+    topLeft: CGPoint = .zero,
+    topRight: CGPoint = .zero,
+    bottomLeft: CGPoint = .zero,
+    bottomRight: CGPoint = .zero
+  ) {
     self.topLeft = topLeft
     self.topRight = topRight
-    self.bottomRight = bottomRight
     self.bottomLeft = bottomLeft
+    self.bottomRight = bottomRight
   }
 
-  /// VNRectangleObservationからRectangleFeatureを生成
-  public static func from(observation: VNRectangleObservation, width: CGFloat, height: CGFloat)
-    -> RectangleFeature
-  {
-    func convert(_ point: CGPoint) -> CGPoint {
-      CGPoint(x: point.x * width, y: (1 - point.y) * height)
+  // CIRectangleFeatureから初期化
+  public init(_ feature: CIRectangleFeature) {
+    self.topLeft = feature.topLeft
+    self.topRight = feature.topRight
+    self.bottomLeft = feature.bottomLeft
+    self.bottomRight = feature.bottomRight
+  }
+
+  // UIBezierPath化
+  var bezierPath: UIBezierPath {
+    let path = UIBezierPath()
+    path.move(to: topLeft)
+    path.addLine(to: topRight)
+    path.addLine(to: bottomRight)
+    path.addLine(to: bottomLeft)
+    path.close()
+    return path
+  }
+}
+
+extension RectangleFeature {
+  func smoothed(with previous: inout [RectangleFeature]) -> RectangleFeature {
+    let allFeatures = [self] + previous
+    let smoothed = allFeatures.average
+    previous = Array(allFeatures.prefix(10))
+    return smoothed
+  }
+
+  func normalized(source: CGSize, target: CGSize) -> RectangleFeature {
+    // UIView.ContentMode.aspectFillのように、sourceを正規化
+    let normalizedSource = CGSize(
+      width: source.height * target.aspectRatio,
+      height: source.height)
+    let xShift = (normalizedSource.width - source.width) / 2
+    let yShift = (normalizedSource.height - source.height) / 2
+
+    let distortion = CGVector(
+      dx: target.width / normalizedSource.width,
+      dy: target.height / normalizedSource.height)
+
+    func normalize(_ point: CGPoint) -> CGPoint {
+      point
+        .yAxisInverted(source.height)
+        .shifted(by: CGPoint(x: xShift, y: yShift))
+        .distorted(by: distortion)
     }
+
     return RectangleFeature(
-      topLeft: convert(observation.topLeft),
-      topRight: convert(observation.topRight),
-      bottomRight: convert(observation.bottomRight),
-      bottomLeft: convert(observation.bottomLeft)
+      topLeft: normalize(topLeft),
+      topRight: normalize(topRight),
+      bottomLeft: normalize(bottomLeft),
+      bottomRight: normalize(bottomRight)
     )
   }
 
-  /// RectangleFeature配列の平均値
-  public static func average(_ features: [RectangleFeature]) -> RectangleFeature {
-    guard !features.isEmpty else {
-      return RectangleFeature(
-        topLeft: .zero, topRight: .zero, bottomRight: .zero, bottomLeft: .zero)
-    }
-    let count = CGFloat(features.count)
-    func avg(_ points: [CGPoint]) -> CGPoint {
-      points.reduce(.zero, +) / count
-    }
-    return RectangleFeature(
-      topLeft: avg(features.map { $0.topLeft }),
-      topRight: avg(features.map { $0.topRight }),
-      bottomRight: avg(features.map { $0.bottomRight }),
-      bottomLeft: avg(features.map { $0.bottomLeft })
-    )
+  func difference(to: RectangleFeature) -> CGFloat {
+    abs(to.topLeft - topLeft) + abs(to.topRight - topRight) + abs(to.bottomLeft - bottomLeft)
+      + abs(to.bottomRight - bottomRight)
   }
 
-  /// RectangleFeature配列のジッター（ばらつき）を計算
-  public static func jitter(_ features: [RectangleFeature]) -> CGFloat {
-    guard features.count > 1 else { return 0 }
-    let avg = average(features)
-    let diffs = features.map {
-      abs($0.topLeft - avg.topLeft) + abs($0.topRight - avg.topRight)
-        + abs($0.bottomRight - avg.bottomRight) + abs($0.bottomLeft - avg.bottomLeft)
-    }
-    return diffs.reduce(0, +) / CGFloat(diffs.count)
+  /// This isn't the real area, but enables correct comparison
+  private var areaQualifier: CGFloat {
+    let diagonalToLeft = (topRight - bottomLeft)
+    let diagonalToRight = (topLeft - bottomRight)
+    let phi =
+      (diagonalToLeft.x * diagonalToRight.x + diagonalToLeft.y * diagonalToRight.y)
+      / (diagonalToLeft.length * diagonalToRight.length)
+    return sqrt(1 - phi * phi) * diagonalToLeft.length * diagonalToRight.length
+  }
+}
+
+extension RectangleFeature: Comparable {
+  public static func < (lhs: RectangleFeature, rhs: RectangleFeature) -> Bool {
+    lhs.areaQualifier < rhs.areaQualifier
+  }
+}
+
+extension CGSize {
+  fileprivate var aspectRatio: CGFloat {
+    width / height
+  }
+}
+
+extension CGPoint {
+  fileprivate func distorted(by distortion: CGVector) -> CGPoint {
+    CGPoint(x: x * distortion.dx, y: y * distortion.dy)
+  }
+
+  fileprivate func yAxisInverted(_ maxY: CGFloat) -> CGPoint {
+    CGPoint(x: x, y: maxY - y)
+  }
+
+  fileprivate func shifted(by shiftAmount: CGPoint) -> CGPoint {
+    CGPoint(x: x + shiftAmount.x, y: y + shiftAmount.y)
+  }
+
+  fileprivate var length: CGFloat {
+    sqrt(x * x + y * y)
   }
 }

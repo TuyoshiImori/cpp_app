@@ -1,33 +1,14 @@
+import AVFoundation
 import UIKit
-import Vision
 
-// ここからプロトコル定義を削除
+public protocol DocumentScanner: AnyObject {
+  var desiredJitter: CGFloat { get set }
+  var featuresRequired: Int { get set }
+  var previewLayer: CALayer { get }
+  var progress: Progress { get }
 
-final class DocumentScanner {
-  weak var delegate: DocumentScannerDelegate?
-
-  private let sequenceHandler = VNSequenceRequestHandler()
-
-  func detectRectangle(in image: CGImage) {
-    let request = VNDetectRectanglesRequest { [weak self] request, error in
-      if let error = error {
-        self?.delegate?.documentScanner(self!, didFailWithError: error)
-        return
-      }
-      guard let observation = request.results?.first as? VNRectangleObservation else { return }
-      let feature = RectangleFeature.from(
-        observation: observation,
-        width: CGFloat(image.width),
-        height: CGFloat(image.height)
-      )
-      self?.delegate?.documentScanner(self!, didDetectRectangle: feature)
-    }
-    request.minimumConfidence = 0.7
-    request.minimumAspectRatio = 0.3
-    do {
-      try sequenceHandler.perform([request], on: image)
-    } catch {
-      delegate?.documentScanner(self, didFailWithError: error)
-    }
-  }
+  func captureImage(in bounds: RectangleFeature?, completion: @escaping (UIImage) -> Void)
+  func start()
+  func pause()
+  func stop()
 }

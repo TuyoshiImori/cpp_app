@@ -1,35 +1,17 @@
-import Foundation
+import CoreGraphics
 
 extension Array where Element == RectangleFeature {
-  /// 配列の中央値RectangleFeatureを返す
-  func medianFeature() -> RectangleFeature? {
-    guard !isEmpty else { return nil }
-    func median(_ values: [CGFloat]) -> CGFloat {
-      let sorted = values.sorted()
-      let count = sorted.count
-      if count % 2 == 0 {
-        return (sorted[count / 2 - 1] + sorted[count / 2]) / 2
-      } else {
-        return sorted[count / 2]
-      }
-    }
-    return RectangleFeature(
-      topLeft: CGPoint(
-        x: median(map { $0.topLeft.x }),
-        y: median(map { $0.topLeft.y })
-      ),
-      topRight: CGPoint(
-        x: median(map { $0.topRight.x }),
-        y: median(map { $0.topRight.y })
-      ),
-      bottomRight: CGPoint(
-        x: median(map { $0.bottomRight.x }),
-        y: median(map { $0.bottomRight.y })
-      ),
-      bottomLeft: CGPoint(
-        x: median(map { $0.bottomLeft.x }),
-        y: median(map { $0.bottomLeft.y })
-      )
-    )
+  /// 全要素のjitter（平均との差の合計）を返す
+  var jitter: CGFloat {
+    guard !isEmpty else { return 0 }
+    let averageElement = average
+    let diffs = map { $0.difference(to: averageElement) }
+    return diffs.reduce(0, +)
+  }
+
+  /// RectangleFeatureの平均値
+  var average: RectangleFeature {
+    guard !isEmpty else { return RectangleFeature() }
+    return reduce(RectangleFeature(), +) / CGFloat(count)
   }
 }
