@@ -35,10 +35,22 @@ public struct CameraView: View {
         }
         .frame(height: 60)
         .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.5))
+        .background(
+          viewModel.isAutoCaptureEnabled ? Color.blue.opacity(0.7) : Color.black.opacity(0.5)
+        )
         .padding(.top, getSafeAreaTop())
 
         Spacer()
+
+        if !viewModel.isAutoCaptureEnabled {
+          Button("再開") {
+            viewModel.resumeAutoCapture()
+          }
+          .padding()
+          .background(Color.white.opacity(0.8))
+          .cornerRadius(12)
+          .padding(.bottom, 40)
+        }
       }
     }
   }

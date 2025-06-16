@@ -23,6 +23,7 @@ public final class AVDocumentScanner: NSObject, ObservableObject, DocumentScanne
   private var rectangleFeatures: [RectangleFeature] = []
   private let captureSession = AVCaptureSession()
   private let imageQueue = DispatchQueue(label: "imageQueue")
+  public var isAutoCaptureEnabled: Bool = true
 
   private let device: AVCaptureDevice? = {
     AVCaptureDevice.DiscoverySession(
@@ -123,12 +124,14 @@ extension AVDocumentScanner: AVCaptureVideoDataOutputSampleBufferDelegate {
       isStopped == false,
       let delegate = delegate
     {
-
-      pause()
-
-      captureImage(in: smoothed) { [weak delegate] image in
-        delegate?.didCapture(image: image)
+      if isAutoCaptureEnabled {
+        pause()  // ← 自動撮影だけ止めたい場合はここでpause()
+        captureImage(in: smoothed) { [weak delegate] image in
+          delegate?.didCapture(image: image)
+        }
       }
+      // isAutoCaptureEnabled == false のときはpauseもcaptureImageも呼ばない
+      // これで矩形検出は継続
     }
 
     return smoothed
@@ -143,9 +146,10 @@ extension AVDocumentScanner {
 
   public func start() {
     imageQueue.async {
-      guard !self.captureSession.isRunning else { return }
-      self.captureSession.startRunning()
-      self.isStopped = false
+      self.isStopped = false  // ★ここを必ず実行
+      if !self.captureSession.isRunning {
+        self.captureSession.startRunning()
+      }
     }
   }
 
