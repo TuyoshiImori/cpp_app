@@ -11,7 +11,12 @@ public struct CameraView: View {
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
-    UIApplication.shared.windows.first?.safeAreaInsets ?? .zero
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+      let window = windowScene.windows.first
+    else {
+      return .zero
+    }
+    return window.safeAreaInsets
   }
 
   public init(image: Binding<UIImage?>) {
@@ -128,11 +133,13 @@ public struct CameraView: View {
       image = img
     }
   }
-}
 
-private func getSafeAreaTop() -> CGFloat {
-  let scenes = UIApplication.shared.connectedScenes
-  let windowScene = scenes.first { $0 is UIWindowScene } as? UIWindowScene
-  let window = windowScene?.windows.first
-  return window?.safeAreaInsets.top ?? 0
+  private func getSafeAreaTop() -> CGFloat {
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+      let window = windowScene.windows.first
+    else {
+      return 0
+    }
+    return window.safeAreaInsets.top
+  }
 }

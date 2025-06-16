@@ -17,4 +17,16 @@ extension UIImage {
     }
     return nil
   }
+  /// OpenCVを使用してグレースケール化する関数
+  func toGrayscale() -> UIImage? {
+    guard let ciImage = CIImage(image: self) else { return nil }
+    let filter = CIFilter(name: "CIPhotoEffectMono")  // グレースケールフィルタ
+    filter?.setValue(ciImage, forKey: kCIInputImageKey)
+    guard let outputImage = filter?.outputImage else { return nil }
+    let context = CIContext()
+    if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+      return UIImage(cgImage: cgImage)
+    }
+    return nil
+  }
 }
