@@ -4,7 +4,7 @@ public struct CameraView: View {
   @StateObject private var viewModel = CameraViewModel()
   @Binding public var image: UIImage?
   @Environment(\.dismiss) private var dismiss
-  @State private var previewColor: Color = .green
+  @State private var previewColor: Color = .blue
 
   public init(image: Binding<UIImage?>) {
     self._image = image
@@ -18,10 +18,6 @@ public struct CameraView: View {
         previewColor: $previewColor
       )
       .edgesIgnoringSafeArea(.all)
-
-      if let feature = viewModel.detectedFeature {
-        QuadOverlay(feature: feature)
-      }
 
       VStack {
         HStack {
