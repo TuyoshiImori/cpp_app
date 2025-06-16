@@ -160,10 +160,16 @@ struct CameraPreview: UIViewRepresentable {
     } else {
       context.coordinator.detectionLayer?.path = nil
     }
-    context.coordinator.detectionLayer?.fillColor =
-      UIColor(previewColor).withAlphaComponent(0.3).cgColor
-    context.coordinator.detectionLayer?.strokeColor =
-      UIColor(previewColor).withAlphaComponent(0.9).cgColor
+
+    if previewColor == .clear {
+      context.coordinator.detectionLayer?.fillColor = UIColor.clear.cgColor
+      context.coordinator.detectionLayer?.strokeColor = UIColor.clear.cgColor
+    } else {
+      context.coordinator.detectionLayer?.fillColor =
+        UIColor(previewColor).withAlphaComponent(0.3).cgColor
+      context.coordinator.detectionLayer?.strokeColor =
+        UIColor(previewColor).withAlphaComponent(0.9).cgColor
+    }
   }
 
   func makeCoordinator() -> Coordinator {

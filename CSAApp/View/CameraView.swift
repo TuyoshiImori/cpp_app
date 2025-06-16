@@ -15,7 +15,7 @@ public struct CameraView: View {
       CameraPreview(
         scanner: viewModel.scanner,
         recognizedFeature: $viewModel.detectedFeature,
-        previewColor: $previewColor
+        previewColor: .constant(viewModel.isAutoCaptureEnabled ? .blue : .clear)  // ←ここを修正
       )
       .edgesIgnoringSafeArea(.all)
 
@@ -31,9 +31,7 @@ public struct CameraView: View {
         }
         .frame(height: 60)
         .frame(maxWidth: .infinity)
-        .background(
-          viewModel.isAutoCaptureEnabled ? Color.blue.opacity(0.7) : Color.black.opacity(0.5)
-        )
+        .background(Color.black.opacity(0.5))
         .padding(.top, getSafeAreaTop())
 
         Spacer()
