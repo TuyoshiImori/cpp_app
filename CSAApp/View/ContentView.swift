@@ -1,26 +1,57 @@
 import SwiftData
 import SwiftUI
 
-// ContentViewはアプリのメイン画面を定義する構造体です
 struct ContentView: View {
-  // modelContextはデータベース操作のための環境変数です
   @Environment(\.modelContext) private var modelContext
-  // itemsはItem型の配列で、データベースから取得されます
   @Query private var items: [Item]
-  // カメラ画面表示用のフラグ
   @State private var isPresentedCameraView = false
-  // 撮影画像を保持する変数
   @State private var image: UIImage?
+
+  // ダイアログ表示用の状態
+  @State private var isPresentedQuestionDialog = false
+  @State private var selectedQuestionTypes: [QuestionType] = []
+
+  // 選択されたアイテムの画像を保持する状態
+  @State private var selectedImage: UIImage?
 
   var body: some View {
     NavigationSplitView {
       List {
         ForEach(items) { item in
-          // リスト項目タップでカメラ画面を表示
-          Button {
-            isPresentedCameraView = true
-          } label: {
+          VStack(alignment: .leading) {
             Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+              .font(.headline)
+            if !item.questionTypes.isEmpty {
+              Text("設問タイプ:")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+              ForEach(item.questionTypes, id: \.self) { questionType in
+                HStack(alignment: .top) {
+                  switch questionType {
+                  case .singleChoice:
+                    Image(systemName: "checkmark.circle")
+                      .foregroundColor(.blue)
+                    Text("単数回答")
+                  case .multipleChoice:
+                    Image(systemName: "list.bullet")
+                      .foregroundColor(.green)
+                    Text("複数回答")
+                  case .freeText:
+                    Image(systemName: "textformat")
+                      .foregroundColor(.orange)
+                    Text("自由記述")
+                  }
+                  Spacer()  // 右側に余白を追加して左寄せを強調
+                }
+              }
+            }
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .contentShape(Rectangle())
+          .onTapGesture {
+            // アイテムをタップした際にCameraViewを表示
+            selectedImage = image  // 必要に応じてアイテムの画像を設定
+            isPresentedCameraView = true
           }
         }
         .onDelete(perform: deleteItems)
@@ -30,13 +61,15 @@ struct ContentView: View {
           EditButton()
         }
         ToolbarItem {
-          Button(action: addItem) {
+          Button(action: {
+            selectedQuestionTypes = []  // 選択状態をリセット
+            isPresentedQuestionDialog = true
+          }) {
             Label("Add Item", systemImage: "plus")
           }
         }
       }
     } detail: {
-      // 撮影画像があれば表示
       if let image {
         Image(uiImage: image)
           .resizable()
@@ -46,21 +79,26 @@ struct ContentView: View {
         Text("Select an item")
       }
     }
-    // カメラ画面をフルスクリーンで表示
     .fullScreenCover(isPresented: $isPresentedCameraView) {
-      CameraView(image: $image).ignoresSafeArea()
+      CameraView(image: $selectedImage).ignoresSafeArea()
+    }
+    .sheet(isPresented: $isPresentedQuestionDialog) {
+      QuestionTypeSelectionView(
+        selectedQuestionTypes: $selectedQuestionTypes,
+        onComplete: { addItem() }
+      )
     }
   }
 
-  // 新しいItemを追加する関数
   private func addItem() {
     withAnimation {
-      let newItem = Item(timestamp: Date())
+      let newItem = Item(timestamp: Date(), questionTypes: selectedQuestionTypes)
       modelContext.insert(newItem)
+      isPresentedQuestionDialog = false  // QuestionTypeSelectionViewを閉じる
+      isPresentedCameraView = true  // CameraViewを開く
     }
   }
 
-  // 指定されたインデックスのItemを削除する関数
   private func deleteItems(offsets: IndexSet) {
     withAnimation {
       for index in offsets {
@@ -68,10 +106,4 @@ struct ContentView: View {
       }
     }
   }
-}
-
-// プレビュー用
-#Preview {
-  ContentView()
-    .modelContainer(for: Item.self, inMemory: true)
 }
