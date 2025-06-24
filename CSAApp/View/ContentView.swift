@@ -41,7 +41,7 @@ struct ContentView: View {
                       .foregroundColor(.orange)
                     Text("自由記述")
                   }
-                  Spacer()  // 右側に余白を追加して左寄せを強調
+                  Spacer()
                 }
               }
             }
@@ -49,8 +49,7 @@ struct ContentView: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .contentShape(Rectangle())
           .onTapGesture {
-            // アイテムをタップした際にCameraViewを表示
-            selectedImage = image  // 必要に応じてアイテムの画像を設定
+            selectedImage = image
             isPresentedCameraView = true
           }
         }
@@ -62,7 +61,7 @@ struct ContentView: View {
         }
         ToolbarItem {
           Button(action: {
-            selectedQuestionTypes = []  // 選択状態をリセット
+            selectedQuestionTypes = []
             isPresentedQuestionDialog = true
           }) {
             Label("Add Item", systemImage: "plus")
@@ -80,7 +79,8 @@ struct ContentView: View {
       }
     }
     .fullScreenCover(isPresented: $isPresentedCameraView) {
-      CameraView(image: $selectedImage).ignoresSafeArea()
+      CameraView(image: $selectedImage, item: items.first)  // Itemを渡す
+        .ignoresSafeArea()
     }
     .sheet(isPresented: $isPresentedQuestionDialog) {
       QuestionTypeSelectionView(
@@ -89,7 +89,6 @@ struct ContentView: View {
       )
     }
   }
-
   private func addItem() {
     withAnimation {
       let newItem = Item(timestamp: Date(), questionTypes: selectedQuestionTypes)

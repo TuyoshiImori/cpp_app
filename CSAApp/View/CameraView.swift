@@ -19,8 +19,12 @@ public struct CameraView: View {
     return window.safeAreaInsets
   }
 
-  public init(image: Binding<UIImage?>) {
+  // Item情報を受け取るプロパティを追加
+  public var item: Item?
+
+  public init(image: Binding<UIImage?>, item: Item? = nil) {
     self._image = image
+    self.item = item
   }
 
   public var body: some View {
@@ -43,6 +47,12 @@ public struct CameraView: View {
               .padding(.vertical, 8)
           }
           Spacer()
+          if let item = item {
+            Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+              .foregroundColor(.white)
+              .font(.headline)
+              .padding(.trailing, 16)
+          }
         }
         .frame(height: 60)
         .frame(maxWidth: .infinity)

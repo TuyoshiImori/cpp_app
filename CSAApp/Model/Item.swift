@@ -1,18 +1,18 @@
 import Foundation
 import SwiftData
 
-enum QuestionType: Codable {
+public enum QuestionType: Codable {
   case singleChoice
   case multipleChoice
   case freeText
 }
 
 @Model
-final class Item {
-  var timestamp: Date
-  var questionTypes: [QuestionType]  // 設問タイプを保存するプロパティ
+public final class Item {
+  public var timestamp: Date
+  public var questionTypes: [QuestionType]  // 設問タイプを保存するプロパティ
 
-  init(timestamp: Date, questionTypes: [QuestionType] = []) {
+  public init(timestamp: Date, questionTypes: [QuestionType] = []) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
   }
