@@ -4,6 +4,7 @@ public struct CameraView: View {
   @StateObject private var viewModel = CameraViewModel()
   @Binding public var image: UIImage?
   @Environment(\.dismiss) private var dismiss
+
   @State private var capturedImages: [UIImage] = []
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
