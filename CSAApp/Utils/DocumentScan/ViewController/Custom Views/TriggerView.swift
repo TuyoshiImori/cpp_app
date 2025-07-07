@@ -8,7 +8,6 @@ struct TriggerView: View {
       let width = geometry.size.width
       let gap = width * (isHighlighted ? 0.06 : 0.03)
       let thickness = 0.09 * width
-      let radius = width / 2
 
       ZStack {
         // 外側の円

@@ -52,14 +52,13 @@ struct VisualEffectBlur: UIViewRepresentable {
 }
 
 // プレビュー
-#Preview {
-  @State var torchLevel: Float = 0.5
-  return TorchPickerView(
-    torchLevel: $torchLevel,
-    hasTorch: true,
-    onLevelChange: { _ in },
-    onDismiss: {}
-  )
-  .frame(width: 80, height: 200)
-  .background(Color.black)
+struct TorchPickerView_Previews: PreviewProvider {
+  static var previews: some View {
+    TorchPickerView(
+      torchLevel: .constant(0.5),
+      hasTorch: true,
+      onLevelChange: { _ in },
+      onDismiss: {}
+    )
+  }
 }

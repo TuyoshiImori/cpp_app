@@ -39,7 +39,7 @@ public final class AVDocumentScanner: NSObject, ObservableObject, DocumentScanne
       kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
     ]
     captureSession.addOutput(output)
-    output.connection(with: .video)?.videoOrientation = .portrait
+    output.connection(with: .video)?.videoRotationAngle = 90
     return output
   }()
 

@@ -114,8 +114,8 @@ struct ScannerView: View {
     .onDisappear {
       scanner.stop()
     }
-    .onChange(of: scanner.progress.fractionCompleted) { value in
-      progress = Float(value)
+    .onChange(of: scanner.progress.fractionCompleted) { oldValue, newValue in
+      progress = Float(newValue)
     }
     .onReceive(scanner.$lastTorchLevel) { level in
       torchLevel = level
@@ -204,14 +204,15 @@ class ScannerDelegateProxy: NSObject, DocumentScannerDelegate {
 }
 
 // プレビュー例
-#Preview {
-  @StateObject var scanner = AVDocumentScanner()
-  return ScannerView(
-    scanner: scanner,
-    config: .all,
-    onCapture: { image in
-      // 画像取得時の処理例
-      print("画像取得: \(image)")
-    }
-  )
+struct ScannerView_Previews: PreviewProvider {
+  static var previews: some View {
+    let scanner = AVDocumentScanner()
+    ScannerView(
+      scanner: scanner,
+      config: .all,
+      onCapture: { image in
+        print("画像取得: \(image)")
+      }
+    )
+  }
 }
