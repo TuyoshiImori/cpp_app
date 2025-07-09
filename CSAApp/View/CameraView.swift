@@ -122,12 +122,12 @@ public struct CameraView: View {
       VStack {
         Spacer()
         HStack {
-          if let lastImage = capturedImages.last {
+          if !capturedImages.isEmpty {
             Button(action: {
               previewIndex = capturedImages.count - 1
               isPreviewPresented = true
             }) {
-              Image(uiImage: lastImage)
+              Image(uiImage: capturedImages.last!)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 56, height: 56)
@@ -142,6 +142,8 @@ public struct CameraView: View {
           }
           Spacer()
         }
+        // デバッグ用: 画像数を表示（不要なら削除してOK）
+        Text("画像数: \(capturedImages.count)").foregroundColor(.white)
       }
       .edgesIgnoringSafeArea(.bottom)
 
@@ -168,6 +170,42 @@ public struct CameraView: View {
         }
       }
       .edgesIgnoringSafeArea(.bottom)
+
+      // サンプル画像読み込みボタン
+      VStack {
+        HStack {
+          Spacer()
+          Button(action: {
+            let sample1 = UIImage(named: "sample", in: Bundle.main, compatibleWith: nil)
+            let sample2 = UIImage(named: "sample")
+            let loadedSample = sample1 ?? sample2
+            if let sample = loadedSample {
+              let graySample = sample.toGrayscaleOnly() ?? sample
+              capturedImages.append(graySample)
+              print("[DEBUG] サンプル追加後: 画像数=\(capturedImages.count)")
+              image = graySample
+              recognizeText(in: graySample, index: capturedImages.count - 1)
+            } else {
+              print("[DEBUG] sample.pngの読み込みに失敗しました")
+            }
+          }) {
+            HStack(spacing: 8) {
+              Image(systemName: "photo.on.rectangle")
+              Text("サンプル読み込み")
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.blue.opacity(0.8))
+            .cornerRadius(16)
+            .shadow(radius: 4)
+          }
+          .padding(.top, 16 + safeAreaInsets.top)
+          .padding(.trailing, 16)
+        }
+        Spacer()
+      }
     }
     // 全画面プレビュー（スワイプで切り替え）
     .fullScreenCover(isPresented: $isPreviewPresented) {

@@ -6,13 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		2DCB88252E1BEFD800885F7E /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DCB88242E1BEFD800885F7E /* CoreMedia.framework */; };
-		2DCB88272E1BEFE200885F7E /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DCB88262E1BEFE200885F7E /* CoreImage.framework */; };
-		2DCB88292E1BEFE800885F7E /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DCB88282E1BEFE800885F7E /* CoreGraphics.framework */; };
-		2DCB882A2E1BEFED00885F7E /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DCB88232E1BEFCE00885F7E /* libc++.tbd */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		2D50A1D12DF1B4250023643B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -34,10 +27,6 @@
 		2D50A1BF2DF1B4230023643B /* CSAApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CSAApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1D02DF1B4250023643B /* CSAAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1DA2DF1B4250023643B /* CSAAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DCB88232E1BEFCE00885F7E /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
-		2DCB88242E1BEFD800885F7E /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
-		2DCB88262E1BEFE200885F7E /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
-		2DCB88282E1BEFE800885F7E /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -76,10 +65,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DCB88292E1BEFE800885F7E /* CoreGraphics.framework in Frameworks */,
-				2DCB882A2E1BEFED00885F7E /* libc++.tbd in Frameworks */,
-				2DCB88252E1BEFD800885F7E /* CoreMedia.framework in Frameworks */,
-				2DCB88272E1BEFE200885F7E /* CoreImage.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,7 +91,6 @@
 				2D50A1C12DF1B4230023643B /* CSAApp */,
 				2D50A1D32DF1B4250023643B /* CSAAppTests */,
 				2D50A1DD2DF1B4250023643B /* CSAAppUITests */,
-				2DCB88222E1BEFCE00885F7E /* Frameworks */,
 				2D50A1C02DF1B4230023643B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -119,17 +103,6 @@
 				2D50A1DA2DF1B4250023643B /* CSAAppUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		2DCB88222E1BEFCE00885F7E /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				2DCB88282E1BEFE800885F7E /* CoreGraphics.framework */,
-				2DCB88262E1BEFE200885F7E /* CoreImage.framework */,
-				2DCB88242E1BEFD800885F7E /* CoreMedia.framework */,
-				2DCB88232E1BEFCE00885F7E /* libc++.tbd */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
