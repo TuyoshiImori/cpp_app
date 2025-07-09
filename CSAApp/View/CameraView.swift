@@ -1,4 +1,5 @@
 import SwiftUI
+import Vision
 
 public struct CameraView: View {
   @StateObject private var viewModel = CameraViewModel()
@@ -8,6 +9,7 @@ public struct CameraView: View {
   @State private var capturedImages: [UIImage] = []
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
+  @State private var recognizedTexts: [Int: [VNRecognizedTextObservation]] = [:]
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -25,6 +27,61 @@ public struct CameraView: View {
   public init(image: Binding<UIImage?>, item: Item? = nil) {
     self._image = image
     self.item = item
+  }
+
+  // 全画面プレビュー部分をサブViewに分離
+  private func previewFullScreenView() -> some View {
+    ZStack(alignment: .topTrailing) {
+      Color.black.ignoresSafeArea()
+      if !capturedImages.isEmpty {
+        TabView(selection: $previewIndex) {
+          ForEach(Array(capturedImages.enumerated()), id: \.offset) { idx, img in
+            ZStack {
+              Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .tag(idx)
+                .background(Color.black)
+              VStack {
+                Spacer()
+                let textObs = recognizedTexts[idx] ?? []
+                ScrollView(.vertical, showsIndicators: true) {
+                  VStack(alignment: .leading, spacing: 4) {
+                    if textObs.isEmpty {
+                      Text("文字が検出されませんでした")
+                        .foregroundColor(.gray)
+                        .padding(.vertical, 8)
+                    } else {
+                      ForEach(textObs, id: \.uuid) { obs in
+                        if let candidate = obs.topCandidates(1).first {
+                          Text(candidate.string)
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .padding(.vertical, 2)
+                            .padding(.horizontal, 8)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(6)
+                        }
+                      }
+                    }
+                  }
+                  .padding(.bottom, 32)
+                  .padding(.horizontal, 12)
+                }
+              }
+            }
+          }
+        }
+        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+        .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
+      }
+      Button(action: { isPreviewPresented = false }) {
+        Image(systemName: "xmark.circle.fill")
+          .font(.system(size: 36))
+          .foregroundColor(.white)
+          .padding()
+      }
+    }
   }
 
   public var body: some View {
@@ -114,33 +171,13 @@ public struct CameraView: View {
     }
     // 全画面プレビュー（スワイプで切り替え）
     .fullScreenCover(isPresented: $isPreviewPresented) {
-      ZStack(alignment: .topTrailing) {
-        Color.black.ignoresSafeArea()
-        if !capturedImages.isEmpty {
-          TabView(selection: $previewIndex) {
-            ForEach(Array(capturedImages.enumerated()), id: \.offset) { idx, img in
-              Image(uiImage: img)
-                .resizable()
-                .scaledToFit()
-                .tag(idx)
-                .background(Color.black)
-            }
-          }
-          .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-          .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-        }
-        Button(action: { isPreviewPresented = false }) {
-          Image(systemName: "xmark.circle.fill")
-            .font(.system(size: 36))
-            .foregroundColor(.white)
-            .padding()
-        }
-      }
+      previewFullScreenView()
     }
     // 撮影画像をViewModelから受け取る
-    .onReceive(viewModel.$capturedImage.compactMap { $0 }) { img in
-      capturedImages.append(img)
-      image = img
+    .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
+      capturedImages.append(img.toGrayscaleOnly() ?? img)
+      image = img.toGrayscaleOnly() ?? img
+      recognizeText(in: img.toGrayscaleOnly() ?? img, index: capturedImages.count - 1)
     }
   }
 
@@ -151,5 +188,24 @@ public struct CameraView: View {
       return 0
     }
     return window.safeAreaInsets.top
+  }
+
+  // OCR処理: 画像内のテキストを検出しrecognizedTextsに格納
+  private func recognizeText(in image: UIImage, index: Int) {
+    guard let cgImage = image.cgImage else { return }
+    let request = VNRecognizeTextRequest { request, error in
+      if let results = request.results as? [VNRecognizedTextObservation] {
+        DispatchQueue.main.async {
+          recognizedTexts[index] = results
+        }
+      }
+    }
+    request.recognitionLevel = .accurate
+    request.usesLanguageCorrection = true
+    request.recognitionLanguages = ["ja-JP", "en-US"]  // 日本語と英語を優先
+    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    DispatchQueue.global(qos: .userInitiated).async {
+      try? handler.perform([request])
+    }
   }
 }
