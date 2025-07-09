@@ -9,7 +9,6 @@ public struct CameraView: View {
   @State private var capturedImages: [UIImage] = []
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
-  @State private var recognizedTexts: [Int: [VNRecognizedTextObservation]] = [:]
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -21,7 +20,6 @@ public struct CameraView: View {
     return window.safeAreaInsets
   }
 
-  // Item情報を受け取るプロパティを追加
   public var item: Item?
 
   public init(image: Binding<UIImage?>, item: Item? = nil) {
@@ -29,45 +27,21 @@ public struct CameraView: View {
     self.item = item
   }
 
-  // 全画面プレビュー部分をサブViewに分離
+  // プレビュー全画面表示
   private func previewFullScreenView() -> some View {
     ZStack(alignment: .topTrailing) {
       Color.black.ignoresSafeArea()
       if !capturedImages.isEmpty {
         TabView(selection: $previewIndex) {
           ForEach(Array(capturedImages.enumerated()), id: \.offset) { idx, img in
-            ZStack {
-              Image(uiImage: img)
-                .resizable()
-                .scaledToFit()
-                .tag(idx)
-                .background(Color.black)
+            GeometryReader { geo in
               VStack {
                 Spacer()
-                let textObs = recognizedTexts[idx] ?? []
-                ScrollView(.vertical, showsIndicators: true) {
-                  VStack(alignment: .leading, spacing: 4) {
-                    if textObs.isEmpty {
-                      Text("文字が検出されませんでした")
-                        .foregroundColor(.gray)
-                        .padding(.vertical, 8)
-                    } else {
-                      ForEach(textObs, id: \.uuid) { obs in
-                        if let candidate = obs.topCandidates(1).first {
-                          Text(candidate.string)
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundColor(.yellow)
-                            .padding(.vertical, 2)
-                            .padding(.horizontal, 8)
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(6)
-                        }
-                      }
-                    }
-                  }
-                  .padding(.bottom, 32)
-                  .padding(.horizontal, 12)
-                }
+                Image(uiImage: img)
+                  .resizable()
+                  .scaledToFit()
+                  .frame(maxWidth: geo.size.width, maxHeight: geo.size.height, alignment: .center)
+                Spacer()
               }
             }
           }
@@ -122,12 +96,12 @@ public struct CameraView: View {
       VStack {
         Spacer()
         HStack {
-          if !capturedImages.isEmpty {
+          if let last = capturedImages.last {
             Button(action: {
               previewIndex = capturedImages.count - 1
               isPreviewPresented = true
             }) {
-              Image(uiImage: capturedImages.last!)
+              Image(uiImage: last)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 56, height: 56)
@@ -142,8 +116,6 @@ public struct CameraView: View {
           }
           Spacer()
         }
-        // デバッグ用: 画像数を表示（不要なら削除してOK）
-        Text("画像数: \(capturedImages.count)").foregroundColor(.white)
       }
       .edgesIgnoringSafeArea(.bottom)
 
@@ -176,17 +148,13 @@ public struct CameraView: View {
         HStack {
           Spacer()
           Button(action: {
-            let sample1 = UIImage(named: "sample", in: Bundle.main, compatibleWith: nil)
-            let sample2 = UIImage(named: "sample")
+            let sample1 = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
+            let sample2 = UIImage(named: "form")
             let loadedSample = sample1 ?? sample2
             if let sample = loadedSample {
               let graySample = sample.toGrayscaleOnly() ?? sample
               capturedImages.append(graySample)
-              print("[DEBUG] サンプル追加後: 画像数=\(capturedImages.count)")
               image = graySample
-              recognizeText(in: graySample, index: capturedImages.count - 1)
-            } else {
-              print("[DEBUG] sample.pngの読み込みに失敗しました")
             }
           }) {
             HStack(spacing: 8) {
@@ -207,15 +175,13 @@ public struct CameraView: View {
         Spacer()
       }
     }
-    // 全画面プレビュー（スワイプで切り替え）
     .fullScreenCover(isPresented: $isPreviewPresented) {
       previewFullScreenView()
     }
-    // 撮影画像をViewModelから受け取る
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
-      capturedImages.append(img.toGrayscaleOnly() ?? img)
-      image = img.toGrayscaleOnly() ?? img
-      recognizeText(in: img.toGrayscaleOnly() ?? img, index: capturedImages.count - 1)
+      let gray = img.toGrayscaleOnly() ?? img
+      capturedImages.append(gray)
+      image = gray
     }
   }
 
@@ -226,24 +192,5 @@ public struct CameraView: View {
       return 0
     }
     return window.safeAreaInsets.top
-  }
-
-  // OCR処理: 画像内のテキストを検出しrecognizedTextsに格納
-  private func recognizeText(in image: UIImage, index: Int) {
-    guard let cgImage = image.cgImage else { return }
-    let request = VNRecognizeTextRequest { request, error in
-      if let results = request.results as? [VNRecognizedTextObservation] {
-        DispatchQueue.main.async {
-          recognizedTexts[index] = results
-        }
-      }
-    }
-    request.recognitionLevel = .accurate
-    request.usesLanguageCorrection = true
-    request.recognitionLanguages = ["ja-JP", "en-US"]  // 日本語と英語を優先
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-    DispatchQueue.global(qos: .userInitiated).async {
-      try? handler.perform([request])
-    }
   }
 }

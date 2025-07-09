@@ -42,7 +42,7 @@ final class CameraViewModel: NSObject, ObservableObject {
   func capturePhoto(completion: @escaping (UIImage?) -> Void) {
     scanner.captureImage(in: detectedFeature) { image in
       DispatchQueue.main.async {
-        self.capturedImage = image.toGrayscale()
+        self.capturedImage = image.toGrayscaleOnly()
         self.pauseAutoCapture()
         completion(self.capturedImage)
       }
@@ -53,7 +53,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 extension CameraViewModel: DocumentScannerDelegate {
   func didCapture(image: UIImage) {
     DispatchQueue.main.async {
-      self.capturedImage = image.toGrayscale()
+      self.capturedImage = image.toGrayscaleOnly()
       self.pauseAutoCapture()
     }
   }
