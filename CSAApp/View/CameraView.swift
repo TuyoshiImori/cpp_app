@@ -9,6 +9,7 @@ public struct CameraView: View {
   @State private var capturedImages: [UIImage] = []
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
+  @State private var detectedCircles: [[CGPoint]] = []  // 各画像ごとの検出円座標
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -35,13 +36,27 @@ public struct CameraView: View {
         TabView(selection: $previewIndex) {
           ForEach(Array(capturedImages.enumerated()), id: \.offset) { idx, img in
             GeometryReader { geo in
-              VStack {
-                Spacer()
-                Image(uiImage: img)
-                  .resizable()
-                  .scaledToFit()
-                  .frame(maxWidth: geo.size.width, maxHeight: geo.size.height, alignment: .center)
-                Spacer()
+              ZStack {
+                VStack {
+                  Spacer()
+                  Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: geo.size.width, maxHeight: geo.size.height, alignment: .center)
+                  Spacer()
+                }
+                // 円座標を赤い円で重ねて描画（全画面プレビューのみ）
+                if detectedCircles.indices.contains(idx) {
+                  let circles = detectedCircles[idx]
+                  ForEach(Array(circles.enumerated()), id: \.offset) { _, pt in
+                    Circle()
+                      .stroke(Color.red, lineWidth: 2)
+                      .frame(width: 24, height: 24)
+                      .position(
+                        x: pt.x * geo.size.width / img.size.width,
+                        y: pt.y * geo.size.height / img.size.height)
+                  }
+                }
               }
             }
           }
@@ -152,8 +167,9 @@ public struct CameraView: View {
             let sample2 = UIImage(named: "form")
             let loadedSample = sample1 ?? sample2
             if let sample = loadedSample {
-              let graySample = sample.toGrayscaleOnly() ?? sample
+              let (graySample, circles) = sample.detectCirclesWithVisionSync()
               capturedImages.append(graySample)
+              detectedCircles.append(circles)
               image = graySample
             }
           }) {
@@ -179,8 +195,9 @@ public struct CameraView: View {
       previewFullScreenView()
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
-      let gray = img.toGrayscaleOnly() ?? img
+      let (gray, circles) = img.detectCirclesWithVisionSync()
       capturedImages.append(gray)
+      detectedCircles.append(circles)
       image = gray
     }
   }
