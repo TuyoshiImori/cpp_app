@@ -2,60 +2,22 @@ import UIKit
 import Vision
 
 extension UIImage {
-  /// 画像をリサイズ→グレースケール→鮮鋭化→二値化→モルフォロジー処理→円検出し、
+  /// 画像をリサイズ→グレースケール→鮮鋭化→二値化→モルフォロジー処理（OpenCVで実装）→円検出し、
   /// グレースケール画像と円の中心座標（画像内座標）を返す
   func detectCirclesWithVisionSync() -> (UIImage, [CGPoint]) {
-    // 1. 画像をリサイズ（例: 最大幅1024px）
-    let targetWidth: CGFloat = 1024
-    let scale = targetWidth / max(self.size.width, self.size.height)
-    let newSize = CGSize(width: self.size.width * scale, height: self.size.height * scale)
-    UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-    self.draw(in: CGRect(origin: .zero, size: newSize))
-    let resizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? self
-    UIGraphicsEndImageContext()
-
-    // 2. グレースケール化
-    guard let ciImage = CIImage(image: resizedImage) else {
-      return (self, [])
-    }
-    let gray = ciImage.applyingFilter(
-      "CIColorMatrix",
-      parameters: [
-        "inputRVector": CIVector(x: 0.298912, y: 0.586611, z: 0.114478, w: 0),
-        "inputGVector": CIVector(x: 0.298912, y: 0.586611, z: 0.114478, w: 0),
-        "inputBVector": CIVector(x: 0.298912, y: 0.586611, z: 0.114478, w: 0),
-        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-      ])
-    // 3. 鮮鋭化（アンシャープマスク）
-    let sharp = gray.applyingFilter(
-      "CIUnsharpMask",
-      parameters: ["inputRadius": 5.0, "inputIntensity": 2.0])
-    // 4. 二値化（明度クラップ）
-    let clampMin = CIVector(x: 0.0, y: 0.0, z: 0.0, w: 0.0)
-    let clampMax = CIVector(x: 0.8, y: 0.8, z: 0.8, w: 1.0)
-    let clamped = sharp.applyingFilter(
-      "CIColorClamp",
-      parameters: ["inputMinComponents": clampMin, "inputMaxComponents": clampMax])
-    // 5. モルフォロジー処理（膨張→収縮でノイズ除去）
-    let morphed =
-      clamped
-      .applyingFilter(
-        "CIMorphologyRectangleMaximum", parameters: ["inputWidth": 3, "inputHeight": 3]
-      )
-      .applyingFilter(
-        "CIMorphologyRectangleMinimum", parameters: ["inputWidth": 3, "inputHeight": 3])
-    // 6. CGImage化
-    let context = CIContext()
-    guard let cgimg = context.createCGImage(morphed, from: morphed.extent) else {
-      return (self, [])
-    }
-    // 7. Visionで輪郭検出（同期）
+    // OpenCVWrapper経由で前処理済み画像を取得
+    guard let processedImage = OpenCVWrapper.processImage(self) else { return (self, []) }
+    // Vision用にCGImage化
+    guard let cgimg = processedImage.cgImage else { return (self, []) }
+    // リサイズ後のサイズを取得（OpenCVWrapperでリサイズしている場合はそちらに合わせて）
+    let newSize = CGSize(width: processedImage.size.width, height: processedImage.size.height)
+    // --- 以降はVisionで円検出（既存ロジックのまま） ---
     var circleCenters: [CGPoint] = []
     let semaphore = DispatchSemaphore(value: 0)
     let request = VNDetectContoursRequest()
     request.contrastAdjustment = 2.0
     request.detectsDarkOnLight = true
-    request.maximumImageDimension = Int(targetWidth)
+    request.maximumImageDimension = Int(newSize.width)
     let handler = VNImageRequestHandler(cgImage: cgimg, options: [:])
     DispatchQueue.global(qos: .userInitiated).async {
       defer { semaphore.signal() }
@@ -105,10 +67,6 @@ extension UIImage {
     }
     semaphore.wait()
     // グレースケール画像を返す
-    if let cgImage = context.createCGImage(gray, from: gray.extent) {
-      return (UIImage(cgImage: cgImage), circleCenters)
-    } else {
-      return (self, circleCenters)
-    }
+    return (processedImage, circleCenters)
   }
 }
