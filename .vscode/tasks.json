@@ -1,16 +1,98 @@
 {
-    "label": "Launch CSAApp",
-    "type": "shell",
-    "command": "xcodebuild",
-    "args": [
-        "-workspace",
-        "CSAApp.xcworkspace",
-        "-scheme",
-        "CSAApp",
-        "-configuration",
-        "Debug",
-        "-destination",
-        "platform=iOS,id=00008130-00092DA400C1401C",
-        "build"
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build CSAApp",
+            "type": "shell",
+            "command": "xcodebuild",
+            "args": [
+                "-workspace",
+                "CSAApp.xcworkspace",
+                "-scheme",
+                "CSAApp",
+                "-configuration",
+                "Debug",
+                "-sdk",
+                "iphoneos",
+                "build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Quick Build CSAApp",
+            "type": "shell",
+            "command": "xcodebuild",
+            "args": [
+                "-workspace",
+                "CSAApp.xcworkspace",
+                "-scheme",
+                "CSAApp",
+                "-configuration",
+                "Debug",
+                "-sdk",
+                "iphoneos",
+                "-derivedDataPath",
+                "./build",
+                "-quiet",
+                "build"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean Build CSAApp",
+            "type": "shell",
+            "command": "xcodebuild",
+            "args": [
+                "-workspace",
+                "CSAApp.xcworkspace",
+                "-scheme",
+                "CSAApp",
+                "-configuration",
+                "Debug",
+                "-sdk",
+                "iphoneos",
+                "clean",
+                "build"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Watch Build CSAApp",
+            "type": "shell",
+            "command": "./watch_build.sh",
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
     ]
 }

@@ -103,7 +103,11 @@ using namespace cv;
 
   cv::Mat sharpMat;
   try {
-    cv::addWeighted(grayMat, 1.5, blurMat, -0.5, 0, sharpMat);
+    // 鮮鋭化の強度を調整（文字が白飛びしないように）
+    // 鮮鋭化の強度（aopha、beta）をさらに弱める（文字の白飛び防止）
+    // cv::addWeighted(grayMat, 1.5, blurMat, -0.5, 0, sharpMat);
+
+    cv::addWeighted(grayMat, 1, blurMat, -0.5, 0, sharpMat);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: addWeightedでエラー: %s", e.what());
     return nil;
@@ -117,7 +121,9 @@ using namespace cv;
   // 4. 二値化
   cv::Mat binMat;
   try {
-    cv::threshold(sharpMat, binMat, 180, 255, cv::THRESH_BINARY);
+    // 二値化のしきい値を調整（文字が白飛びしないように）
+    // 二値化のしきい値（thresh）もさらに下げる
+    cv::threshold(sharpMat, binMat, 110, 255, cv::THRESH_BINARY);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: thresholdでエラー: %s", e.what());
     return nil;
