@@ -36,45 +36,17 @@ using namespace cv;
   NSLog(@"OpenCVWrapper: 元画像 channels=%d, type=%d, size=%dx%d",
         mat.channels(), mat.type(), mat.cols, mat.rows);
 
-  // 1. リサイズ
-  CGFloat targetWidth = 1024;
-  CGFloat scale = targetWidth / MAX(image.size.width, image.size.height);
-  cv::Size newSize(image.size.width * scale, image.size.height * scale);
-
-  // newSizeの幅・高さが0以下の場合はnilを返す
-  if (newSize.width <= 0 || newSize.height <= 0) {
-    NSLog(@"OpenCVWrapper: newSizeが不正です width=%d height=%d", newSize.width,
-          newSize.height);
-    return nil;
-  }
-
-  cv::Mat resizedMat;
-  try {
-    cv::resize(mat, resizedMat, newSize);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: リサイズでエラー: %s", e.what());
-    return nil;
-  }
-
-  if (resizedMat.empty()) {
-    NSLog(@"OpenCVWrapper: リサイズ後の画像が空です");
-    return nil;
-  }
-
-  // 2. グレースケール変換（チャンネル数に応じて適切な変換を選択）
+  // 1. グレースケール変換
   cv::Mat grayMat;
   try {
-    if (resizedMat.channels() == 4) {
-      // RGBA -> GRAY
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_RGBA2GRAY);
-    } else if (resizedMat.channels() == 3) {
-      // BGR -> GRAY
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_BGR2GRAY);
-    } else if (resizedMat.channels() == 1) {
-      // 既にグレースケール
-      grayMat = resizedMat.clone();
+    if (mat.channels() == 4) {
+      cv::cvtColor(mat, grayMat, cv::COLOR_RGBA2GRAY);
+    } else if (mat.channels() == 3) {
+      cv::cvtColor(mat, grayMat, cv::COLOR_BGR2GRAY);
+    } else if (mat.channels() == 1) {
+      grayMat = mat.clone();
     } else {
-      NSLog(@"OpenCVWrapper: 未対応のチャンネル数: %d", resizedMat.channels());
+      NSLog(@"OpenCVWrapper: 未対応のチャンネル数: %d", mat.channels());
       return nil;
     }
   } catch (const cv::Exception &e) {
@@ -87,72 +59,58 @@ using namespace cv;
     return nil;
   }
 
-  // 3. 鮮鋭化（アンシャープマスク）
+  // 2. ガウシアンブラーで平滑化
   cv::Mat blurMat;
   try {
-    cv::GaussianBlur(grayMat, blurMat, cv::Size(0, 0), 3);
+    cv::GaussianBlur(grayMat, blurMat, cv::Size(3, 3), 0);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: GaussianBlurでエラー: %s", e.what());
     return nil;
   }
 
-  if (blurMat.empty()) {
-    NSLog(@"OpenCVWrapper: GaussianBlur後の画像が空です");
-    return nil;
-  }
-
-  cv::Mat sharpMat;
+  // 3. 適応的二値化
+  cv::Mat binaryMat;
   try {
-    // 鮮鋭化の強度を調整（文字が白飛びしないように）
-    // 鮮鋭化の強度（aopha、beta）をさらに弱める（文字の白飛び防止）
-    // cv::addWeighted(grayMat, 1.5, blurMat, -0.5, 0, sharpMat);
-
-    cv::addWeighted(grayMat, 1, blurMat, -0.5, 0, sharpMat);
+    cv::adaptiveThreshold(blurMat, binaryMat, 255,
+                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 19,
+                          2);
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: addWeightedでエラー: %s", e.what());
+    NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
     return nil;
   }
 
-  if (sharpMat.empty()) {
-    NSLog(@"OpenCVWrapper: addWeighted後の画像が空です");
-    return nil;
-  }
-
-  // 4. 二値化
-  cv::Mat binMat;
+  // 4. 白黒反転
+  cv::Mat invMat;
   try {
-    // 二値化のしきい値を調整（文字が白飛びしないように）
-    // 二値化のしきい値（thresh）もさらに下げる
-    cv::threshold(sharpMat, binMat, 110, 255, cv::THRESH_BINARY);
+    cv::bitwise_not(binaryMat, invMat);
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: thresholdでエラー: %s", e.what());
+    NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return nil;
   }
 
-  if (binMat.empty()) {
-    NSLog(@"OpenCVWrapper: 二値化後の画像が空です");
-    return nil;
-  }
-
-  // 5. モルフォロジー（クロージング）
-  cv::Mat morphMat;
+  // 5. ノイズ除去（モルフォロジーオープン）
+  cv::Mat noNoiseMat;
   try {
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(binMat, morphMat, cv::MORPH_CLOSE, kernel);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+    cv::morphologyEx(invMat, noNoiseMat, cv::MORPH_OPEN, kernel);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
     return nil;
   }
 
-  if (morphMat.empty()) {
-    NSLog(@"OpenCVWrapper: モルフォロジー後の画像が空です");
+  // 6. 再度反転
+  cv::Mat finalMat;
+  try {
+    cv::bitwise_not(noNoiseMat, finalMat);
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: bitwise_not(2)でエラー: %s", e.what());
     return nil;
   }
 
-  // cv::Mat -> UIImage
+  // 最終画像をUIImageに変換
   UIImage *result = nil;
   try {
-    result = MatToUIImage(morphMat);
+    result = MatToUIImage(finalMat);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: MatToUIImageでエラー: %s", e.what());
     return nil;
