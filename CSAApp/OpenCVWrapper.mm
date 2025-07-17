@@ -1,4 +1,3 @@
-
 #import "OpenCVWrapper.h"
 #import <UIKit/UIKit.h>
 
@@ -36,21 +35,37 @@ using namespace cv;
   NSLog(@"OpenCVWrapper: 元画像 channels=%d, type=%d, size=%dx%d",
         mat.channels(), mat.type(), mat.cols, mat.rows);
 
+  // 画像を拡大
+  cv::Mat resizedMat;
+  try {
+    cv::resize(mat, resizedMat, cv::Size(), 2.0, 2.0, cv::INTER_LINEAR);
+  } catch (const cv::Exception &e) {
+    std::cerr << "OpenCVWrapper: resizeでエラー: " << e.what() << std::endl;
+    return nil;
+  }
+
+  if (resizedMat.empty()) {
+    std::cerr << "OpenCVWrapper: 拡大後の画像が空です" << std::endl;
+    return nil;
+  }
+
   // 1. グレースケール変換
   cv::Mat grayMat;
   try {
-    if (mat.channels() == 4) {
-      cv::cvtColor(mat, grayMat, cv::COLOR_RGBA2GRAY);
-    } else if (mat.channels() == 3) {
-      cv::cvtColor(mat, grayMat, cv::COLOR_BGR2GRAY);
-    } else if (mat.channels() == 1) {
-      grayMat = mat.clone();
+    if (resizedMat.channels() == 4) {
+      cv::cvtColor(resizedMat, grayMat, cv::COLOR_RGBA2GRAY);
+    } else if (resizedMat.channels() == 3) {
+      cv::cvtColor(resizedMat, grayMat, cv::COLOR_BGR2GRAY);
+    } else if (resizedMat.channels() == 1) {
+      grayMat = resizedMat.clone();
     } else {
-      NSLog(@"OpenCVWrapper: 未対応のチャンネル数: %d", mat.channels());
+      std::cerr << "OpenCVWrapper: 未対応のチャンネル数: "
+                << resizedMat.channels() << std::endl;
       return nil;
     }
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: グレースケール変換でエラー: %s", e.what());
+    std::cerr << "OpenCVWrapper: グレースケール変換でエラー: " << e.what()
+              << std::endl;
     return nil;
   }
 

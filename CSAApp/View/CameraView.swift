@@ -9,7 +9,7 @@ public struct CameraView: View {
   @State private var capturedImages: [UIImage] = []
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
-  @State private var detectedCircles: [[CGPoint]] = []  // 各画像ごとの検出円座標
+  @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -45,16 +45,20 @@ public struct CameraView: View {
                     .frame(maxWidth: geo.size.width, maxHeight: geo.size.height, alignment: .center)
                   Spacer()
                 }
-                // 円座標を赤い円で重ねて描画（全画面プレビューのみ）
-                if detectedCircles.indices.contains(idx) {
-                  let circles = detectedCircles[idx]
-                  ForEach(Array(circles.enumerated()), id: \.offset) { _, pt in
-                    Circle()
-                      .stroke(Color.red, lineWidth: 2)
-                      .frame(width: 24, height: 24)
-                      .position(
-                        x: pt.x * geo.size.width / img.size.width,
-                        y: pt.y * geo.size.height / img.size.height)
+                // 認識された文字列を表示（全画面プレビューのみ）
+                if recognizedTexts.indices.contains(idx) {
+                  let texts = recognizedTexts[idx]
+                  ScrollView(.vertical) {
+                    VStack(alignment: .leading) {
+                      ForEach(texts, id: \.self) { text in
+                        Text(text)
+                          .foregroundColor(.white)
+                          .padding(4)
+                          .background(Color.black.opacity(0.7))
+                          .cornerRadius(4)
+                      }
+                    }
+                    .padding()
                   }
                 }
               }
@@ -167,9 +171,9 @@ public struct CameraView: View {
             let sample2 = UIImage(named: "form")
             let loadedSample = sample1 ?? sample2
             if let sample = loadedSample {
-              let (graySample, circles) = sample.detectCirclesWithVisionSync()
+              let (graySample, texts) = sample.recognizeTextWithVisionSync()
               capturedImages.append(graySample)
-              detectedCircles.append(circles)
+              recognizedTexts.append(texts)
               image = graySample
             }
           }) {
@@ -195,9 +199,9 @@ public struct CameraView: View {
       previewFullScreenView()
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
-      let (gray, circles) = img.detectCirclesWithVisionSync()
+      let (gray, texts) = img.recognizeTextWithVisionSync()
       capturedImages.append(gray)
-      detectedCircles.append(circles)
+      recognizedTexts.append(texts)
       image = gray
     }
   }

@@ -42,7 +42,7 @@ final class CameraViewModel: NSObject, ObservableObject {
   func capturePhoto(completion: @escaping (UIImage?) -> Void) {
     scanner.captureImage(in: detectedFeature) { image in
       DispatchQueue.main.async {
-        let (gray, _) = image.detectCirclesWithVisionSync()
+        let (gray, _) = image.recognizeTextWithVisionSync()
         self.capturedImage = gray
         self.pauseAutoCapture()
         completion(self.capturedImage)
@@ -54,7 +54,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 extension CameraViewModel: DocumentScannerDelegate {
   func didCapture(image: UIImage) {
     DispatchQueue.main.async {
-      let (gray, _) = image.detectCirclesWithVisionSync()
+      let (gray, _) = image.recognizeTextWithVisionSync()
       self.capturedImage = gray
       self.pauseAutoCapture()
     }
