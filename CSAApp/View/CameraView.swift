@@ -7,6 +7,7 @@ public struct CameraView: View {
   @Environment(\.dismiss) private var dismiss
 
   @State private var capturedImages: [UIImage] = []
+  @State private var croppedImageSets: [[UIImage]] = []  // 各キャプチャごとの切り取り画像セット
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
@@ -32,37 +33,31 @@ public struct CameraView: View {
   private func previewFullScreenView() -> some View {
     ZStack(alignment: .topTrailing) {
       Color.black.ignoresSafeArea()
-      if !capturedImages.isEmpty {
+      if !croppedImageSets.isEmpty {
         TabView(selection: $previewIndex) {
-          ForEach(Array(capturedImages.enumerated()), id: \.offset) { idx, img in
+          ForEach(Array(croppedImageSets.enumerated()), id: \.offset) { setIdx, imageSet in
             GeometryReader { geo in
-              ZStack {
-                VStack {
-                  Spacer()
-                  Image(uiImage: img)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: geo.size.width, maxHeight: geo.size.height, alignment: .center)
-                  Spacer()
-                }
-                // 認識された文字列を表示（全画面プレビューのみ）
-                if recognizedTexts.indices.contains(idx) {
-                  let texts = recognizedTexts[idx]
-                  ScrollView(.vertical) {
-                    VStack(alignment: .leading) {
-                      ForEach(texts, id: \.self) { text in
-                        Text(text)
-                          .foregroundColor(.white)
-                          .padding(4)
-                          .background(Color.black.opacity(0.7))
-                          .cornerRadius(4)
-                      }
+              ScrollView(.vertical) {
+                VStack(spacing: 10) {
+                  ForEach(Array(imageSet.enumerated()), id: \.offset) { imgIdx, img in
+                    VStack {
+                      Text("設問 \(imgIdx + 1)つ目")
+                        .foregroundColor(.white)
+                        .font(.headline)
+                        .padding(.top, 10)
+
+                      Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: geo.size.width - 20)
+                        .padding(.horizontal, 10)
                     }
-                    .padding()
                   }
                 }
+                .padding(.top, 50)
               }
             }
+            .tag(setIdx)
           }
         }
         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
@@ -115,12 +110,12 @@ public struct CameraView: View {
       VStack {
         Spacer()
         HStack {
-          if let last = capturedImages.last {
+          if let lastImageSet = croppedImageSets.last, let firstImage = lastImageSet.first {
             Button(action: {
-              previewIndex = capturedImages.count - 1
+              previewIndex = croppedImageSets.count - 1
               isPreviewPresented = true
             }) {
-              Image(uiImage: last)
+              Image(uiImage: firstImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 56, height: 56)
@@ -172,7 +167,10 @@ public struct CameraView: View {
             let loadedSample = sample1 ?? sample2
             if let sample = loadedSample {
               let (graySample, texts) = sample.recognizeTextWithVisionSync()
+              let croppedImages = sample.cropImagesByCircles()
+
               capturedImages.append(graySample)
+              croppedImageSets.append(croppedImages)
               recognizedTexts.append(texts)
               image = graySample
             }
@@ -200,7 +198,10 @@ public struct CameraView: View {
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
       let (gray, texts) = img.recognizeTextWithVisionSync()
+      let croppedImages = img.cropImagesByCircles()
+
       capturedImages.append(gray)
+      croppedImageSets.append(croppedImages)
       recognizedTexts.append(texts)
       image = gray
     }

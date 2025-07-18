@@ -37,4 +37,20 @@ extension UIImage {
     // グレースケール画像を返す
     return (processedImage, recognizedTexts)
   }
+
+  /// 円の検出を行い、円の中心座標と前処理済み画像を返す
+  func detectCirclesWithVisionSync() -> ([CGPoint], UIImage) {
+    guard let processedImage = OpenCVWrapper.processImage(self) else { return ([], self) }
+    // 元の画像（処理前）を使って円検出を行う
+    let circleCenters = OpenCVWrapper.detectCircles(self) as! [CGPoint]
+    return (circleCenters, processedImage)
+  }
+
+  /// 円の検出に基づいて画像を複数の領域に切り取る
+  func cropImagesByCircles() -> [UIImage] {
+    guard let croppedImages = OpenCVWrapper.cropImages(byCircles: self) else {
+      return [self]
+    }
+    return croppedImages
+  }
 }
