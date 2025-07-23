@@ -11,6 +11,7 @@ public struct CameraView: View {
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
+  @State private var isCircleDetectionFailed: Bool = false
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -192,6 +193,14 @@ public struct CameraView: View {
         }
         Spacer()
       }
+
+      .alert(isPresented: $isCircleDetectionFailed) {
+        Alert(
+          title: Text("スキャン失敗"),
+          message: Text("適切なフォーマットのアンケートをスキャンしてください。"),
+          dismissButton: .default(Text("OK"))
+        )
+      }
     }
     .fullScreenCover(isPresented: $isPreviewPresented) {
       previewFullScreenView()
@@ -200,10 +209,14 @@ public struct CameraView: View {
       let (gray, texts) = img.recognizeTextWithVisionSync()
       let croppedImages = img.cropImagesByCircles()
 
-      capturedImages.append(gray)
-      croppedImageSets.append(croppedImages)
-      recognizedTexts.append(texts)
-      image = gray
+      if croppedImages.isEmpty {
+        isCircleDetectionFailed = true
+      } else {
+        capturedImages.append(gray)
+        croppedImageSets.append(croppedImages)
+        recognizedTexts.append(texts)
+        image = gray
+      }
     }
   }
 

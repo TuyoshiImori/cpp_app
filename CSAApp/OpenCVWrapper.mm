@@ -223,6 +223,16 @@ using namespace cv;
     };
   }
 
+  // 円が検出されなかった場合は処理を終了
+  if (circles.empty()) {
+    NSLog(@"OpenCVWrapper: 円が検出されませんでした");
+    return @{
+      @"processedImage" : [NSNull null],
+      @"circleCenters" : @[],
+      @"croppedImages" : @[]
+    };
+  }
+
   // 円の座標をNSArrayに変換
   NSMutableArray<NSValue *> *circleCenters = [NSMutableArray array];
   for (const auto &circle : circles) {
