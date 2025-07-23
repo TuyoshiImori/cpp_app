@@ -98,12 +98,28 @@ using namespace cv;
 
   // 4. 適応的二値化
   cv::Mat binaryMat;
+  // 適応的二値化のパラメータを調整
   try {
     cv::adaptiveThreshold(blurMat, binaryMat, 255,
-                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 19,
-                          2);
+                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY,
+                          25, // ブロックサイズを19から25に変更
+                          5); // 定数を2から5に変更
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
+    return @{
+      @"processedImage" : image,
+      @"circleCenters" : @[],
+      @"croppedImages" : @[]
+    };
+  }
+
+  // 白黒反転前にさらに平滑化処理を追加
+  cv::Mat extraBlurMat;
+  try {
+    cv::GaussianBlur(binaryMat, extraBlurMat, cv::Size(5, 5),
+                     2.0); // カーネルサイズを5x5に変更し、標準偏差を2.0に設定
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"circleCenters" : @[],
@@ -114,7 +130,7 @@ using namespace cv;
   // 5. 白黒反転
   cv::Mat invMat;
   try {
-    cv::bitwise_not(binaryMat, invMat);
+    cv::bitwise_not(extraBlurMat, invMat); // extraBlurMatを使用
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return @{
@@ -126,8 +142,10 @@ using namespace cv;
 
   // 6. ノイズ除去（モルフォロジーオープン）
   cv::Mat noNoiseMat;
+  // モルフォロジーオープンのカーネルサイズを拡大
   try {
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+    cv::Mat kernel = cv::getStructuringElement(
+        cv::MORPH_RECT, cv::Size(3, 3)); // カーネルサイズを2x2から3x3に変更
     cv::morphologyEx(invMat, noNoiseMat, cv::MORPH_OPEN, kernel);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
