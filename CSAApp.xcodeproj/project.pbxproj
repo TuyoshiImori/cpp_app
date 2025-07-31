@@ -11,7 +11,7 @@
 		2D1E98422E266E88001B13E7 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D1E98412E266E88001B13E7 /* CoreMedia.framework */; };
 		2D1E98442E266E91001B13E7 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D1E98432E266E91001B13E7 /* CoreImage.framework */; };
 		2D1E98462E266E99001B13E7 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D1E98452E266E99001B13E7 /* CoreGraphics.framework */; };
-		666E49872D21F2330F21A1AE /* Pods_CSAApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D07AD0668BFE7F7454C66C /* Pods_CSAApp.framework */; };
+		2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */; };
 		9D13808771CFA51272F8E5AD /* Pods_CSAAppTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCA567B1557FB0658F81CE6 /* Pods_CSAAppTests.framework */; };
 		B8A624244E84E59279520977 /* Pods_CSAApp_CSAAppUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BA3923D67B51D7E8445AEF5 /* Pods_CSAApp_CSAAppUITests.framework */; };
 /* End PBXBuildFile section */
@@ -34,22 +34,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		12553578B90E226D5AB7D00C /* Pods-CSAApp-CSAAppUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAApp-CSAAppUITests.release.xcconfig"; path = "Target Support Files/Pods-CSAApp-CSAAppUITests/Pods-CSAApp-CSAAppUITests.release.xcconfig"; sourceTree = "<group>"; };
 		2D1E983F2E266E78001B13E7 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		2D1E98412E266E88001B13E7 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		2D1E98432E266E91001B13E7 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
 		2D1E98452E266E99001B13E7 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = opencv2.xcframework; path = ../opencv/build_all/opencv2.xcframework; sourceTree = "<group>"; };
 		2D50A1BF2DF1B4230023643B /* CSAApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CSAApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1D02DF1B4250023643B /* CSAAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1DA2DF1B4250023643B /* CSAAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4146C90B949A812293E0D807 /* Pods-CSAApp-CSAAppUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAApp-CSAAppUITests.debug.xcconfig"; path = "Target Support Files/Pods-CSAApp-CSAAppUITests/Pods-CSAApp-CSAAppUITests.debug.xcconfig"; sourceTree = "<group>"; };
-		498AC456E7021EA5F04B8579 /* Pods-CSAApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAApp.release.xcconfig"; path = "Target Support Files/Pods-CSAApp/Pods-CSAApp.release.xcconfig"; sourceTree = "<group>"; };
-		689CC27D873816C0EDD5D87B /* Pods-CSAAppTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAAppTests.debug.xcconfig"; path = "Target Support Files/Pods-CSAAppTests/Pods-CSAAppTests.debug.xcconfig"; sourceTree = "<group>"; };
 		7BA3923D67B51D7E8445AEF5 /* Pods_CSAApp_CSAAppUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CSAApp_CSAAppUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		7DD699136B18B96A41562EAE /* Pods-CSAApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAApp.debug.xcconfig"; path = "Target Support Files/Pods-CSAApp/Pods-CSAApp.debug.xcconfig"; sourceTree = "<group>"; };
 		90D07AD0668BFE7F7454C66C /* Pods_CSAApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CSAApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BCA567B1557FB0658F81CE6 /* Pods_CSAAppTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_CSAAppTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC1020D8C10A55053127E4E3 /* Pods-CSAAppTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CSAAppTests.release.xcconfig"; path = "Target Support Files/Pods-CSAAppTests/Pods-CSAAppTests.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -90,9 +85,9 @@
 			files = (
 				2D1E98422E266E88001B13E7 /* CoreMedia.framework in Frameworks */,
 				2D1E98402E266E80001B13E7 /* libc++.tbd in Frameworks */,
-				666E49872D21F2330F21A1AE /* Pods_CSAApp.framework in Frameworks */,
 				2D1E98462E266E99001B13E7 /* CoreGraphics.framework in Frameworks */,
 				2D1E98442E266E91001B13E7 /* CoreImage.framework in Frameworks */,
+				2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +113,7 @@
 		241577A857574DB7BE33533C /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */,
 				2D1E98452E266E99001B13E7 /* CoreGraphics.framework */,
 				2D1E98432E266E91001B13E7 /* CoreImage.framework */,
 				2D1E98412E266E88001B13E7 /* CoreMedia.framework */,
@@ -136,7 +132,6 @@
 				2D50A1D32DF1B4250023643B /* CSAAppTests */,
 				2D50A1DD2DF1B4250023643B /* CSAAppUITests */,
 				2D50A1C02DF1B4230023643B /* Products */,
-				63EAAD96D5D6FE95CD71C5F9 /* Pods */,
 				241577A857574DB7BE33533C /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -151,19 +146,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		63EAAD96D5D6FE95CD71C5F9 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				7DD699136B18B96A41562EAE /* Pods-CSAApp.debug.xcconfig */,
-				498AC456E7021EA5F04B8579 /* Pods-CSAApp.release.xcconfig */,
-				4146C90B949A812293E0D807 /* Pods-CSAApp-CSAAppUITests.debug.xcconfig */,
-				12553578B90E226D5AB7D00C /* Pods-CSAApp-CSAAppUITests.release.xcconfig */,
-				689CC27D873816C0EDD5D87B /* Pods-CSAAppTests.debug.xcconfig */,
-				CC1020D8C10A55053127E4E3 /* Pods-CSAAppTests.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -171,7 +153,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2D50A1E32DF1B4250023643B /* Build configuration list for PBXNativeTarget "CSAApp" */;
 			buildPhases = (
-				6526E6E167B8A7E173742D07 /* [CP] Check Pods Manifest.lock */,
 				2D50A1BB2DF1B4230023643B /* Sources */,
 				2D50A1BC2DF1B4230023643B /* Frameworks */,
 				2D50A1BD2DF1B4230023643B /* Resources */,
@@ -192,7 +173,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2D50A1E82DF1B4250023643B /* Build configuration list for PBXNativeTarget "CSAAppTests" */;
 			buildPhases = (
-				F7D5A40A7AD9E7E40F6F0B3B /* [CP] Check Pods Manifest.lock */,
 				2D50A1CC2DF1B4250023643B /* Sources */,
 				2D50A1CD2DF1B4250023643B /* Frameworks */,
 				2D50A1CE2DF1B4250023643B /* Resources */,
@@ -214,7 +194,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2D50A1EB2DF1B4250023643B /* Build configuration list for PBXNativeTarget "CSAAppUITests" */;
 			buildPhases = (
-				42EBF9D2102F1142A511208C /* [CP] Check Pods Manifest.lock */,
 				2D50A1D62DF1B4250023643B /* Sources */,
 				2D50A1D72DF1B4250023643B /* Frameworks */,
 				2D50A1D82DF1B4250023643B /* Resources */,
@@ -328,50 +307,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		42EBF9D2102F1142A511208C /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-CSAApp-CSAAppUITests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		6526E6E167B8A7E173742D07 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-CSAApp-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
+/* End PBXShellScriptBuildPhase section */
 		F7D5A40A7AD9E7E40F6F0B3B /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -436,7 +372,6 @@
 /* Begin XCBuildConfiguration section */
 		2D50A1E42DF1B4250023643B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7DD699136B18B96A41562EAE /* Pods-CSAApp.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -481,7 +416,6 @@
 		};
 		2D50A1E52DF1B4250023643B /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 498AC456E7021EA5F04B8579 /* Pods-CSAApp.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -646,7 +580,6 @@
 		};
 		2D50A1E92DF1B4250023643B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 689CC27D873816C0EDD5D87B /* Pods-CSAAppTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -666,7 +599,6 @@
 		};
 		2D50A1EA2DF1B4250023643B /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CC1020D8C10A55053127E4E3 /* Pods-CSAAppTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -686,7 +618,6 @@
 		};
 		2D50A1EC2DF1B4250023643B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4146C90B949A812293E0D807 /* Pods-CSAApp-CSAAppUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -704,7 +635,6 @@
 		};
 		2D50A1ED2DF1B4250023643B /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 12553578B90E226D5AB7D00C /* Pods-CSAApp-CSAAppUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
