@@ -2,7 +2,7 @@ import SwiftUI
 import Vision
 
 public struct CameraView: View {
-  @StateObject private var viewModel = CameraViewModel()
+  @StateObject private var viewModel: CameraViewModel
   @Binding public var image: UIImage?
   @Environment(\.dismiss) private var dismiss
 
@@ -28,6 +28,11 @@ public struct CameraView: View {
   public init(image: Binding<UIImage?>, item: Item? = nil) {
     self._image = image
     self.item = item
+    if let item = item {
+      _viewModel = StateObject(wrappedValue: CameraViewModel(questionTypes: item.questionTypes))
+    } else {
+      _viewModel = StateObject(wrappedValue: CameraViewModel())
+    }
   }
 
   // プレビュー全画面表示

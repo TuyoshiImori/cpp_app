@@ -3,6 +3,7 @@ import Combine
 import UIKit
 
 final class CameraViewModel: NSObject, ObservableObject {
+  @Published var initialQuestionTypes: [QuestionType] = []
   @Published var capturedImage: UIImage?
   @Published var detectedFeature: RectangleFeature? = nil
   @Published var isTorchOn: Bool = false
@@ -17,6 +18,11 @@ final class CameraViewModel: NSObject, ObservableObject {
     scanner.start()
     isAutoCaptureEnabled = true
     scanner.isAutoCaptureEnabled = true
+  }
+
+  convenience init(questionTypes: [QuestionType]) {
+    self.init()
+    self.initialQuestionTypes = questionTypes
   }
 
   func toggleTorch() {

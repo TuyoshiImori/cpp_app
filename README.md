@@ -65,11 +65,17 @@ CSAAppは、SwiftUIを使用して開発されたiOSアプリケーションで�
 
 ## 今後の機能実装
 - 設問タイプを選択し、完了ボタンを押すと、`CameraView`の前に未記入のアンケートを読み取って、単数解答、複数回答の選択肢の文字列を設定する機能を実装する。
-- Web側でアンケートのフォーマットを作成した後にQRを作成して、それをアプリで読み取ったらフォーマットと選択肢の分などを自動反映できるようにする。
+- Web側でアンケートのフォーマットを作成した後にアプリを開く下記フォーマットのURLを作成して、そのURLからアプリを開いたときにフォーマットと選択肢の文などを自動反映できるようにする。
 - 画像を設問ごとに切り取ったあと、事前に選択した設問タイプの順番に解答内容を集計する。
 - お客様情報（名前、メールアドレスなど）の設問タイプを作成する（どういったフォーマットにするか考える）
 
-## QRの仕様
+## URLの仕様
+URLの例
+myapp://import?single=10%E4%BB%A3%E6%9C%AA%E6%BA%80,20%E4%BB%A3,30%E4%BB%A3,40%E4%BB%A3,50%E4%BB%A3,60%E4%BB%A3,70%E4%BB%A3,80%E4%BB%A3%E4%BB%A5%E4%B8%8A&multi=%E3%83%9D%E3%82%B9%E3%82%BF%E3%83%BC,%E5%87%BA%E6%BC%94%E8%80%85%E3%81%8B%E3%82%89,SNS(X,Instagram,Facebook),%E3%81%9D%E3%81%AE%E4%BB%96&single=%E5%A4%A7%E5%A4%89%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F,%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F,%E6%99%AE%E9%80%9A,%E8%89%AF%E3%81%8F%E3%81%AA%E3%81%8B%E3%81%A3%E3%81%9F,%E6%82%AA%E3%81%8B%E3%81%A3%E3%81%9F&text=&text=&info=furigana,name,nameKana,email,tel,zip,address
+
+URLのエンコード・デコードはここでやる
+https://tech-unlimited.com/urlencode.html
+
 https://example.com/form?
 single=10代未満,20代,30代,40代,50代,60代,70代,80代以上&
 multi=ポスター,出演者から,SNS(X,Instagram,Facebook),その他&

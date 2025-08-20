@@ -9,7 +9,7 @@ struct QuestionTypeSelectionView: View {
       Form {
         Section(header: Text("設問タイプを選択")) {
           Button(action: {
-            selectedQuestionTypes.append(.singleChoice)
+            selectedQuestionTypes.append(.single([]))
           }) {
             HStack {
               Image(systemName: "checkmark.circle")
@@ -18,7 +18,7 @@ struct QuestionTypeSelectionView: View {
             }
           }
           Button(action: {
-            selectedQuestionTypes.append(.multipleChoice)
+            selectedQuestionTypes.append(.multiple([]))
           }) {
             HStack {
               Image(systemName: "list.bullet")
@@ -41,14 +41,14 @@ struct QuestionTypeSelectionView: View {
           ForEach(selectedQuestionTypes.indices, id: \.self) { index in
             HStack {
               switch selectedQuestionTypes[index] {
-              case .singleChoice:
+              case .single(let options):
                 Image(systemName: "checkmark.circle")
                   .foregroundColor(.blue)
-                Text("単数回答")
-              case .multipleChoice:
+                Text("単数回答: \(options.joined(separator: ","))")
+              case .multiple(let options):
                 Image(systemName: "list.bullet")
                   .foregroundColor(.green)
-                Text("複数回答")
+                Text("複数回答: \(options.joined(separator: ","))")
               case .freeText:
                 Image(systemName: "textformat")
                   .foregroundColor(.orange)

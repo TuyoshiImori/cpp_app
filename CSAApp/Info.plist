@@ -9,5 +9,17 @@
     <!-- カメラ利用許可の説明文を追加 -->
     <key>NSCameraUsageDescription</key>
     <string>このアプリではカメラを使用します。</string>
+    <!-- カスタム URL スキームを追加 -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.example.csaapp</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>myapp</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

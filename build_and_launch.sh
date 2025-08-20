@@ -13,10 +13,14 @@ xcodebuild -project CSAApp.xcodeproj -target CSAApp -configuration Debug -sdk ip
 
 # 2. インストール
 echo "📱 デバイスにインストール中..."
-xcrun devicectl device install app --device $DEVICE_ID "$APP_PATH"
+# devicectl の --device オプションはサポートされていないため、device id を位置引数で渡す
+xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"
 
 # 3. 起動
 echo "🎯 アプリを起動中..."
-xcrun devicectl device launch app --device $DEVICE_ID $BUNDLE_ID
+# 同様に device id を位置引数で渡す
+# Launch the app via the "process launch" subcommand which accepts --device
+# and bundle identifier as its argument. Use --activate to bring app to foreground.
+xcrun devicectl device process launch --device "$DEVICE_ID" "$BUNDLE_ID" --activate
 
 echo "✅ 一括ビルド・インストール・起動完了！"
