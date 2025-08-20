@@ -81,7 +81,7 @@ info=furigana,name,nameKana,email,tel,zip,address
 **前提ルール**
 
 - 設問は&で区切る
-- タイプを type=single|multi|text で指定
+- タイプを type=single|multi|text|info で指定
     - single：単数解答の選択肢
     - multi：複数回答の選択肢
     - text：自由回答
