@@ -23,9 +23,6 @@ struct ContentView: View {
               Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
                 .font(.headline)
               if !item.questionTypes.isEmpty {
-                Text("設問タイプ:")
-                  .font(.subheadline)
-                  .foregroundColor(.gray)
                 ForEach(item.questionTypes, id: \.self) { questionType in
                   HStack(alignment: .top) {
                     switch questionType {
@@ -33,26 +30,28 @@ struct ContentView: View {
                       Image(systemName: "checkmark.circle")
                         .foregroundColor(.blue)
                       VStack(alignment: .leading) {
-                        Text("単数回答: \(question)")
-                          .font(.subheadline)
+                        Text("\(question)")
                         Text(options.joined(separator: ","))
-                          .font(.caption)
+                          .font(.subheadline)
                           .foregroundColor(.gray)
+                          .lineLimit(1)
+                          .truncationMode(.tail)
                       }
                     case .multiple(let question, let options):
                       Image(systemName: "list.bullet")
                         .foregroundColor(.green)
                       VStack(alignment: .leading) {
-                        Text("複数回答: \(question)")
-                          .font(.subheadline)
+                        Text("\(question)")
                         Text(options.joined(separator: ","))
-                          .font(.caption)
+                          .font(.subheadline)
                           .foregroundColor(.gray)
+                          .lineLimit(1)
+                          .truncationMode(.tail)
                       }
                     case .text(let question):
                       Image(systemName: "textformat")
                         .foregroundColor(.orange)
-                      Text("自由記述: \(question)")
+                      Text("\(question)")
                     }
                     Spacer()
                   }
