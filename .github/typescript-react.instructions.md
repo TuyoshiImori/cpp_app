@@ -1,79 +1,79 @@
 ---
 applyTo: "**/*.ts,**/*.tsx"
 ---
-# TypeScript & React Best Practices
+# TypeScript と React のベストプラクティス
 
-Apply the [general coding guidelines](./general-coding.instructions.md) to all code.
+すべてのコードに [一般的なコーディングガイドライン](./general-coding.instructions.md) を適用してください。
 
-## TypeScript Guidelines
-- Use strict TypeScript configuration with `strict: true`
-- Define explicit types for function parameters and return values
-- Use interfaces for objects that represent entities, types for simpler constructs
-- Leverage TypeScript utility types (Pick, Omit, Partial, Required, etc.)
-- Avoid using `any` - use `unknown` with type guards when type is uncertain
-- Define readonly properties for immutable data
-- Use discriminated unions for handling state with different shapes
-- Create generic components and functions when appropriate
-- Define proper typing for API responses and requests
-- Use enums for fixed sets of related values
-- Properly handle nullable types with optional chaining (?.) and nullish coalescing (??)
-- Add JSDoc comments for complex types and non-obvious behavior
+## TypeScript ガイドライン
+- `strict: true` を使用した厳密な TypeScript 設定を使用する
+- 関数のパラメータと戻り値には明示的な型を定義する
+- エンティティを表すオブジェクトにはインターフェースを使用し、よりシンプルな構造には型を使用する
+- TypeScript ユーティリティ型 (Pick、Omit、Partial、Required など) を活用する
+- `any` の使用を避ける - 型が不明な場合は型ガード付きの `unknown` を使用する
+- 不変データには読み取り専用プロパティを定義する
+- 異なる形状の状態を処理するには判別共用体を使用する
+- 必要に応じて汎用コンポーネントと関数を作成する
+- API レスポンスとリクエストに適切な型付けを定義する
+- 関連する値の固定セットには列挙型を使用する
+- オプショナルチェイニング (?.) と null 合体 (??) を使用して、null 許容型を適切に処理する
+- 複雑な型や不明な動作については JSDoc コメントを追加する
 
-## React Fundamentals
-- Use functional components with hooks instead of class components
-- Apply proper dependency arrays in useEffect and useMemo hooks
-- Extract business logic to custom hooks for reusability
-- Memoize expensive calculations with useMemo
-- Prevent unnecessary re-renders with React.memo for pure components
-- Use useCallback for functions passed to child components
-- Implement controlled components for form inputs
-- Pass only required props to components (avoid prop drilling)
-- Avoid direct DOM manipulation - use refs when necessary
-- Keep components small and focused on a single responsibility
+## React の基礎
+- クラスコンポーネントではなく、フック付きの関数コンポーネントを使用する
+- useEffect フックと useMemo フックに適切な依存関係配列を適用する
+- カスタムフックにビジネスロジックを抽出する再利用性
+- 高価な計算は useMemo でメモ化する
+- 純粋なコンポーネントでは React.memo で不要な再レンダリングを防ぐ
+- 子コンポーネントに渡す関数には useCallback を使用する
+- フォーム入力には制御されたコンポーネントを実装する
+- 必要な props のみをコンポーネントに渡す（properties のドリルダウンを避ける）
+- DOM の直接操作を避ける - 必要に応じて ref を使用する
+- コンポーネントを小さくし、単一の責任に集中させる
 
-## React State Management
-- Use useState for simple component-level state
-- Implement useReducer for complex state logic
-- Apply useContext for sharing state across component trees
-- Consider global state management only when necessary (Redux, Zustand, Jotai)
-- Keep state as close as possible to where it's used
-- Separate UI state from application state
-- Minimize state duplication and ensure single source of truth
-- Normalize complex state structures for better performance
+## React の状態管理
+- シンプルなコンポーネントレベルの状態には useState を使用する
+- 複雑な状態ロジックには useReducer を実装する
+- コンポーネントツリー間で状態を共有するには useContext を適用する
+- グローバル状態管理は必要な場合にのみ検討する（Redux、Zustand、Jotai など）
+- 状態は使用される場所にできるだけ近づける
+- UI の状態とアプリケーションの状態を分離する
+- 状態の重複を最小限に抑え、信頼できる唯一の情報源を確保する
+- 複雑な状態構造を正規化してパフォーマンスを向上させる
 
-## Component Design
-- Create atomic, reusable components
-- Implement proper prop validation with TypeScript
-- Use composition over inheritance
-- Design components with accessibility in mind
-- Support keyboard navigation for interactive elements
-- Implement theming using CSS variables or styled-components
-- Follow responsive design principles
-- Use CSS modules or styled-components for component styling
-- Implement lazy loading for larger components with React.lazy
+## コンポーネント設計
+- アトミックで再利用可能なコンポーネントを作成する
+- TypeScript で適切な props 検証を実装する
+- 継承よりもコンポジションを使用する
+- アクセシビリティを考慮したコンポーネントを設計する念頭に置いて
+- インタラクティブな要素のキーボードナビゲーションをサポートする
+- CSS変数またはstyled-componentsを使用してテーマ設定を実装する
+- レスポンシブデザインの原則に従う
+- コンポーネントのスタイル設定にはCSSモジュールまたはstyled-componentsを使用する
+- 大規模なコンポーネントの遅延読み込みをReact.lazyで実装する
 
-## React Performance Optimization
-- Virtualize long lists with react-window or react-virtualized
-- Implement code splitting with dynamic imports
-- Use proper keys for list items (avoid using index as key)
-- Avoid inline function definitions in render
-- Properly handle cleanup in useEffect to prevent memory leaks
-- Use debouncing/throttling for frequently firing events
-- Implement memoization judiciously
+## Reactのパフォーマンス最適化
+- react-windowまたはreact-virtualizedを使用して長いリストを仮想化する
+- 動的インポートを使用してコード分割を実装する
+- リスト項目には適切なキーを使用する（インデックスをキーとして使用しない）
+- render内でのインライン関数定義を避ける
+- メモリリークを防ぐため、useEffectでクリーンアップを適切に処理する
+- 頻繁に発生するイベントにはデバウンス/スロットリングを使用する
+- メモ化を慎重に実装する
 
-## Testing in React & TypeScript
-- Write unit tests for components using React Testing Library
-- Test for accessibility with axe-core or similar tools
-- Use TypeScript to ensure prop types are correct
-- Test custom hooks with renderHook
-- Implement integration tests for complex workflows
-- Mock external dependencies in tests
-- Use snapshot testing sparingly
+## ReactとTypeScriptでのテスト
+- React Testing Libraryを使用してコンポーネントのユニットテストを作成する
+- axe-coreなどのツールを使用してアクセシビリティをテストする
+- TypeScriptを使用してプロパティの型が正しいことを確認する
+- renderHookを使用してカスタムフックをテストする
+- 複雑なワークフローの統合テストを実装する
+- 外部依存関係をモック化するテストでは
+- スナップショットテストは控えめに使用してください
 
-## React & API Integration
-- Implement proper loading and error states
-- Use React Query or SWR for data fetching and caching
-- Handle optimistic updates for better UX
-- Properly type API responses with TypeScript interfaces
-- Implement retry logic for failed requests
-- Add cancellation for abandoned requests
+## React と API の統合
+- 適切な読み込み状態とエラー状態を実装する
+- データの取得とキャッシュには React Query または SWR を使用する
+- UX を向上させるために楽観的更新を処理する
+- TypeScript インターフェースを使用して API レスポンスを適切に型指定する
+- 失敗したリクエストに対する再試行ロジックを実装する
+- 放棄されたリクエストに対してキャンセルを追加する

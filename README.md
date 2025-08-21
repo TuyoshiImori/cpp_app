@@ -12,13 +12,10 @@ CSAAppは、SwiftUIを使用して開発されたiOSアプリケーションで�
 - 保存されたアンケートデータ（`Item`）のリストを表示。
 - 各アイテムにはタイムスタンプと選択された設問タイプが表示される。
 - アイテムをタップするとカメラ画面（`CameraView`）が開く。
-- 新しいアイテムを追加するためのボタンを提供し、設問タイプ選択画面（`QuestionTypeSelectionView`）を表示。
+ - 新しいアイテムは外部からの URL インポート（例: `myapp://import?...`）によって作成されます。
 
-### 2. **QuestionTypeSelectionView**
-- 設問タイプ（単数回答、複数回答、自由記述）を選択する画面。
-- 選択した設問タイプをリスト形式で表示。
-- 設問タイプを削除する機能を提供。
-- 完了ボタンで選択内容を確定し、`ContentView`に戻る。
+### 2. **（旧）QuestionTypeSelectionView**
+- 以前はアプリ内で設問タイプを手動で設定するための画面を用意していましたが、現在は廃止しています。
 
 ### 3. **CameraView**
 - カメラプレビューを表示し、リアルタイムで矩形検出を行う。
@@ -32,9 +29,9 @@ CSAAppは、SwiftUIを使用して開発されたiOSアプリケーションで�
 ## 機能のフロー
 
 1. **アンケートデータの作成**
-   - `ContentView`で「+」ボタンを押下。
-   - `QuestionTypeSelectionView`で設問タイプを選択し、完了ボタンを押す。
-   - 新しいアイテムがリストに追加されて`CameraView`が自動で開く。
+   - Web 側でアンケートのフォーマット（設問文・選択肢）を作成し、所定のクエリフォーマットでアプリを開く URL（例: `myapp://import?...`）を用意する。
+   - その URL でアプリを開くと、アプリ側でパースして `Item` が自動的に作成されます（設問文と選択肢を含む）。
+   - 必要に応じて `CameraView` を開き、アンケート用紙のスキャンや画像処理を行います。
 
 2. **アンケートのスキャン**
    - `ContentView`でアイテムをタップして`CameraView`を開く。
@@ -64,32 +61,32 @@ CSAAppは、SwiftUIを使用して開発されたiOSアプリケーションで�
 ---
 
 ## 今後の機能実装
-- 設問タイプを選択し、完了ボタンを押すと、`CameraView`の前に未記入のアンケートを読み取って、単数解答、複数回答の選択肢の文字列を設定する機能を実装する。
+- Web 側でアンケートのフォーマットを作成し、その URL からアプリを起動して設問と選択肢を自動反映する機能は既に実装の方向にあります。
 - Web側でアンケートのフォーマットを作成した後にアプリを開く下記フォーマットのURLを作成して、そのURLからアプリを開いたときにフォーマットと選択肢の文などを自動反映できるようにする。
 - 画像を設問ごとに切り取ったあと、事前に選択した設問タイプの順番に解答内容を集計する。
 - お客様情報（名前、メールアドレスなど）の設問タイプを作成する（どういったフォーマットにするか考える）
 
 ## URLの仕様
 URLの例
-myapp://import?single=10%E4%BB%A3%E6%9C%AA%E6%BA%80,20%E4%BB%A3,30%E4%BB%A3,40%E4%BB%A3,50%E4%BB%A3,60%E4%BB%A3,70%E4%BB%A3,80%E4%BB%A3%E4%BB%A5%E4%B8%8A&multi=%E3%83%9D%E3%82%B9%E3%82%BF%E3%83%BC,%E5%87%BA%E6%BC%94%E8%80%85%E3%81%8B%E3%82%89,SNS(X,Instagram,Facebook),%E3%81%9D%E3%81%AE%E4%BB%96&single=%E5%A4%A7%E5%A4%89%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F,%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F,%E6%99%AE%E9%80%9A,%E8%89%AF%E3%81%8F%E3%81%AA%E3%81%8B%E3%81%A3%E3%81%9F,%E6%82%AA%E3%81%8B%E3%81%A3%E3%81%9F&text=&text=&info=furigana,name,nameKana,email,tel,zip,address
+myapp://import?single=%E3%81%8A%E5%AE%A2%E6%A7%98%E3%81%AE%E3%81%94%E5%B9%B4%E4%BB%A3%E3%82%92%E3%81%8A%E7%9F%A5%E3%82%89%E3%81%9B%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%7C10%E4%BB%A3%E6%9C%AA%E6%BA%80%2C20%E4%BB%A3%2C30%E4%BB%A3%2C40%E4%BB%A3%2C50%E4%BB%A3%2C60%E4%BB%A3%2C70%E4%BB%A3%2C80%E4%BB%A3%E4%BB%A5%E4%B8%8A&multiple=%E6%9C%AC%E5%85%AC%E6%BC%94%E3%81%AF%E3%81%A9%E3%81%A1%E3%82%89%E3%81%A7%E3%81%8A%E7%9F%A5%E3%82%8A%E3%81%AB%E3%81%AA%E3%82%8A%E3%81%BE%E3%81%97%E3%81%9F%E3%81%8B%EF%BC%9F%7C%E3%83%9D%E3%82%B9%E3%82%BF%E3%83%BC%2C%E5%87%BA%E6%BC%94%E8%80%85%E3%81%8B%E3%82%89%2CSNS%28X%2CInstagram%2CFacebook%29%2C%E3%81%9D%E3%81%AE%E4%BB%96&single=%E4%BB%8A%E5%9B%9E%E3%81%AE%E6%BC%94%E5%A5%8F%E4%BC%9A%E3%81%AF%E3%81%84%E3%81%8B%E3%81%8C%E3%81%A7%E3%81%97%E3%81%9F%E3%81%8B%EF%BC%9F%7C%E5%A4%A7%E5%A4%89%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F%2C%E8%89%AF%E3%81%8B%E3%81%A3%E3%81%9F%2C%E6%99%AE%E9%80%9A%2C%E8%89%AF%E3%81%8F%E3%81%AA%E3%81%8B%E3%81%A3%E3%81%9F%2C%E6%82%AA%E3%81%8B%E3%81%A3%E3%81%9F&text=%E6%9C%AC%E6%97%A5%E3%81%AE%E3%81%94%E6%84%9F%E6%83%B3%E3%82%92%E3%81%8A%E8%81%9E%E3%81%8B%E3%81%9B%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82&text=%E6%94%B9%E5%96%84%E7%82%B9%E3%82%84%E5%8F%96%E3%82%8A%E7%B5%84%E3%82%93%E3%81%A7%E3%81%BB%E3%81%97%E3%81%84%E3%81%93%E3%81%A8%E3%82%92%E3%81%94%E8%87%AA%E7%94%B1%E3%81%AB%E3%81%8A%E6%9B%B8%E3%81%8D%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82&info=%E6%AC%A1%E5%9B%9E%E3%81%AE%E6%BC%94%E5%A5%8F%E4%BC%9A%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%94%E6%A1%88%E5%86%85%E3%82%92%E5%B8%8C%E6%9C%9B%E3%81%95%E3%82%8C%E3%82%8B%E6%96%B9%E3%81%AF%E3%81%94%E8%A8%98%E5%85%A5%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%7Cfurigana%2Cname%2CnameKana%2Cemail%2Ctel%2Czip%2Caddress
 
 URLのエンコード・デコードはここでやる
 https://tech-unlimited.com/urlencode.html
 
 https://example.com/form?
-single=10代未満,20代,30代,40代,50代,60代,70代,80代以上&
-multi=ポスター,出演者から,SNS(X,Instagram,Facebook),その他&
-single=大変良かった,良かった,普通,良くなかった,悪かった&
-text=&
-text=&
-info=furigana,name,nameKana,email,tel,zip,address
+single=お客様のご年代をお知らせください。|10代未満,20代,30代,40代,50代,60代,70代,80代以上&
+multiple=本公演はどちらでお知りになりましたか？|ポスター,出演者から,SNS(X,Instagram,Facebook),その他&
+single=今回の演奏会はいかがでしたか？|大変良かった,良かった,普通,良くなかった,悪かった&
+text=本日のご感想をお聞かせください。&
+text=改善点や取り組んでほしいことをご自由にお書きください。&
+info=次回の演奏会についてご案内を希望される方はご記入ください。|furigana,name,nameKana,email,tel,zip,address
 
 **前提ルール**
 
 - 設問は&で区切る
-- タイプを type=single|multi|text|info で指定
+- タイプを type=single|multiple|text|info で指定
     - single：単数解答の選択肢
-    - multi：複数回答の選択肢
+    - multiple：複数回答の選択肢
     - text：自由回答
     - info：個人情報（1つの設問に複数項目を用意）
 - 選択肢の内容は single=選択肢1,選択肢2,... で指定

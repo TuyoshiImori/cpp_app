@@ -9,9 +9,7 @@ struct ContentView: View {
   @State private var image: UIImage?
   @State private var currentItem: Item?
 
-  // ダイアログ表示用の状態
-  @State private var isPresentedQuestionDialog = false
-  @State private var selectedQuestionTypes: [QuestionType] = []
+  // (手動での設問設定は廃止) ダイアログ関連の状態を削除
 
   // 選択されたアイテムの画像を保持する状態
   @State private var selectedImage: UIImage?
@@ -31,18 +29,30 @@ struct ContentView: View {
                 ForEach(item.questionTypes, id: \.self) { questionType in
                   HStack(alignment: .top) {
                     switch questionType {
-                    case .single(let options):
+                    case .single(let question, let options):
                       Image(systemName: "checkmark.circle")
                         .foregroundColor(.blue)
-                      Text("単数回答: \(options.joined(separator: ","))")
-                    case .multiple(let options):
+                      VStack(alignment: .leading) {
+                        Text("単数回答: \(question)")
+                          .font(.subheadline)
+                        Text(options.joined(separator: ","))
+                          .font(.caption)
+                          .foregroundColor(.gray)
+                      }
+                    case .multiple(let question, let options):
                       Image(systemName: "list.bullet")
                         .foregroundColor(.green)
-                      Text("複数回答: \(options.joined(separator: ","))")
-                    case .freeText:
+                      VStack(alignment: .leading) {
+                        Text("複数回答: \(question)")
+                          .font(.subheadline)
+                        Text(options.joined(separator: ","))
+                          .font(.caption)
+                          .foregroundColor(.gray)
+                      }
+                    case .text(let question):
                       Image(systemName: "textformat")
                         .foregroundColor(.orange)
-                      Text("自由記述")
+                      Text("自由記述: \(question)")
                     }
                     Spacer()
                   }
@@ -60,18 +70,8 @@ struct ContentView: View {
         }
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            HStack {
-              EditButton()
-                .tint(.blue)
-              Button(action: {
-                // 従来の設問タイプ選択画面を開く
-                selectedQuestionTypes = []
-                isPresentedQuestionDialog = true
-              }) {
-                Image(systemName: "plus")
-              }
+            EditButton()
               .tint(.blue)
-            }
           }
         }
       } detail: {
@@ -86,48 +86,17 @@ struct ContentView: View {
       }
 
       // Floating action button (常に画面右下に表示される + ボタン)
-      VStack {
-        Spacer()
-        HStack {
-          Spacer()
-          Button(action: {
-            selectedQuestionTypes = []
-            isPresentedQuestionDialog = true
-          }) {
-            Image(systemName: "plus")
-              .font(.system(size: 22, weight: .bold))
-              .foregroundColor(.white)
-              .frame(width: 56, height: 56)
-          }
-          .background(Color.blue)
-          .clipShape(Circle())
-          .shadow(color: Color.black.opacity(0.25), radius: 6, x: 0, y: 4)
-          .padding(.trailing, 16)
-          .padding(.bottom, 16)
-        }
-      }
+      EmptyView()
     }
     .fullScreenCover(isPresented: $isPresentedCameraView) {
       CameraView(image: $selectedImage, item: currentItem)  // Itemを渡す
         .ignoresSafeArea()
     }
     // QR スキャナ経由のインポートは現在使用しないため削除済み
-    .sheet(isPresented: $isPresentedQuestionDialog) {
-      QuestionTypeSelectionView(
-        selectedQuestionTypes: $selectedQuestionTypes,
-        onComplete: { addItem() }
-      )
-    }
+    // 手動での設問設定は廃止しているため、関連シートは削除
   }
 
-  private func addItem() {
-    withAnimation {
-      let newItem = Item(timestamp: Date(), questionTypes: selectedQuestionTypes)
-      modelContext.insert(newItem)
-      isPresentedQuestionDialog = false  // QuestionTypeSelectionViewを閉じる
-      isPresentedCameraView = true  // CameraViewを開く
-    }
-  }
+  // 手動での設問追加 UI を廃止したため、addItem() は不要となった
 
   private func deleteItems(offsets: IndexSet) {
     withAnimation {

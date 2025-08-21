@@ -17,6 +17,7 @@
             <string>com.example.csaapp</string>
             <key>CFBundleURLSchemes</key>
             <array>
+                <!-- スキーム名 -->
                 <string>myapp</string>
             </array>
         </dict>

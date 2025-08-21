@@ -9,7 +9,7 @@ struct QuestionTypeSelectionView: View {
       Form {
         Section(header: Text("設問タイプを選択")) {
           Button(action: {
-            selectedQuestionTypes.append(.single([]))
+            selectedQuestionTypes.append(.single("", []))
           }) {
             HStack {
               Image(systemName: "checkmark.circle")
@@ -18,7 +18,7 @@ struct QuestionTypeSelectionView: View {
             }
           }
           Button(action: {
-            selectedQuestionTypes.append(.multiple([]))
+            selectedQuestionTypes.append(.multiple("", []))
           }) {
             HStack {
               Image(systemName: "list.bullet")
@@ -27,7 +27,7 @@ struct QuestionTypeSelectionView: View {
             }
           }
           Button(action: {
-            selectedQuestionTypes.append(.freeText)
+            selectedQuestionTypes.append(.text(""))
           }) {
             HStack {
               Image(systemName: "textformat")
@@ -41,18 +41,30 @@ struct QuestionTypeSelectionView: View {
           ForEach(selectedQuestionTypes.indices, id: \.self) { index in
             HStack {
               switch selectedQuestionTypes[index] {
-              case .single(let options):
+              case .single(let question, let options):
                 Image(systemName: "checkmark.circle")
                   .foregroundColor(.blue)
-                Text("単数回答: \(options.joined(separator: ","))")
-              case .multiple(let options):
+                VStack(alignment: .leading) {
+                  Text("単数回答: \(question)")
+                    .font(.subheadline)
+                  Text(options.joined(separator: ","))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                }
+              case .multiple(let question, let options):
                 Image(systemName: "list.bullet")
                   .foregroundColor(.green)
-                Text("複数回答: \(options.joined(separator: ","))")
-              case .freeText:
+                VStack(alignment: .leading) {
+                  Text("複数回答: \(question)")
+                    .font(.subheadline)
+                  Text(options.joined(separator: ","))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                }
+              case .text(let question):
                 Image(systemName: "textformat")
                   .foregroundColor(.orange)
-                Text("自由記述")
+                Text("自由記述: \(question)")
               }
               Spacer()
               Button(action: {

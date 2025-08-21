@@ -2,57 +2,57 @@
 applyTo: "**"
 ---
 
-# General Coding Best Practices
+# 一般的なコーディングのベストプラクティス
 
-## Code Quality & Maintainability
-- Write self-documenting code with clear variable and function names
-- Limit function length to 30 lines max, break larger functions into smaller ones
-- Follow the Single Responsibility Principle - each function does one thing well
-- Use meaningful comments for "why" not "what" (code should explain itself)
-- Apply consistent indentation and formatting throughout the codebase
-- Avoid nested conditionals deeper than 3 levels - refactor when necessary
-- Implement proper error handling with informative error messages
-- Avoid magic numbers and strings - use named constants instead
+## コードの品質と保守性
+- 明確な変数名と関数名を使い、自己文書化できるコードを記述する
+- 関数の長さは最大30行に制限し、大きな関数は小さな関数に分割する
+- 単一責任の原則に従う - 各関数は1つの機能を適切に実行する
+- 「何を」ではなく「なぜ」について意味のあるコメントを使用する（コードはそれ自体で説明できるべきである）
+- コードベース全体で一貫したインデントとフォーマットを適用する
+- 3レベルを超える条件文のネストを避ける - 必要に応じてリファクタリングする
+- 情報豊富なエラーメッセージで適切なエラー処理を実装する
+- マジックナンバーやマジック文字列を避ける - 代わりに名前付き定数を使用する
 
-## Performance & Optimization
-- Optimize for readability first, then performance if needed
-- Avoid premature optimization - measure before optimizing
-- Use appropriate data structures for the task (consider time/space complexity)
-- Be mindful of memory usage, especially with large datasets
-- Implement lazy loading where appropriate for better initial load times
-- Consider pagination for large result sets
+## パフォーマンスと最適化
+- まず読みやすさを重視し、必要に応じてパフォーマンスを最適化する
+- 早すぎる最適化を避ける - 最適化前に測定を行う
+- タスクに適したデータ構造を使用する（時間/空間計算量を考慮する）
+- 特に大規模なデータセットでは、メモリ使用量に注意する
+- 初期読み込み時間を短縮するために、必要に応じて遅延読み込みを実装する
+- 考慮する大規模な結果セットのページネーション
 
-## Security Practices
-- Never trust user input - always validate and sanitize
-- Implement proper authentication and authorization
-- Use parametrized queries to prevent SQL injection
-- Avoid hardcoding sensitive information (keys, passwords)
-- Follow the principle of least privilege
-- Set appropriate CORS policies
-- Implement rate limiting for APIs
+## セキュリティプラクティス
+- ユーザー入力を決して信用せず、常に検証とサニタイズを行う
+- 適切な認証と認可を実装する
+- SQLインジェクションを防ぐため、パラメータ化されたクエリを使用する
+- 機密情報（キー、パスワード）のハードコーディングを避ける
+- 最小権限の原則に従う
+- 適切なCORSポリシーを設定する
+- APIにレート制限を実装する
 
-## Modern Development Practices
-- Use async/await for asynchronous operations instead of callbacks
-- Apply functional programming techniques where appropriate
-- Write code with testability in mind
-- Implement proper logging for monitoring and debugging
-- Use environment variables for configuration
-- Follow semantic versioning for releases
-- Write useful commit messages explaining the "why" of changes
+## 最新の開発プラクティス
+- 非同期操作にはコールバックではなくasync/awaitを使用する
+- 必要に応じて関数型プログラミング手法を適用する
+- テスト容易性を考慮してコードを記述する
+- 監視とデバッグのために適切なログ記録を実装する
+- 設定には環境変数を使用する
+- リリースにはセマンティックバージョニングを適用する
+- 変更の「理由」を説明する有用なコミットメッセージを作成する
 
-## Project Structure
-- Maintain a clear, logical project structure
-- Use appropriate design patterns but avoid overengineering
-- Separate concerns between layers (presentation, business logic, data access)
-- Organize code by feature rather than by technical function when appropriate
-- Create reusable, modular components
-- Use dependency injection to manage dependencies
+## プロジェクト構造
+- 明確で論理的なプロジェクト構造を維持する
+- 適切な設計パターンを使用するが、過剰なエンジニアリングは避ける
+- レイヤー（プレゼンテーション、ビジネスロジック、データアクセス）間で懸念事項を分離する
+- 必要に応じて、技術的な機能ではなく機能別にコードを整理する
+- 再利用可能なモジュール型コンポーネントを作成する
+- 依存性注入を使用して管理する依存関係
 
-## When Generating Code
-- Generate code that follows these principles
-- Include appropriate error handling
-- Add helpful comments for complex logic
-- Include examples of usage when generating functions or classes
-- Ensure backward compatibility unless explicitly requested otherwise
-- Suggest unit tests for critical functionality
-- Provide optimization tips for resource-intensive operations
+## コード生成時
+- 以下の原則に従ったコードを生成する
+- 適切なエラー処理を含める
+- 複雑なロジックには役立つコメントを追加する
+- 関数またはクラスを生成する際に使用例を含める
+- 明示的に要求されない限り、下位互換性を確保する
+- 重要な機能については単体テストを提案する
+- リソースを大量に消費する操作については最適化のヒントを提供する

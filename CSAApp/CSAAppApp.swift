@@ -31,14 +31,14 @@ struct CSAAppApp: App {
           let vm = ContentViewModel()
           let parsed = vm.parse(url.absoluteString)
           var qtypes: [QuestionType] = []
-          for (key, options) in parsed {
+          for (key, questionText, options) in parsed {
             switch key {
             case "single", "type=single":
-              qtypes.append(.single(options))
-            case "multi", "multiple", "type=multi", "type=multiple":
-              qtypes.append(.multiple(options))
+              qtypes.append(.single(questionText, options))
+            case "multiple", "type=multiple":
+              qtypes.append(.multiple(questionText, options))
             case "text", "type=text", "info", "type=info":
-              qtypes.append(.freeText)
+              qtypes.append(.text(questionText))
             default:
               continue
             }
