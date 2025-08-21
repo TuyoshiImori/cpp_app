@@ -63,12 +63,9 @@ final class ContentViewModel: ObservableObject {
         questionText = decodedValue.trimmingCharacters(in: .whitespacesAndNewlines)
       }
 
-      // 選択肢を決定: text/info のような自由記述タイプは選択肢を持たない。
+      // 選択肢を決定: '|' があれば右側を選択肢／項目リストとしてカンマで分割
       let options: [String]
-      if decodedKey == "text" || decodedKey == "info" {
-        // 自由記述は選択肢なし
-        options = []
-      } else if let barIndex = decodedValue.firstIndex(of: "|") {
+      if let barIndex = decodedValue.firstIndex(of: "|") {
         // '|' があれば右側を選択肢としてカンマで分割
         let after = decodedValue.index(after: barIndex)
         let optionsPart = String(decodedValue[after...])
@@ -79,7 +76,7 @@ final class ContentViewModel: ObservableObject {
           .map { String($0) }
           .filter { !$0.isEmpty }
       } else {
-        // 旧フォーマット: 値全体をカンマ区切りの選択肢リストとして扱う
+        // '|' が無ければ旧フォーマット扱い: 値全体をカンマ区切りの選択肢リストとして扱う
         options =
           decodedValue
           .split(separator: ",")

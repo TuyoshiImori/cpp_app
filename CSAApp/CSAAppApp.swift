@@ -37,8 +37,12 @@ struct CSAAppApp: App {
               qtypes.append(.single(questionText, options))
             case "multiple", "type=multiple":
               qtypes.append(.multiple(questionText, options))
-            case "text", "type=text", "info", "type=info":
+            case "text", "type=text":
               qtypes.append(.text(questionText))
+            case "info", "type=info":
+              // options は文字列の配列なので InfoField に変換する（不明なフィールドは無視）
+              let infoFields = options.compactMap { QuestionType.InfoField(from: $0) }
+              qtypes.append(.info(questionText, infoFields))
             default:
               continue
             }

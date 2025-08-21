@@ -52,6 +52,17 @@ struct ContentView: View {
                       Image(systemName: "textformat")
                         .foregroundColor(.orange)
                       Text("\(question)")
+                    case .info(let question, let fields):
+                      Image(systemName: "person.crop.circle")
+                        .foregroundColor(.purple)
+                      VStack(alignment: .leading) {
+                        Text("\(question)")
+                        Text(fields.map { $0.displayName }.joined(separator: ","))
+                          .font(.subheadline)
+                          .foregroundColor(.gray)
+                          .lineLimit(1)
+                          .truncationMode(.tail)
+                      }
                     }
                     Spacer()
                   }
