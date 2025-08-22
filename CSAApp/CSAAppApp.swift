@@ -8,6 +8,10 @@
 import SwiftData
 import SwiftUI
 
+extension Notification.Name {
+  static let didInsertSurvey = Notification.Name("didInsertSurvey")
+}
+
 @main
 struct CSAAppApp: App {
   var sharedModelContainer: ModelContainer = {
@@ -77,9 +81,20 @@ struct CSAAppApp: App {
           }
 
           let newItem = Item(
-            timestamp: Date(), questionTypes: qtypes, surveyID: surveyID ?? "", title: title ?? "")
+            timestamp: Date(), questionTypes: qtypes, surveyID: surveyID ?? "", title: title ?? "",
+            isNew: true)
           context.insert(newItem)
           try? context.save()
+          // 新規追加の通知を出す（timestamp を送る）
+          NotificationCenter.default.post(
+            name: .didInsertSurvey,
+            object: nil,
+            userInfo: [
+              "timestamp": newItem.timestamp.timeIntervalSince1970,
+              "surveyID": newItem.surveyID,
+              "title": newItem.title,
+            ]
+          )
         }
     }
     .modelContainer(sharedModelContainer)

@@ -139,14 +139,17 @@ public final class Item {
   public var questionTypes: [QuestionType]  // 設問タイプを保存するプロパティ
   public var surveyID: String
   public var title: String
+  // 新規追加を表すフラグ（タップで消すために永続化）
+  public var isNew: Bool
 
   public init(
     timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
-    title: String = ""
+    title: String = "", isNew: Bool = false
   ) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
     self.surveyID = surveyID
     self.title = title
+    self.isNew = isNew
   }
 }
