@@ -44,22 +44,27 @@ struct ContentView: View {
                 }
                 // タイトル
                 if !item.title.isEmpty {
-                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                  // HStack を中央揃えにして、バッジは常にレイアウト上に存在させる（opacity で表示制御）
+                  HStack(alignment: .center, spacing: 8) {
                     Text(item.title)
                       .font(.title3)
                       .fontWeight(.semibold)
-                    // NEW バッジ
-                    if newRowIDs.contains(rowID) || item.isNew {
-                      Text("NEW")
-                        .font(.caption2)
-                        .bold()
-                        .foregroundColor(.white)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(Color.red)
-                        .cornerRadius(6)
-                        .transition(.opacity)
-                    }
+
+                    // NEW バッジ（常に配置して幅を確保することで消えた際にサイズが変わらない）
+                    Text("NEW")
+                      .font(.caption2)
+                      .bold()
+                      .foregroundColor(.white)
+                      .padding(.vertical, 4)
+                      .padding(.horizontal, 8)
+                      .background(Color.red)
+                      .cornerRadius(6)
+                      .frame(minWidth: 44, alignment: .center)
+                      .opacity((newRowIDs.contains(rowID) || item.isNew) ? 1.0 : 0.0)
+                      .animation(
+                        .easeInOut(duration: 0.25), value: (newRowIDs.contains(rowID) || item.isNew)
+                      )
+
                     Spacer()
                   }
                 }
