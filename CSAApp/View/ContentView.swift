@@ -20,8 +20,21 @@ struct ContentView: View {
         List {
           ForEach(items) { item in
             VStack(alignment: .leading) {
+              // ID
+              if !item.surveyID.isEmpty {
+                Text("ID: \(item.surveyID)")
+                  .font(.caption)
+                  .foregroundColor(.secondary)
+              }
+              // タイトル
+              if !item.title.isEmpty {
+                Text(item.title)
+                  .font(.title3)
+              }
+              // タイムスタンプ
               Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
                 .font(.headline)
+              // 設問
               if !item.questionTypes.isEmpty {
                 ForEach(item.questionTypes, id: \.self) { questionType in
                   HStack(alignment: .top) {

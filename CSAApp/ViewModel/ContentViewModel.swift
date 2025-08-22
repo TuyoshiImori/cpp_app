@@ -2,9 +2,9 @@ import Combine
 import Foundation
 
 final class ContentViewModel: ObservableObject {
-  // QR (または URL クエリ) の文字列を解析して (key, questionText, options) の配列を返す
+  // QR (または URL クエリ) の文字列を解析して (key, questionText, options, rawValue) の配列を返す
   // 例: "single=設問文|選択肢A,選択肢B&multiple=別の設問文|選択肢1,選択肢2"
-  public func parse(_ string: String) -> [(String, String, [String])] {
+  public func parse(_ string: String) -> [(String, String, [String], String)] {
     let query: String
     if let idx = string.firstIndex(of: "?") {
       let after = string.index(after: idx)
@@ -13,7 +13,7 @@ final class ContentViewModel: ObservableObject {
       query = string
     }
 
-    var results: [(String, String, [String])] = []
+    var results: [(String, String, [String], String)] = []
     let parts = query.components(separatedBy: "&")
     for part in parts {
       let pair = part.components(separatedBy: "=")
@@ -85,7 +85,7 @@ final class ContentViewModel: ObservableObject {
           .filter { !$0.isEmpty }
       }
 
-      results.append((decodedKey, questionText, options))
+      results.append((decodedKey, questionText, options, decodedValue))
     }
     return results
   }

@@ -31,7 +31,20 @@ struct CSAAppApp: App {
           let vm = ContentViewModel()
           let parsed = vm.parse(url.absoluteString)
           var qtypes: [QuestionType] = []
-          for (key, questionText, options) in parsed {
+          var surveyID: String? = nil
+          var title: String? = nil
+
+          for (key, questionText, options, rawValue) in parsed {
+            // id と title がクエリとして含まれている場合は抽出
+            if key == "id" {
+              surveyID = questionText.isEmpty ? rawValue : questionText
+              continue
+            }
+            if key == "title" {
+              title = questionText.isEmpty ? rawValue : questionText
+              continue
+            }
+
             switch key {
             case "single", "type=single":
               qtypes.append(.single(questionText, options))
@@ -47,13 +60,26 @@ struct CSAAppApp: App {
               continue
             }
           }
-          if !qtypes.isEmpty {
-            // sharedModelContainer の mainContext に挿入（メインスレッド）
-            let context = sharedModelContainer.mainContext
-            let newItem = Item(timestamp: Date(), questionTypes: qtypes)
-            context.insert(newItem)
-            try? context.save()
+
+          guard !qtypes.isEmpty else { return }
+
+          let context = sharedModelContainer.mainContext
+
+          // surveyID が与えられていれば既存のものを検索して重複を避ける
+          if let sid = surveyID, !sid.isEmpty {
+            // シンプルに全 Item を取得して surveyID が一致するものがあるかをチェック
+            let fetch = FetchDescriptor<Item>()
+            if let existing = try? context.fetch(fetch) {
+              if existing.contains(where: { $0.surveyID == sid }) {
+                return  // 同じ ID のものが既に存在するため作成しない
+              }
+            }
           }
+
+          let newItem = Item(
+            timestamp: Date(), questionTypes: qtypes, surveyID: surveyID ?? "", title: title ?? "")
+          context.insert(newItem)
+          try? context.save()
         }
     }
     .modelContainer(sharedModelContainer)

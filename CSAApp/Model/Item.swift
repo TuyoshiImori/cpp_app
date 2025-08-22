@@ -137,9 +137,16 @@ public enum QuestionType: Codable, Hashable {
 public final class Item {
   public var timestamp: Date
   public var questionTypes: [QuestionType]  // 設問タイプを保存するプロパティ
+  public var surveyID: String
+  public var title: String
 
-  public init(timestamp: Date, questionTypes: [QuestionType] = []) {
+  public init(
+    timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
+    title: String = ""
+  ) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
+    self.surveyID = surveyID
+    self.title = title
   }
 }
