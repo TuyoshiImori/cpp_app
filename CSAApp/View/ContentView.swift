@@ -149,23 +149,32 @@ struct ContentView: View {
               return
             }
 
-            // NEW バッジを表示（集合に追加）
-            newRowIDs.insert(targetRowID)
-
-            // バナー表示タイトルをセットして表示（アニメーションで）
-            if let t = info["title"] as? String { bannerTitle = t }
-            withAnimation(.easeOut(duration: 0.25)) { showBanner = true }
-
-            // 少し遅らせてスクロール（UI のレイアウトが整うのを待つ）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-              proxy.scrollTo(targetRowID, anchor: .center)
+            // まずはどの画面が表示されていても ContentView に戻るように
+            // フルスクリーンカバー等が開いていれば閉じる
+            DispatchQueue.main.async {
+              isPresentedCameraView = false
             }
 
-            // バッジは数秒でフェードアウトして集合から削除
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-              newRowIDs.remove(targetRowID)
-              // バナーも隠す
-              withAnimation(.easeOut(duration: 0.6)) { showBanner = false }
+            // 少し待ってから NEW バッジ表示とスクロールを行う（画面切替アニメーションの完了を待つ）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+              // NEW バッジを表示（集合に追加）
+              newRowIDs.insert(targetRowID)
+
+              // バナー表示タイトルをセットして表示（アニメーションで）
+              if let t = info["title"] as? String { bannerTitle = t }
+              withAnimation(.easeOut(duration: 0.25)) { showBanner = true }
+
+              // スクロール（UI のレイアウトが整うのを待つ）
+              DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                proxy.scrollTo(targetRowID, anchor: .center)
+              }
+
+              // バッジは数秒でフェードアウトして集合から削除
+              DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                newRowIDs.remove(targetRowID)
+                // バナーも隠す
+                withAnimation(.easeOut(duration: 0.6)) { showBanner = false }
+              }
             }
           }
         }
