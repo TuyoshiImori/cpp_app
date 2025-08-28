@@ -79,7 +79,11 @@ struct AccordionItem: View {
     }
     .background(.background)
     .animation(.easeInOut(duration: 0.25), value: isExpanded)
-    .onTapGesture(perform: onTap)
+    // 編集モード中はタップによる画面遷移を無効化
+    .onTapGesture {
+      guard !viewModel.isEditing else { return }
+      onTap()
+    }
   }
 
   @ViewBuilder
