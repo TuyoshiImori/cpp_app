@@ -7,6 +7,9 @@ import SwiftUI
 struct AccordionItem: View {
   let item: Item
   let rowID: String
+  // リスト内で先頭・末尾を判定して角丸を制御
+  let isFirst: Bool
+  let isLast: Bool
   @Binding var expandedRowIDs: Set<String>
   @Binding var newRowIDs: Set<String>
   let viewModel: ContentViewModel
@@ -46,10 +49,92 @@ struct AccordionItem: View {
           suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
           value: slideOffset)
     }
-    .clipped()
-    .cornerRadius(10)
+    // 背景を白にしてから指定角だけ丸める（先頭/末尾のみ角丸）
+    .background(Color.white)
+    .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
+    // 設定アプリ風の区切り線を各アイテム下部に表示（左にインセットを入れる）
+    .overlay(
+      VStack {
+        Spacer()
+        Rectangle()
+          .fill(Color.secondary.opacity(0.25))
+          .frame(height: 0.5)
+          .padding(.leading, 16)
+      }
+    )
     .padding(.horizontal, 0)
     .padding(.vertical, 0)
+  }
+
+  // 角丸を適用する角を決定
+  private func cornersToRound() -> Corners {
+    if isFirst && isLast { return .all }
+    if isFirst { return [.topLeft, .topRight] }
+    if isLast { return [.bottomLeft, .bottomRight] }
+    return []
+  }
+
+  // 独自の OptionSet で角を表現
+  struct Corners: OptionSet {
+    let rawValue: Int
+    static let topLeft = Corners(rawValue: 1 << 0)
+    static let topRight = Corners(rawValue: 1 << 1)
+    static let bottomLeft = Corners(rawValue: 1 << 2)
+    static let bottomRight = Corners(rawValue: 1 << 3)
+    static let all: Corners = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+  }
+
+  // カスタム Shape: 指定した角だけを丸める（UIKit 非依存）
+  struct RoundedCorners: Shape {
+    var radius: CGFloat = 10
+    var corners: Corners = []
+
+    func path(in rect: CGRect) -> Path {
+      var path = Path()
+
+      let tl = corners.contains(.topLeft) ? radius : 0
+      let tr = corners.contains(.topRight) ? radius : 0
+      let bl = corners.contains(.bottomLeft) ? radius : 0
+      let br = corners.contains(.bottomRight) ? radius : 0
+
+      // start at top-left
+      path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+      // top edge
+      path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+      // top-right corner
+      if tr > 0 {
+        path.addArc(
+          center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr,
+          startAngle: Angle(degrees: -90), endAngle: Angle(degrees: 0), clockwise: false)
+      }
+      // right edge
+      path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+      // bottom-right corner
+      if br > 0 {
+        path.addArc(
+          center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br,
+          startAngle: Angle(degrees: 0), endAngle: Angle(degrees: 90), clockwise: false)
+      }
+      // bottom edge
+      path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+      // bottom-left corner
+      if bl > 0 {
+        path.addArc(
+          center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl,
+          startAngle: Angle(degrees: 90), endAngle: Angle(degrees: 180), clockwise: false)
+      }
+      // left edge
+      path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+      // top-left corner
+      if tl > 0 {
+        path.addArc(
+          center: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl,
+          startAngle: Angle(degrees: 180), endAngle: Angle(degrees: 270), clockwise: false)
+      }
+
+      path.closeSubpath()
+      return path
+    }
   }
 
   @ViewBuilder

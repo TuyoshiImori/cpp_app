@@ -13,11 +13,15 @@ struct ItemsListView: View {
   var body: some View {
     ScrollViewReader { proxy in
       ScrollView {
-        LazyVStack(spacing: 12) {
-          ForEach(viewModel.rowModels(from: items)) { row in
+        LazyVStack(spacing: 0) {
+          let rows = viewModel.rowModels(from: items)
+          ForEach(rows.indices, id: \.self) { index in
+            let row = rows[index]
             AccordionItem(
               item: row.item,
               rowID: row.id,
+              isFirst: index == 0,
+              isLast: index == rows.count - 1,
               expandedRowIDs: $expandedRowIDs,
               newRowIDs: $viewModel.newRowIDs,
               viewModel: viewModel,
@@ -28,11 +32,11 @@ struct ItemsListView: View {
             .id(row.id)
           }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 0)
         .padding(.horizontal, 12)
       }
-      // mimic grouped list background
-      .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+      // mimic grouped list background (approximate without UIKit)
+      .background(Color(white: 0.97).ignoresSafeArea())
       .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
         viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
         DispatchQueue.main.async { isPresentedCameraView = false }
