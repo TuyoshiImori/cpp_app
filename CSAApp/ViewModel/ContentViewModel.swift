@@ -244,6 +244,18 @@ final class ContentViewModel: ObservableObject {
     }
   }
 
+  /// アニメーション無しで削除を行うメソッド（UI 側でアニメーションを制御したい場合に使う）
+  func handleSlideDeleteWithoutAnimation(_ item: Item, modelContext: ModelContext?) {
+    let rowID = self.rowID(for: item)
+
+    // 直接削除を実行し、状態を即時にクリーンアップする
+    DispatchQueue.main.async {
+      self.delete(item, modelContext: modelContext)
+      self.slideOffsets.removeValue(forKey: rowID)
+      self.swipeStates.removeValue(forKey: rowID)
+    }
+  }
+
   // AccordionItem 用の軽量ヘルパーをこの ViewModel に統合
   struct AccordionItemVM {
     let item: Item

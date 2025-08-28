@@ -22,6 +22,9 @@ struct AccordionItem: View {
   @State private var dragOffset: CGFloat = 0
   @State private var isDragging: Bool = false
 
+  // 削除時に slideOffset によるアニメーションを一時的に無効化するフラグ
+  @State private var suppressSlideAnimation: Bool = false
+
   // 削除ボタンの幅
   private let deleteButtonWidth: CGFloat = 60
 
@@ -34,7 +37,10 @@ struct AccordionItem: View {
       mainContentView(isExpanded: isExpanded)
         .offset(x: slideOffset + dragOffset)
         // 手動スワイプを無効化: 編集モードの切り替え(Editボタン)でのみスライド状態を変更する
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: slideOffset)
+        // 削除アクションのときだけアニメーションを抑制できるように制御
+        .animation(
+          suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
+          value: slideOffset)
     }
     .clipped()
     .cornerRadius(10)
@@ -60,7 +66,16 @@ struct AccordionItem: View {
 
   private var deleteButton: some View {
     Button(action: {
-      viewModel.handleSlideDelete(item, modelContext: modelContext)
+      // 削除時に slideOffset のアニメーションのみ無効化
+      suppressSlideAnimation = true
+
+      // ViewModel 側のアニメーション入り処理を呼ばない非アニメーション版を使う
+      viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
+
+      // 状態変更が反映される短い遅延の後にフラグを戻す
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        suppressSlideAnimation = false
+      }
     }) {
       Image(systemName: "trash")
         .foregroundColor(.white)
