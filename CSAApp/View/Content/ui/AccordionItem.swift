@@ -22,24 +22,19 @@ struct AccordionItem: View {
     ContentViewModel.AccordionItemVM(item: item, rowID: rowID)
   }
 
-  // スライド削除機能用の状態
-  @State private var dragOffset: CGFloat = 0
-  @State private var isDragging: Bool = false
-
-  // 削除時に slideOffset によるアニメーションを一時的に無効化するフラグ
-  @State private var suppressSlideAnimation: Bool = false
-
-  // 削除ボタンの幅
-  // アクションボタン幅は ViewModel 側で定義
+  // スライド削除機能用の状態は ViewModel が保持する
   private var actionButtonWidth: CGFloat { viewModel.actionButtonWidth }
   private var totalActionButtonsWidth: CGFloat { viewModel.totalActionButtonsWidth }
 
-  // ローカルで削除アニメーション用のオフセット（deleteButtonView と mainContentView に適用）
-  @State private var deleteAnimationOffset: CGFloat = 0
+  // per-row UI state を ViewModel 側から参照/更新するための computed properties
+  private var dragOffset: CGFloat { viewModel.getDragOffset(for: rowID) }
+  private var isDragging: Bool { viewModel.isDragging(for: rowID) }
+  private var suppressSlideAnimation: Bool { viewModel.isSuppressSlideAnimation(for: rowID) }
+  private var deleteAnimationOffset: CGFloat { viewModel.getDeleteAnimationOffset(for: rowID) }
 
   var body: some View {
-    let isExpanded = vm.isExpanded(in: expandedRowIDs)
-    let slideOffset = vm.getSlideOffset(from: viewModel.slideOffsets)
+  let isExpanded = vm.isExpanded(in: expandedRowIDs)
+  let slideOffset = vm.getSlideOffset(from: viewModel.slideOffsets)
 
     ZStack(alignment: .leading) {
       deleteButtonView
@@ -163,20 +158,20 @@ struct AccordionItem: View {
           Button(action: {
             // 削除アニメーション用オフセットを親幅分右へアニメーション
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-              deleteAnimationOffset = geo.size.width
+              viewModel.setDeleteAnimationOffset(for: rowID, geo.size.width)
             }
 
             // アニメーション完了後に ViewModel の非アニメーション削除を呼ぶ
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
               // 削除時に slideOffset のアニメーションのみ無効化
-              suppressSlideAnimation = true
+              viewModel.setSuppressSlideAnimation(for: rowID, true)
 
               viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
 
               // すぐにフラグを戻す
               DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                suppressSlideAnimation = false
-                deleteAnimationOffset = 0
+                viewModel.setSuppressSlideAnimation(for: rowID, false)
+                viewModel.setDeleteAnimationOffset(for: rowID, 0)
               }
             }
           }) {
@@ -352,21 +347,21 @@ struct AccordionItem: View {
         // 編集モードでない場合はユーザー操作によるドラッグを無視する
         guard viewModel.isEditing else { return }
         let translation = value.translation.width
-        isDragging = true
+        viewModel.setIsDragging(true, for: rowID)
 
         // 左方向のドラッグのみ許可（削除ボタンを表示するため）
         if translation < 0 {
           // 2つ分のボタン幅までドラッグ可能にする
-          dragOffset = max(translation, -totalActionButtonsWidth)
+          viewModel.setDragOffset(for: rowID, max(translation, -totalActionButtonsWidth))
         } else if vm.getSwipeState(from: viewModel.swipeStates) == .revealed {
           // 既に削除ボタンが表示されている場合は右方向のドラッグも許可
-          dragOffset = min(translation, 0)
+          viewModel.setDragOffset(for: rowID, min(translation, 0))
         }
       }
       .onEnded { value in
         // 編集モードでない場合はユーザー操作によるドラッグを無視する
         guard viewModel.isEditing else { return }
-        isDragging = false
+        viewModel.setIsDragging(false, for: rowID)
         let translation = value.translation.width
         let velocity = value.velocity.width
 
@@ -383,7 +378,7 @@ struct AccordionItem: View {
             // 元の位置に戻す
             viewModel.setSlideState(for: rowID, offset: 0, state: .normal)
           }
-          dragOffset = 0
+          viewModel.clearDragOffset(for: rowID)
         }
       }
   }
