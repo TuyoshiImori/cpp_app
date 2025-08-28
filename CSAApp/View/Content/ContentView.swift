@@ -5,6 +5,7 @@ import UIKit
 struct ContentView: View {
   @StateObject private var viewModel = ContentViewModel()
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.editMode) private var editMode
   @Query private var items: [Item]
   // 新規追加を示すための一時的な rowID 集合（NEW バッジ表示用）
   @State private var newRowIDs: Set<String> = []
@@ -71,8 +72,20 @@ struct ContentView: View {
         }
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            EditButton()
-              .tint(.blue)
+            // EditButton の代替。編集モード中はデフォルトの "Done" ではなく "Cancel" を表示する
+            Button(action: {
+              withAnimation {
+                if editMode?.wrappedValue == .active {
+                  editMode?.wrappedValue = .inactive
+                } else {
+                  editMode?.wrappedValue = .active
+                }
+              }
+            }) {
+              // 編集モードかどうかでラベルを切り替える
+              Text(editMode?.wrappedValue == .active ? "Cancel" : "Edit")
+            }
+            .tint(.blue)
           }
         }
       } detail: {
