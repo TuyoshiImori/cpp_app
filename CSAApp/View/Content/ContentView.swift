@@ -33,102 +33,38 @@ struct ContentView: View {
   var body: some View {
     ZStack {
       NavigationSplitView {
-        ScrollViewReader { proxy in
-          ScrollView {
-            LazyVStack(spacing: 12) {
-              ForEach(viewModel.rowModels(from: items)) { row in
-                let accordionItem = AccordionItem(
-                  item: row.item,
-                  rowID: row.id,
-                  expandedRowIDs: $expandedRowIDs,
-                  newRowIDs: $viewModel.newRowIDs,
-                  viewModel: viewModel,
-                  modelContext: modelContext
-                ) {
-                  viewModel.handleItemTapped(row.item, rowID: row.id, modelContext: modelContext)
-                  selectedImage = image
-                  isPresentedCameraView = true
-                }
-                accordionItem.id(row.id)
-              }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-          }
-          // mimic grouped list background
-          .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
-          .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
-            viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
-            // ensure any full-screen cover is dismissed when survey inserted
-            DispatchQueue.main.async { isPresentedCameraView = false }
-          }
-
-          // ViewModel がスクロールターゲットを公開してきたら proxy でスクロール
-          .onChange(of: viewModel.pendingScrollTo) { target in
-            if let target = target {
-              DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                proxy.scrollTo(target, anchor: .center)
-                viewModel.clearPendingScroll()
-              }
-            }
-          }
+        // アイテム一覧部分を分割したサブビューへ移譲
+        ItemsListView(
+          viewModel: viewModel,
+          items: items,
+          expandedRowIDs: $expandedRowIDs,
+          isPresentedCameraView: $isPresentedCameraView,
+          modelContext: modelContext
+        ) { item, rowID in
+          // タップ時の動作は引き続き ContentView が保持
+          viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
+          selectedImage = image
+          isPresentedCameraView = true
         }
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            // EditButton の代替。編集モード中はデフォルトの "Done" ではなく "Cancel" を表示する
             Button(action: {
               viewModel.toggleEditMode()
-              if viewModel.isEditing {
-                // 編集モードに入ったときに全アイテムをスライド
-                viewModel.slideAllItemsForEdit(items: items)
-              }
-            }) {
-              // 編集モードかどうかでラベルを切り替える
-              Text(viewModel.isEditing ? "Done" : "Edit")
-            }
+              if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
+            }) { Text(viewModel.isEditing ? "Done" : "Edit") }
             .tint(.blue)
           }
         }
       } detail: {
-        if let image {
-          Image(uiImage: image)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 300)
-        } else {
-          Text("Select an item")
-        }
+        // 詳細表示を小さなコンポーネントに分離
+        DetailImageView(image: image)
       }
-
-      // Floating action button (常に画面右下に表示される + ボタン)
-      EmptyView()
     }
     .fullScreenCover(isPresented: $isPresentedCameraView) {
-      CameraView(image: $selectedImage, item: currentItem)  // Itemを渡す
+      CameraView(image: $selectedImage, item: currentItem)
         .ignoresSafeArea()
     }
-    // バナー表示
-    .overlay(
-      Group {
-        if showBanner {
-          VStack {
-            VStack(alignment: .leading, spacing: 6) {
-              Text("新しいアンケートが追加されました")
-                .foregroundColor(.white)
-                .padding(.horizontal)
-              Text("\(bannerTitle)")
-                .foregroundColor(.white)
-                .padding(.horizontal)
-            }
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.8))
-            .cornerRadius(8)
-            Spacer()
-          }
-          .padding()
-          .transition(.move(edge: .top).combined(with: .opacity))
-        }
-      }
-    )
+    // バナー表示を分離したコンポーネントで表示
+    .overlay(BannerView(show: showBanner, title: bannerTitle))
   }
 }
