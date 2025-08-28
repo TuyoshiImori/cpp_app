@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
   @StateObject private var viewModel = ContentViewModel()
@@ -35,22 +36,16 @@ struct ContentView: View {
         ScrollViewReader { proxy in
           ScrollView {
             LazyVStack(spacing: 12) {
-              ForEach(items.sorted(by: { $0.timestamp > $1.timestamp })) { item in
-                let rowID: String =
-                  item.surveyID.isEmpty
-                  ? String(item.timestamp.timeIntervalSince1970) : item.surveyID
+              ForEach(viewModel.rowModels(from: items)) { row in
                 AccordionItem(
-                  item: item, rowID: rowID, expandedRowIDs: $expandedRowIDs, newRowIDs: $newRowIDs
+                  item: row.item, rowID: row.id, expandedRowIDs: $expandedRowIDs,
+                  newRowIDs: $viewModel.newRowIDs
                 ) {
-                  if item.isNew {
-                    item.isNew = false
-                    try? modelContext.save()
-                  }
-                  newRowIDs.remove(rowID)
+                  viewModel.handleItemTapped(row.item, rowID: row.id, modelContext: modelContext)
                   selectedImage = image
                   isPresentedCameraView = true
                 }
-                .id(rowID)
+                .id(row.id)
               }
             }
             .padding(.vertical, 8)
@@ -59,45 +54,17 @@ struct ContentView: View {
           // mimic grouped list background
           .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
           .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
-            guard let info = notif.userInfo else { return }
+            viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
+            // ensure any full-screen cover is dismissed when survey inserted
+            DispatchQueue.main.async { isPresentedCameraView = false }
+          }
 
-            // rowID を決定（surveyID を優先、なければ timestamp を文字列化）
-            let sid = (info["surveyID"] as? String) ?? ""
-            let ts = info["timestamp"] as? TimeInterval
-            let targetRowID: String
-            if !sid.isEmpty {
-              targetRowID = sid
-            } else if let ts = ts {
-              targetRowID = String(ts)
-            } else {
-              return
-            }
-
-            // まずはどの画面が表示されていても ContentView に戻るように
-            // フルスクリーンカバー等が開いていれば閉じる
-            DispatchQueue.main.async {
-              isPresentedCameraView = false
-            }
-
-            // 少し待ってから NEW バッジ表示とスクロールを行う（画面切替アニメーションの完了を待つ）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-              // NEW バッジを表示（集合に追加）
-              newRowIDs.insert(targetRowID)
-
-              // バナー表示タイトルをセットして表示（アニメーションで）
-              if let t = info["title"] as? String { bannerTitle = t }
-              withAnimation(.easeOut(duration: 0.25)) { showBanner = true }
-
-              // スクロール（UI のレイアウトが整うのを待つ）
+          // ViewModel がスクロールターゲットを公開してきたら proxy でスクロール
+          .onChange(of: viewModel.pendingScrollTo) { target in
+            if let target = target {
               DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                proxy.scrollTo(targetRowID, anchor: .center)
-              }
-
-              // バッジは数秒でフェードアウトして集合から削除
-              DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                newRowIDs.remove(targetRowID)
-                // バナーも隠す
-                withAnimation(.easeOut(duration: 0.6)) { showBanner = false }
+                proxy.scrollTo(target, anchor: .center)
+                viewModel.clearPendingScroll()
               }
             }
           }
