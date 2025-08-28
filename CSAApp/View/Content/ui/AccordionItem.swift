@@ -1,4 +1,5 @@
 import Combine
+import SwiftData
 import SwiftUI
 
 // コンパイル時の型チェック負荷を軽減するため、ContentView から切り出しました。
@@ -78,8 +79,9 @@ struct AccordionItem: View {
           .foregroundColor(.secondary)
       }
       .padding(12)
-      // ヘッダは横幅いっぱいに広げ、システム背景で覆って透けないようにする
+      // ヘッダは横幅いっぱいに広げ、背景色を設定して透けないようにする
       .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.background)  // SwiftUI標準の背景色を追加
       .zIndex(2)  // ヘッダを展開コンテンツより前面に表示
       .animation(nil, value: isExpanded)
 
@@ -89,8 +91,6 @@ struct AccordionItem: View {
       if !item.questionTypes.isEmpty {
         // 折りたたまれたときはコンテンツを表示しない（高さ0）
         if isExpanded {
-          Spacer().frame(height: 12)
-
           VStack(spacing: 8) {
             ForEach(item.questionTypes, id: \.self) { questionType in
               HStack(alignment: .top) {
@@ -132,7 +132,8 @@ struct AccordionItem: View {
               }
             }
           }
-          .zIndex(0)
+          .padding(.top, 12)  // ヘッダとの間隔を確保
+          .zIndex(0)  // 展開コンテンツは背景層に配置
           .transition(.move(edge: .top).combined(with: .opacity))
           .animation(.easeInOut(duration: 0.25), value: isExpanded)
         }
