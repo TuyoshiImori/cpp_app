@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 // コンパイル時の型チェック負荷を軽減するため、ContentView から切り出しました。
@@ -8,17 +9,16 @@ struct AccordionItem: View {
   @Binding var newRowIDs: Set<String>
   let onTap: () -> Void
 
-  private static let timestampFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.locale = Locale(identifier: "ja_JP_POSIX")
-    f.dateFormat = "yyyy/M/d H:mm"
-    return f
-  }()
+  // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
+  private var vm: ContentViewModel.AccordionItemVM {
+    ContentViewModel.AccordionItemVM(item: item, rowID: rowID)
+  }
 
   var body: some View {
-    let isExpanded = expandedRowIDs.contains(rowID)
+    let isExpanded = vm.isExpanded(in: expandedRowIDs)
 
-    VStack(alignment: .leading) {
+    // アイテム間の余白をなくすため spacing を 0 にする
+    VStack(alignment: .leading, spacing: 0) {
       // 常に表示されるヘッダ領域（ID/タイトル/タイムスタンプ）
       VStack(alignment: .leading, spacing: 6) {
         // ID
@@ -48,24 +48,19 @@ struct AccordionItem: View {
               .background(Color.red)
               .cornerRadius(6)
               .frame(minWidth: 44, alignment: .center)
-              .opacity((newRowIDs.contains(rowID) || item.isNew) ? 1.0 : 0.0)
+              .opacity(vm.isNew(in: newRowIDs) ? 1.0 : 0.0)
 
             if !item.questionTypes.isEmpty {
-              let isExpanded = expandedRowIDs.contains(rowID)
               Button(action: {
                 withAnimation(.easeInOut(duration: 0.25)) {
-                  if isExpanded {
-                    expandedRowIDs.remove(rowID)
-                  } else {
-                    expandedRowIDs.insert(rowID)
-                  }
+                  vm.toggleExpanded(&expandedRowIDs)
                 }
               }) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                  .foregroundColor(isExpanded ? .white : .blue)
+                Image(systemName: vm.chevronImageName(isExpanded: isExpanded))
+                  .foregroundColor(vm.chevronForegroundColor(isExpanded: isExpanded))
                   .imageScale(.medium)
                   .frame(width: 36, height: 36)
-                  .background(isExpanded ? Color.blue : Color.blue.opacity(0.08))
+                  .background(vm.chevronBackgroundColor(isExpanded: isExpanded))
                   .cornerRadius(8)
                   .overlay(
                     RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.15), lineWidth: 1)
@@ -77,7 +72,7 @@ struct AccordionItem: View {
           }
         }
 
-        Text(AccordionItem.timestampFormatter.string(from: item.timestamp))
+        Text(vm.formattedTimestamp(item.timestamp))
           .font(.subheadline)
           .fontWeight(.light)
           .foregroundColor(.secondary)
@@ -85,7 +80,6 @@ struct AccordionItem: View {
       .padding(12)
       // ヘッダは横幅いっぱいに広げ、システム背景で覆って透けないようにする
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color(UIColor.systemBackground))
       .zIndex(2)  // ヘッダを展開コンテンツより前面に表示
       .animation(nil, value: isExpanded)
 
@@ -93,7 +87,7 @@ struct AccordionItem: View {
       // maxHeight = 0 と clipped を用いてレイアウトを押し下げ、
       // 固有の高さを測定しないようにする。
       if !item.questionTypes.isEmpty {
-        // 条件付きレンダリングを使い、折りたたまれた行は高さ0になるようにする。
+        // 折りたたまれたときはコンテンツを表示しない（高さ0）
         if isExpanded {
           Spacer().frame(height: 12)
 
@@ -107,38 +101,31 @@ struct AccordionItem: View {
                   VStack(alignment: .leading) {
                     Text("\(question)")
                       .fixedSize(horizontal: false, vertical: true)
-                      .animation(nil, value: isExpanded)
                     Text(options.joined(separator: ","))
                       .font(.subheadline).foregroundColor(.gray)
                       .lineLimit(1).truncationMode(.tail)
-                      .animation(nil, value: isExpanded)
                   }
                 case .multiple(let question, let options):
                   Image(systemName: "list.bullet").foregroundColor(.green)
                   VStack(alignment: .leading) {
                     Text("\(question)")
                       .fixedSize(horizontal: false, vertical: true)
-                      .animation(nil, value: isExpanded)
                     Text(options.joined(separator: ","))
                       .font(.subheadline).foregroundColor(.gray)
                       .lineLimit(1).truncationMode(.tail)
-                      .animation(nil, value: isExpanded)
                   }
                 case .text(let question):
                   Image(systemName: "textformat").foregroundColor(.orange)
                   Text("\(question)")
                     .fixedSize(horizontal: false, vertical: true)
-                    .animation(nil, value: isExpanded)
                 case .info(let question, let fields):
                   Image(systemName: "person.crop.circle").foregroundColor(.purple)
                   VStack(alignment: .leading) {
                     Text("\(question)")
                       .fixedSize(horizontal: false, vertical: true)
-                      .animation(nil, value: isExpanded)
                     Text(fields.map { $0.displayName }.joined(separator: ","))
                       .font(.subheadline)
                       .foregroundColor(.gray).lineLimit(1).truncationMode(.tail)
-                      .animation(nil, value: isExpanded)
                   }
                 }
                 Spacer()
@@ -153,14 +140,16 @@ struct AccordionItem: View {
     }
     // 展開／折りたたみ時にレイアウトの変化（コンテンツを押し下げる）をアニメーションする
     .animation(.easeInOut(duration: 0.25), value: isExpanded)
-    .background(Color(UIColor.systemBackground))
     .cornerRadius(10)
     .overlay(
       RoundedRectangle(cornerRadius: 10).stroke(
-        Color(UIColor.separator).opacity(0.6), lineWidth: 0.5)
+        Color.secondary.opacity(0.6), lineWidth: 0.5)
     )
     .onTapGesture(perform: onTap)
+    // アイテム間の余白を無くすため縦パディングを0にする
     .padding(.horizontal, 0)
-    .padding(.vertical, 4)
+    .padding(.vertical, 0)
   }
 }
+
+// ローカルの AccordionItemViewModel は ContentViewModel に統合済みのため削除

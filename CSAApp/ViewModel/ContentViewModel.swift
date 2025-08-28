@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 final class ContentViewModel: ObservableObject {
   // QR (または URL クエリ) の文字列を解析して (key, questionText, options, rawValue) の配列を返す
@@ -88,5 +89,36 @@ final class ContentViewModel: ObservableObject {
       results.append((decodedKey, questionText, options, decodedValue))
     }
     return results
+  }
+
+  // AccordionItem 用の軽量ヘルパーをこの ViewModel に統合
+  struct AccordionItemVM {
+    let item: Item
+    let rowID: String
+
+    private static let timestampFormatter: DateFormatter = {
+      let f = DateFormatter()
+      f.locale = Locale(identifier: "ja_JP_POSIX")
+      f.dateFormat = "yyyy/M/d H:mm"
+      return f
+    }()
+
+    func isExpanded(in set: Set<String>) -> Bool { set.contains(rowID) }
+    func isNew(in set: Set<String>) -> Bool { set.contains(rowID) || item.isNew }
+    func formattedTimestamp(_ date: Date) -> String { Self.timestampFormatter.string(from: date) }
+    func toggleExpanded(_ expandedRowIDs: inout Set<String>) {
+      if isExpanded(in: expandedRowIDs) {
+        expandedRowIDs.remove(rowID)
+      } else {
+        expandedRowIDs.insert(rowID)
+      }
+    }
+    func chevronImageName(isExpanded: Bool) -> String {
+      isExpanded ? "chevron.down" : "chevron.right"
+    }
+    func chevronForegroundColor(isExpanded: Bool) -> Color { isExpanded ? .white : .blue }
+    func chevronBackgroundColor(isExpanded: Bool) -> Color {
+      isExpanded ? .blue : Color.blue.opacity(0.08)
+    }
   }
 }
