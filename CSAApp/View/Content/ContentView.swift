@@ -38,8 +38,15 @@ struct ContentView: View {
           ScrollView {
             LazyVStack(spacing: 12) {
               ForEach(viewModel.rowModels(from: items)) { row in
-                rowView(row)
-                  .id(row.id)
+                AccordionItem(
+                  item: row.item, rowID: row.id, expandedRowIDs: $expandedRowIDs,
+                  newRowIDs: $viewModel.newRowIDs
+                ) {
+                  viewModel.handleItemTapped(row.item, rowID: row.id, modelContext: modelContext)
+                  selectedImage = image
+                  isPresentedCameraView = true
+                }
+                .id(row.id)
               }
             }
             .padding(.vertical, 8)
@@ -65,13 +72,18 @@ struct ContentView: View {
         }
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            // ViewModel 側の isEditing を切り替えるボタン
+            // EditButton の代替。編集モード中はデフォルトの "Done" ではなく "Cancel" を表示する
             Button(action: {
-              withAnimation(.easeInOut) {
-                viewModel.isEditing.toggle()
+              withAnimation {
+                if editMode?.wrappedValue == .active {
+                  editMode?.wrappedValue = .inactive
+                } else {
+                  editMode?.wrappedValue = .active
+                }
               }
             }) {
-              Text(viewModel.isEditing ? "Cancel" : "Edit")
+              // 編集モードかどうかでラベルを切り替える
+              Text(editMode?.wrappedValue == .active ? "Cancel" : "Edit")
             }
             .tint(.blue)
           }
@@ -117,23 +129,5 @@ struct ContentView: View {
         }
       }
     )
-  }
-
-  // ForEach の中身を切り出してコンパイラの型チェック負荷を下げるヘルパー
-  @ViewBuilder
-  private func rowView(_ row: ContentViewModel.RowModel) -> some View {
-    AccordionItem(
-      item: row.item,
-      rowID: row.id,
-      expandedRowIDs: $expandedRowIDs,
-      newRowIDs: $viewModel.newRowIDs,
-      isEditing: $viewModel.isEditing,
-      modelContext: modelContext,
-      onDelete: { item in viewModel.delete(item, modelContext: modelContext) }
-    ) {
-      viewModel.handleItemTapped(row.item, rowID: row.id, modelContext: modelContext)
-      selectedImage = image
-      isPresentedCameraView = true
-    }
   }
 }

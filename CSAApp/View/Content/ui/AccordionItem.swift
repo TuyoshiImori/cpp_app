@@ -8,9 +8,6 @@ struct AccordionItem: View {
   let rowID: String
   @Binding var expandedRowIDs: Set<String>
   @Binding var newRowIDs: Set<String>
-  @Binding var isEditing: Bool
-  let modelContext: ModelContext?
-  let onDelete: (Item) -> Void
   let onTap: () -> Void
 
   // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
@@ -22,90 +19,64 @@ struct AccordionItem: View {
     let isExpanded = vm.isExpanded(in: expandedRowIDs)
 
     // アイテム間の余白をなくすため spacing を 0 にする
-    HStack(spacing: 0) {
-      // 編集モード時に左側に削除ボタンを表示
-      Group {
-        if isEditing {
-          Button(action: {
-            // 削除処理は ViewModel に委譲
-            onDelete(item)
-          }) {
-            ZStack {
-              RoundedRectangle(cornerRadius: 8)
-                .fill(Color.red)
-                .frame(width: 72, height: 72)
-              Image(systemName: "trash.fill")
-                .foregroundColor(.white)
-                .font(.title2)
-            }
-            .padding(.leading, 8)
-          }
-          .buttonStyle(.plain)
-          .transition(.move(edge: .leading).combined(with: .opacity))
-        }
-      }
-
-      VStack(alignment: .leading, spacing: 0) {
-        // 常に表示されるヘッダ領域（ID/タイトル/タイムスタンプ）
-        VStack(alignment: .leading, spacing: 6) {
-          // ID
-          if !item.surveyID.isEmpty {
-            Text("ID: \(item.surveyID)")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
-
-          if !item.title.isEmpty {
-            HStack(alignment: .center, spacing: 8) {
-              // タイトル
-              Text(item.title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .lineLimit(2)
-                .layoutPriority(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-              // Newバッジ
-              Text("NEW")
-                .font(.caption2)
-                .bold()
-                .foregroundColor(.white)
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(Color.red)
-                .cornerRadius(6)
-                .frame(minWidth: 44, alignment: .center)
-                .opacity(vm.isNew(in: newRowIDs) ? 1.0 : 0.0)
-
-              if !item.questionTypes.isEmpty {
-                Button(action: {
-                  withAnimation(.easeInOut(duration: 0.25)) {
-                    vm.toggleExpanded(&expandedRowIDs)
-                  }
-                }) {
-                  Image(systemName: vm.chevronImageName(isExpanded: isExpanded))
-                    .foregroundColor(vm.chevronForegroundColor(isExpanded: isExpanded))
-                    .imageScale(.medium)
-                    .frame(width: 36, height: 36)
-                    .background(vm.chevronBackgroundColor(isExpanded: isExpanded))
-                    .cornerRadius(8)
-                    .overlay(
-                      RoundedRectangle(cornerRadius: 8).stroke(
-                        Color.blue.opacity(0.15), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-              }
-            }
-          }
-
-          Text(vm.formattedTimestamp(item.timestamp))
-            .font(.subheadline)
-            .fontWeight(.light)
+    VStack(alignment: .leading, spacing: 0) {
+      // 常に表示されるヘッダ領域（ID/タイトル/タイムスタンプ）
+      VStack(alignment: .leading, spacing: 6) {
+        // ID
+        if !item.surveyID.isEmpty {
+          Text("ID: \(item.surveyID)")
+            .font(.caption)
             .foregroundColor(.secondary)
         }
-        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.9), value: isEditing)
+
+        if !item.title.isEmpty {
+          HStack(alignment: .center, spacing: 8) {
+            // タイトル
+            Text(item.title)
+              .font(.title3)
+              .fontWeight(.semibold)
+              .lineLimit(2)
+              .layoutPriority(1)
+              .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Newバッジ
+            Text("NEW")
+              .font(.caption2)
+              .bold()
+              .foregroundColor(.white)
+              .padding(.vertical, 4)
+              .padding(.horizontal, 8)
+              .background(Color.red)
+              .cornerRadius(6)
+              .frame(minWidth: 44, alignment: .center)
+              .opacity(vm.isNew(in: newRowIDs) ? 1.0 : 0.0)
+
+            if !item.questionTypes.isEmpty {
+              Button(action: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                  vm.toggleExpanded(&expandedRowIDs)
+                }
+              }) {
+                Image(systemName: vm.chevronImageName(isExpanded: isExpanded))
+                  .foregroundColor(vm.chevronForegroundColor(isExpanded: isExpanded))
+                  .imageScale(.medium)
+                  .frame(width: 36, height: 36)
+                  .background(vm.chevronBackgroundColor(isExpanded: isExpanded))
+                  .cornerRadius(8)
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.15), lineWidth: 1)
+                  )
+              }
+              .buttonStyle(.plain)
+              .contentShape(Rectangle())
+            }
+          }
+        }
+
+        Text(vm.formattedTimestamp(item.timestamp))
+          .font(.subheadline)
+          .fontWeight(.light)
+          .foregroundColor(.secondary)
       }
       .padding(12)
       // ヘッダは横幅いっぱいに広げ、背景色を設定して透けないようにする
@@ -181,5 +152,3 @@ struct AccordionItem: View {
     .padding(.vertical, 0)
   }
 }
-
-// ローカルの AccordionItemViewModel は ContentViewModel に統合済みのため削除
