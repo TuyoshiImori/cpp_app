@@ -78,54 +78,14 @@ struct ContentView: View {
     }
     // バナー表示を分離したコンポーネントで表示
     .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
-    // 編集タイトル用の中央ダイアログ
+    // 編集タイトル用の中央ダイアログ（別ファイルに切り出し）
     .overlay {
-      if isShowingEditDialog, let target = editTargetItem {
-        Color.black.opacity(0.35).ignoresSafeArea()
-          .onTapGesture {
-            // 背景タップでキャンセル
-            isShowingEditDialog = false
-          }
-
-        VStack(spacing: 16) {
-          Text("タイトルを編集")
-            .font(.headline)
-
-          TextField("タイトル", text: $editTitleText)
-            .textFieldStyle(.roundedBorder)
-            .padding(.horizontal, 8)
-
-          HStack(spacing: 12) {
-            Button(action: {
-              // キャンセル
-              isShowingEditDialog = false
-            }) {
-              Text("キャンセル")
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-
-            Button(action: {
-              // 保存: modelContext を使ってタイトルを更新
-              target.title = editTitleText
-              try? modelContext.save()
-              // UI 側の再描画を促す
-              viewModel.dataVersion = UUID()
-              isShowingEditDialog = false
-            }) {
-              Text("保存")
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-          }
+      EditTitleDialog(isPresented: $isShowingEditDialog, titleText: $editTitleText) { newTitle in
+        if let target = editTargetItem {
+          target.title = newTitle
+          try? modelContext.save()
+          viewModel.dataVersion = UUID()
         }
-        .padding(20)
-        .background(Color(white: 0.97))
-        .cornerRadius(12)
-        .frame(maxWidth: 420)
-        .padding(.horizontal, 32)
-        .shadow(radius: 20)
-        .zIndex(1000)
       }
     }
   }

@@ -30,10 +30,9 @@ struct AccordionItem: View {
   @State private var suppressSlideAnimation: Bool = false
 
   // 削除ボタンの幅
-  // アクションボタン（削除 / 編集）1つあたりの幅
-  private let actionButtonWidth: CGFloat = 60
-  // 表示されるボタン列の合計幅（編集 + 削除）
-  private var totalActionButtonsWidth: CGFloat { actionButtonWidth * 2 }
+  // アクションボタン幅は ViewModel 側で定義
+  private var actionButtonWidth: CGFloat { viewModel.actionButtonWidth }
+  private var totalActionButtonsWidth: CGFloat { viewModel.totalActionButtonsWidth }
 
   // ローカルで削除アニメーション用のオフセット（deleteButtonView と mainContentView に適用）
   @State private var deleteAnimationOffset: CGFloat = 0
@@ -372,7 +371,7 @@ struct AccordionItem: View {
         let velocity = value.velocity.width
 
         // スワイプの閾値を判定
-        let threshold = totalActionButtonsWidth / 2
+        let threshold = viewModel.swipeRevealThreshold()
         let shouldReveal = translation < -threshold || velocity < -500
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

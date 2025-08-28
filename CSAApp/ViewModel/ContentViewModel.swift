@@ -4,6 +4,13 @@ import SwiftData
 import SwiftUI
 
 final class ContentViewModel: ObservableObject {
+  // アクションボタン（編集/削除）1つ分の幅（UI ロジックの一部だが View 側から参照されるため ViewModel に移動）
+  let actionButtonWidth: CGFloat = 60
+  var totalActionButtonsWidth: CGFloat { actionButtonWidth * 2 }
+
+  // スワイプで reveal するかの閾値を取得
+  func swipeRevealThreshold() -> CGFloat { totalActionButtonsWidth / 2 }
+
   // NEW バッジやバナー表示を ViewModel 側で管理する
   @Published var newRowIDs: Set<String> = []
   @Published var showBanner: Bool = false
