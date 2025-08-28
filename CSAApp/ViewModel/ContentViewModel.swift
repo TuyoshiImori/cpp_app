@@ -219,6 +219,10 @@ final class ContentViewModel: ObservableObject {
 
   /// 特定のアイテムのスライド状態を設定
   func setSlideState(for rowID: String, offset: CGFloat, state: SwipeState) {
+    // 編集モードでないときはユーザー操作によるスライドを無視する
+    // ただしプログラム側から明示的に閉じる（normal, offset == 0）要求が来た場合は許可する
+    guard isEditing || (state == .normal && offset == 0) else { return }
+
     slideOffsets[rowID] = offset
     swipeStates[rowID] = state
   }

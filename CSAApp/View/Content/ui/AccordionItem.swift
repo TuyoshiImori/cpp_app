@@ -217,20 +217,22 @@ struct AccordionItem: View {
   private var swipeGesture: some Gesture {
     DragGesture()
       .onChanged { value in
-        guard !viewModel.isEditing else { return }
+        // 編集モードでない場合はユーザー操作によるドラッグを無視する
+        guard viewModel.isEditing else { return }
         let translation = value.translation.width
         isDragging = true
 
         // 左方向のドラッグのみ許可（削除ボタンを表示するため）
         if translation < 0 {
           dragOffset = max(translation, -deleteButtonWidth)
-        } else if viewModel.swipeStates[String(describing: item.id)] == .revealed {
+        } else if vm.getSwipeState(from: viewModel.swipeStates) == .revealed {
           // 既に削除ボタンが表示されている場合は右方向のドラッグも許可
           dragOffset = min(translation, 0)
         }
       }
       .onEnded { value in
-        guard !viewModel.isEditing else { return }
+        // 編集モードでない場合はユーザー操作によるドラッグを無視する
+        guard viewModel.isEditing else { return }
         isDragging = false
         let translation = value.translation.width
         let velocity = value.velocity.width
