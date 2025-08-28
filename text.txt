@@ -1,276 +1,154 @@
+import Combine
 import SwiftData
 import SwiftUI
 
-struct ContentView: View {
-  @StateObject private var viewModel = ContentViewModel()
-  @Environment(\.modelContext) private var modelContext
-  @Query private var items: [Item]
-  // 新規追加を示すための一時的な rowID 集合（NEW バッジ表示用）
-  @State private var newRowIDs: Set<String> = []
-  // 各行の設問表示を折りたたむ/展開するための状態
-  @State private var expandedRowIDs: Set<String> = []
-  @State private var showBanner: Bool = false
-  @State private var bannerTitle: String = ""
-  @State private var isPresentedCameraView = false
-  @State private var image: UIImage?
-  @State private var currentItem: Item?
+// コンパイル時の型チェック負荷を軽減するため、ContentView から切り出しました。
+struct AccordionItem: View {
+  let item: Item
+  let rowID: String
+  @Binding var expandedRowIDs: Set<String>
+  @Binding var newRowIDs: Set<String>
+  let onTap: () -> Void
 
-  // (手動での設問設定は廃止) ダイアログ関連の状態を削除
-
-  // 選択されたアイテムの画像を保持する状態
-  @State private var selectedImage: UIImage?
-
-  // タイムスタンプを安定して表示するための DateFormatter
-  private static let timestampFormatter: DateFormatter = {
-    let f = DateFormatter()
-    // 日本表記を固定（再現性のあるフォーマット）
-    f.locale = Locale(identifier: "ja_JP_POSIX")
-    f.dateFormat = "yyyy/M/d H:mm"
-    return f
-  }()
+  // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
+  private var vm: ContentViewModel.AccordionItemVM {
+    ContentViewModel.AccordionItemVM(item: item, rowID: rowID)
+  }
 
   var body: some View {
-    ZStack {
-      NavigationSplitView {
-        ScrollViewReader { proxy in
-          ScrollView {
-            LazyVStack(spacing: 12) {
-              ForEach(items.sorted(by: { $0.timestamp > $1.timestamp })) { item in
-                let rowID: String =
-                  item.surveyID.isEmpty
-                  ? String(item.timestamp.timeIntervalSince1970) : item.surveyID
-                VStack(alignment: .leading) {
-                  Group {
-                    // ID
-                    if !item.surveyID.isEmpty {
-                      Text("ID: \(item.surveyID)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    }
-                    // タイトル
-                    if !item.title.isEmpty {
-                      // HStack を中央揃えにして、バッジは常にレイアウト上に存在させる（opacity で表示制御）
-                      HStack(alignment: .center, spacing: 8) {
-                        // タイトルは優先的に幅を確保する
-                        Text(item.title)
-                          .font(.title3)
-                          .fontWeight(.semibold)
-                          .lineLimit(2)
-                          .layoutPriority(1)
-                          .frame(maxWidth: .infinity, alignment: .leading)
+    let isExpanded = vm.isExpanded(in: expandedRowIDs)
 
-                        // NEW バッジ（折りたたみボタンの左に配置）
-                        Text("NEW")
-                          .font(.caption2)
-                          .bold()
-                          .foregroundColor(.white)
-                          .padding(.vertical, 4)
-                          .padding(.horizontal, 8)
-                          .background(Color.red)
-                          .cornerRadius(6)
-                          .frame(minWidth: 44, alignment: .center)
-                          .opacity((newRowIDs.contains(rowID) || item.isNew) ? 1.0 : 0.0)
+    // アイテム間の余白をなくすため spacing を 0 にする
+    VStack(alignment: .leading, spacing: 0) {
+      // 常に表示されるヘッダ領域（ID/タイトル/タイムスタンプ）
+      VStack(alignment: .leading, spacing: 6) {
+        // ID
+        if !item.surveyID.isEmpty {
+          Text("ID: \(item.surveyID)")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
 
-                        // 展開/折りたたみボタン（右端に配置）
-                        if !item.questionTypes.isEmpty {
-                          let isExpanded = expandedRowIDs.contains(rowID)
-                          Button(action: {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                              if isExpanded {
-                                expandedRowIDs.remove(rowID)
-                              } else {
-                                expandedRowIDs.insert(rowID)
-                              }
-                            }
-                          }) {
-                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                              .foregroundColor(isExpanded ? .white : .blue)
-                              .imageScale(.medium)
-                              .frame(width: 36, height: 36)
-                              .background(isExpanded ? Color.blue : Color.blue.opacity(0.08))
-                              .cornerRadius(8)
-                              .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                  .stroke(Color.blue.opacity(0.15), lineWidth: 1)
-                              )
-                          }
-                          .buttonStyle(.plain)
-                          .contentShape(Rectangle())
-                          .accessibilityLabel(isExpanded ? "設問を折りたたむ" : "設問を展開する")
-                        }
-                      }
-                    }
+        if !item.title.isEmpty {
+          HStack(alignment: .center, spacing: 8) {
+            // タイトル
+            Text(item.title)
+              .font(.title3)
+              .fontWeight(.semibold)
+              .lineLimit(2)
+              .layoutPriority(1)
+              .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // タイムスタンプ（常に "yyyy/M/d H:mm" 形式で表示）
-                    Text(Self.timestampFormatter.string(from: item.timestamp))
+            // Newバッジ
+            Text("NEW")
+              .font(.caption2)
+              .bold()
+              .foregroundColor(.white)
+              .padding(.vertical, 4)
+              .padding(.horizontal, 8)
+              .background(Color.red)
+              .cornerRadius(6)
+              .frame(minWidth: 44, alignment: .center)
+              .opacity(vm.isNew(in: newRowIDs) ? 1.0 : 0.0)
+
+            if !item.questionTypes.isEmpty {
+              Button(action: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                  vm.toggleExpanded(&expandedRowIDs)
+                }
+              }) {
+                Image(systemName: vm.chevronImageName(isExpanded: isExpanded))
+                  .foregroundColor(vm.chevronForegroundColor(isExpanded: isExpanded))
+                  .imageScale(.medium)
+                  .frame(width: 36, height: 36)
+                  .background(vm.chevronBackgroundColor(isExpanded: isExpanded))
+                  .cornerRadius(8)
+                  .overlay(
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.15), lineWidth: 1)
+                  )
+              }
+              .buttonStyle(.plain)
+              .contentShape(Rectangle())
+            }
+          }
+        }
+
+        Text(vm.formattedTimestamp(item.timestamp))
+          .font(.subheadline)
+          .fontWeight(.light)
+          .foregroundColor(.secondary)
+      }
+      .padding(12)
+      // ヘッダは横幅いっぱいに広げ、背景色を設定して透けないようにする
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.background)  // SwiftUI標準の背景色を追加
+      .zIndex(2)  // ヘッダを展開コンテンツより前面に表示
+      .animation(nil, value: isExpanded)
+
+      // 展開コンテンツ：常にビュー階層に残すが、折りたたむ際は
+      // maxHeight = 0 と clipped を用いてレイアウトを押し下げ、
+      // 固有の高さを測定しないようにする。
+      if !item.questionTypes.isEmpty {
+        // 折りたたまれたときはコンテンツを表示しない（高さ0）
+        if isExpanded {
+          VStack(spacing: 8) {
+            ForEach(item.questionTypes, id: \.self) { questionType in
+              HStack(alignment: .top) {
+                Spacer().frame(width: 16)
+                switch questionType {
+                case .single(let question, let options):
+                  Image(systemName: "checkmark.circle").foregroundColor(.blue)
+                  VStack(alignment: .leading) {
+                    Text("\(question)")
+                      .fixedSize(horizontal: false, vertical: true)
+                    Text(options.joined(separator: ","))
+                      .font(.subheadline).foregroundColor(.gray)
+                      .lineLimit(1).truncationMode(.tail)
+                  }
+                case .multiple(let question, let options):
+                  Image(systemName: "list.bullet").foregroundColor(.green)
+                  VStack(alignment: .leading) {
+                    Text("\(question)")
+                      .fixedSize(horizontal: false, vertical: true)
+                    Text(options.joined(separator: ","))
+                      .font(.subheadline).foregroundColor(.gray)
+                      .lineLimit(1).truncationMode(.tail)
+                  }
+                case .text(let question):
+                  Image(systemName: "textformat").foregroundColor(.orange)
+                  Text("\(question)")
+                    .fixedSize(horizontal: false, vertical: true)
+                case .info(let question, let fields):
+                  Image(systemName: "person.crop.circle").foregroundColor(.purple)
+                  VStack(alignment: .leading) {
+                    Text("\(question)")
+                      .fixedSize(horizontal: false, vertical: true)
+                    Text(fields.map { $0.displayName }.joined(separator: ","))
                       .font(.subheadline)
-                      .fontWeight(.light)
-                      .foregroundColor(.secondary)
-                  }
-                  .animation(nil, value: expandedRowIDs.contains(rowID))
-
-                  // タイムスタンプと設問の間にスペースを挿入（区切り線を除去して余白のみ）
-                  if expandedRowIDs.contains(rowID) && !item.questionTypes.isEmpty {
-                    Spacer().frame(height: 12)
-
-                    // 設問（展開時のみ表示）
-                    ForEach(item.questionTypes, id: \.self) { questionType in
-                      HStack(alignment: .top) {
-                        // 左側に小さなインデントを付ける
-                        Spacer().frame(width: 16)
-                        switch questionType {
-                        case .single(let question, let options):
-                          Image(systemName: "checkmark.circle")
-                            .foregroundColor(.blue)
-                          VStack(alignment: .leading) {
-                            Text("\(question)")
-                            Text(options.joined(separator: ","))
-                              .font(.subheadline)
-                              .foregroundColor(.gray)
-                              .lineLimit(1)
-                              .truncationMode(.tail)
-                          }
-                        case .multiple(let question, let options):
-                          Image(systemName: "list.bullet")
-                            .foregroundColor(.green)
-                          VStack(alignment: .leading) {
-                            Text("\(question)")
-                            Text(options.joined(separator: ","))
-                              .font(.subheadline)
-                              .foregroundColor(.gray)
-                              .lineLimit(1)
-                              .truncationMode(.tail)
-                          }
-                        case .text(let question):
-                          Image(systemName: "textformat")
-                            .foregroundColor(.orange)
-                          Text("\(question)")
-                        case .info(let question, let fields):
-                          Image(systemName: "person.crop.circle")
-                            .foregroundColor(.purple)
-                          VStack(alignment: .leading) {
-                            Text("\(question)")
-                            Text(fields.map { $0.displayName }.joined(separator: ","))
-                              .font(.subheadline)
-                              .foregroundColor(.gray)
-                              .lineLimit(1)
-                              .truncationMode(.tail)
-                          }
-                        }
-                        Spacer()
-                      }
-                    }
+                      .foregroundColor(.gray).lineLimit(1).truncationMode(.tail)
                   }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(rowID)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                  // タップで NEW フラグを消して保存してからカメラ画面へ遷移
-                  if item.isNew {
-                    item.isNew = false
-                    // モデルコンテキストに変更を保存
-                    try? modelContext.save()
-                  }
-                  // バッジ集合もローカルでクリア
-                  newRowIDs.remove(rowID)
-                  selectedImage = image
-                  isPresentedCameraView = true
-                }
-              }
-            }
-            .padding()
-          }
-          .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
-            guard let info = notif.userInfo else { return }
-
-            // rowID を決定（surveyID を優先、なければ timestamp を文字列化）
-            let sid = (info["surveyID"] as? String) ?? ""
-            let ts = info["timestamp"] as? TimeInterval
-            let targetRowID: String
-            if !sid.isEmpty {
-              targetRowID = sid
-            } else if let ts = ts {
-              targetRowID = String(ts)
-            } else {
-              return
-            }
-
-            // まずはどの画面が表示されていても ContentView に戻るように
-            // フルスクリーンカバー等が開いていれば閉じる
-            DispatchQueue.main.async {
-              isPresentedCameraView = false
-            }
-
-            // 少し待ってから NEW バッジ表示とスクロールを行う（画面切替アニメーションの完了を待つ）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-              // NEW バッジを表示（集合に追加）
-              newRowIDs.insert(targetRowID)
-
-              // バナー表示タイトルをセットして表示（アニメーションで）
-              if let t = info["title"] as? String { bannerTitle = t }
-              withAnimation(.easeOut(duration: 0.25)) { showBanner = true }
-
-              // スクロール（UI のレイアウトが整うのを待つ）
-              DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                proxy.scrollTo(targetRowID, anchor: .center)
-              }
-
-              // バッジは数秒でフェードアウトして集合から削除
-              DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                newRowIDs.remove(targetRowID)
-                // バナーも隠す
-                withAnimation(.easeOut(duration: 0.6)) { showBanner = false }
+                Spacer()
               }
             }
           }
-        }
-        .toolbar {
-          ToolbarItem(placement: .navigationBarTrailing) {
-            EditButton()
-              .tint(.blue)
-          }
-        }
-      } detail: {
-        if let image {
-          Image(uiImage: image)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 300)
-        } else {
-          Text("Select an item")
-        }
-      }
-
-      // Floating action button (常に画面右下に表示される + ボタン)
-      EmptyView()
-    }
-    .fullScreenCover(isPresented: $isPresentedCameraView) {
-      CameraView(image: $selectedImage, item: currentItem)  // Itemを渡す
-        .ignoresSafeArea()
-    }
-    // バナー表示
-    .overlay(
-      Group {
-        if showBanner {
-          VStack {
-            VStack(alignment: .leading, spacing: 6) {
-              Text("新しいアンケートが追加されました")
-                .foregroundColor(.white)
-                .padding(.horizontal)
-              Text("\(bannerTitle)")
-                .foregroundColor(.white)
-                .padding(.horizontal)
-            }
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.8))
-            .cornerRadius(8)
-            Spacer()
-          }
-          .padding()
+          .padding(.top, 12)  // ヘッダとの間隔を確保
+          .zIndex(0)  // 展開コンテンツは背景層に配置
           .transition(.move(edge: .top).combined(with: .opacity))
+          .animation(.easeInOut(duration: 0.25), value: isExpanded)
         }
       }
+    }
+    // 展開／折りたたみ時にレイアウトの変化（コンテンツを押し下げる）をアニメーションする
+    .animation(.easeInOut(duration: 0.25), value: isExpanded)
+    .cornerRadius(10)
+    .overlay(
+      RoundedRectangle(cornerRadius: 10).stroke(
+        Color.secondary.opacity(0.6), lineWidth: 0.5)
     )
+    .onTapGesture(perform: onTap)
+    // アイテム間の余白を無くすため縦パディングを0にする
+    .padding(.horizontal, 0)
+    .padding(.vertical, 0)
   }
 }

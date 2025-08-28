@@ -1,6 +1,5 @@
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct ContentView: View {
   @StateObject private var viewModel = ContentViewModel()
@@ -38,15 +37,19 @@ struct ContentView: View {
           ScrollView {
             LazyVStack(spacing: 12) {
               ForEach(viewModel.rowModels(from: items)) { row in
-                AccordionItem(
-                  item: row.item, rowID: row.id, expandedRowIDs: $expandedRowIDs,
-                  newRowIDs: $viewModel.newRowIDs
+                let accordionItem = AccordionItem(
+                  item: row.item,
+                  rowID: row.id,
+                  expandedRowIDs: $expandedRowIDs,
+                  newRowIDs: $viewModel.newRowIDs,
+                  viewModel: viewModel,
+                  modelContext: modelContext
                 ) {
                   viewModel.handleItemTapped(row.item, rowID: row.id, modelContext: modelContext)
                   selectedImage = image
                   isPresentedCameraView = true
                 }
-                .id(row.id)
+                accordionItem.id(row.id)
               }
             }
             .padding(.vertical, 8)
@@ -74,16 +77,14 @@ struct ContentView: View {
           ToolbarItem(placement: .navigationBarTrailing) {
             // EditButton の代替。編集モード中はデフォルトの "Done" ではなく "Cancel" を表示する
             Button(action: {
-              withAnimation {
-                if editMode?.wrappedValue == .active {
-                  editMode?.wrappedValue = .inactive
-                } else {
-                  editMode?.wrappedValue = .active
-                }
+              viewModel.toggleEditMode()
+              if viewModel.isEditing {
+                // 編集モードに入ったときに全アイテムをスライド
+                viewModel.slideAllItemsForEdit(items: items)
               }
             }) {
               // 編集モードかどうかでラベルを切り替える
-              Text(editMode?.wrappedValue == .active ? "Cancel" : "Edit")
+              Text(viewModel.isEditing ? "Done" : "Edit")
             }
             .tint(.blue)
           }

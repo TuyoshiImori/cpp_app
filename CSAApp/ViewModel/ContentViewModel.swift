@@ -13,6 +13,16 @@ final class ContentViewModel: ObservableObject {
   // 編集モード状態を ViewModel で管理（View はバインディングで参照）
   @Published var isEditing: Bool = false
 
+  // スライド削除機能の状態管理
+  @Published var slideOffsets: [String: CGFloat] = [:]  // 各アイテムのスライドオフセット
+  @Published var swipeStates: [String: SwipeState] = [:]  // 各アイテムのスワイプ状態
+
+  // スワイプの状態を表すenum
+  enum SwipeState {
+    case normal  // 通常状態
+    case revealed  // 削除ボタンが表示された状態
+  }
+
   // QR (または URL クエリ) の文字列を解析して (key, questionText, options, rawValue) の配列を返す
   // 例: "single=設問文|選択肢A,選択肢B&multiple=別の設問文|選択肢1,選択肢2"
   public func parse(_ string: String) -> [(String, String, [String], String)] {
@@ -176,6 +186,60 @@ final class ContentViewModel: ObservableObject {
     try? ctx.save()
   }
 
+  // スライド削除機能のメソッド群
+
+  /// 編集モードの切り替え（すべてのアイテムのスライド状態をリセット）
+  func toggleEditMode() {
+    isEditing.toggle()
+    if !isEditing {
+      resetAllSlideStates()
+    }
+  }
+
+  /// すべてのアイテムのスライド状態をリセット
+  func resetAllSlideStates() {
+    withAnimation(.easeInOut(duration: 0.3)) {
+      slideOffsets.removeAll()
+      swipeStates.removeAll()
+    }
+  }
+
+  /// 編集モードに入ったときに全アイテムを右にスライドさせる
+  func slideAllItemsForEdit(items: [Item]) {
+    guard isEditing else { return }
+
+    for item in items {
+      let rowID = self.rowID(for: item)
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+        slideOffsets[rowID] = 60  // 削除ボタンの幅分右にスライド
+        swipeStates[rowID] = .revealed
+      }
+    }
+  }
+
+  /// 特定のアイテムのスライド状態を設定
+  func setSlideState(for rowID: String, offset: CGFloat, state: SwipeState) {
+    slideOffsets[rowID] = offset
+    swipeStates[rowID] = state
+  }
+
+  /// 特定のアイテムのスライド削除処理
+  func handleSlideDelete(_ item: Item, modelContext: ModelContext?) {
+    let rowID = self.rowID(for: item)
+
+    // スライドアウトアニメーション
+    withAnimation(.easeInOut(duration: 0.3)) {
+      slideOffsets[rowID] = UIScreen.main.bounds.width
+    }
+
+    // アニメーション完了後にアイテムを削除
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      self.delete(item, modelContext: modelContext)
+      self.slideOffsets.removeValue(forKey: rowID)
+      self.swipeStates.removeValue(forKey: rowID)
+    }
+  }
+
   // AccordionItem 用の軽量ヘルパーをこの ViewModel に統合
   struct AccordionItemVM {
     let item: Item
@@ -204,6 +268,17 @@ final class ContentViewModel: ObservableObject {
     func chevronForegroundColor(isExpanded: Bool) -> Color { isExpanded ? .white : .blue }
     func chevronBackgroundColor(isExpanded: Bool) -> Color {
       isExpanded ? .blue : Color.blue.opacity(0.08)
+    }
+
+    // スライド削除機能用のヘルパーメソッド
+    func getSlideOffset(from slideOffsets: [String: CGFloat]) -> CGFloat {
+      slideOffsets[rowID] ?? 0
+    }
+
+    func getSwipeState(from swipeStates: [String: ContentViewModel.SwipeState])
+      -> ContentViewModel.SwipeState
+    {
+      swipeStates[rowID] ?? .normal
     }
   }
 }
