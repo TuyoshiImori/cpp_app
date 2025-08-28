@@ -33,7 +33,7 @@ struct AccordionItem: View {
       deleteButtonView
       mainContentView(isExpanded: isExpanded)
         .offset(x: slideOffset + dragOffset)
-        .gesture(swipeGesture)
+        // 手動スワイプを無効化: 編集モードの切り替え(Editボタン)でのみスライド状態を変更する
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: slideOffset)
     }
     .clipped()
