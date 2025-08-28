@@ -48,10 +48,6 @@ struct AccordionItem: View {
     }
     .clipped()
     .cornerRadius(10)
-    .overlay(
-      RoundedRectangle(cornerRadius: 10).stroke(
-        Color.secondary.opacity(0.6), lineWidth: 0.5)
-    )
     .padding(.horizontal, 0)
     .padding(.vertical, 0)
   }
