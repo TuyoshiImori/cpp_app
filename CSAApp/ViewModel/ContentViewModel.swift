@@ -27,10 +27,10 @@ final class ContentViewModel: ObservableObject {
   @Published var swipeStates: [String: SwipeState] = [:]  // 各アイテムのスワイプ状態
 
   // 一時的な View 側の UI 状態を ViewModel が管理することで MVVM を強化する
-  @Published var dragOffsets: [String: CGFloat] = [:] // 各アイテムのドラッグ中オフセット
-  @Published var isDraggingFlags: [String: Bool] = [:] // 各アイテムのドラッグ中フラグ
-  @Published var suppressSlideAnimationFlags: [String: Bool] = [:] // スライドアニメーション抑制フラグ
-  @Published var deleteAnimationOffsets: [String: CGFloat] = [:] // 削除時の一時オフセット
+  @Published var dragOffsets: [String: CGFloat] = [:]  // 各アイテムのドラッグ中オフセット
+  @Published var isDraggingFlags: [String: Bool] = [:]  // 各アイテムのドラッグ中フラグ
+  @Published var suppressSlideAnimationFlags: [String: Bool] = [:]  // スライドアニメーション抑制フラグ
+  @Published var deleteAnimationOffsets: [String: CGFloat] = [:]  // 削除時の一時オフセット
 
   // スワイプの状態を表すenum
   enum SwipeState {
@@ -254,10 +254,16 @@ final class ContentViewModel: ObservableObject {
   func setIsDragging(_ isDragging: Bool, for rowID: String) { isDraggingFlags[rowID] = isDragging }
   func isDragging(for rowID: String) -> Bool { isDraggingFlags[rowID] ?? false }
 
-  func setSuppressSlideAnimation(for rowID: String, _ value: Bool) { suppressSlideAnimationFlags[rowID] = value }
-  func isSuppressSlideAnimation(for rowID: String) -> Bool { suppressSlideAnimationFlags[rowID] ?? false }
+  func setSuppressSlideAnimation(for rowID: String, _ value: Bool) {
+    suppressSlideAnimationFlags[rowID] = value
+  }
+  func isSuppressSlideAnimation(for rowID: String) -> Bool {
+    suppressSlideAnimationFlags[rowID] ?? false
+  }
 
-  func setDeleteAnimationOffset(for rowID: String, _ value: CGFloat) { deleteAnimationOffsets[rowID] = value }
+  func setDeleteAnimationOffset(for rowID: String, _ value: CGFloat) {
+    deleteAnimationOffsets[rowID] = value
+  }
   func getDeleteAnimationOffset(for rowID: String) -> CGFloat { deleteAnimationOffsets[rowID] ?? 0 }
 
   /// 特定のアイテムのスライド削除処理

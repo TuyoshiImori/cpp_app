@@ -33,8 +33,8 @@ struct AccordionItem: View {
   private var deleteAnimationOffset: CGFloat { viewModel.getDeleteAnimationOffset(for: rowID) }
 
   var body: some View {
-  let isExpanded = vm.isExpanded(in: expandedRowIDs)
-  let slideOffset = vm.getSlideOffset(from: viewModel.slideOffsets)
+    let isExpanded = vm.isExpanded(in: expandedRowIDs)
+    let slideOffset = vm.getSlideOffset(from: viewModel.slideOffsets)
 
     ZStack(alignment: .leading) {
       deleteButtonView
@@ -47,8 +47,8 @@ struct AccordionItem: View {
           suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
           value: slideOffset)
     }
-    // 背景を白にしてから指定角だけ丸める（先頭/末尾のみ角丸）
-    .background(Color.white)
+  // 背景はシステムの背景色を使う（ダークモード対応）
+  .background(Color(.systemBackground))
     .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
     // 設定アプリ風の区切り線を各アイテム下部に表示（左にインセットを入れる）
     .overlay(

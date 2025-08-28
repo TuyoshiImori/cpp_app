@@ -41,8 +41,8 @@ struct ItemsListView: View {
         .padding(.vertical, 0)
         .padding(.horizontal, 12)
       }
-      // mimic grouped list background (approximate without UIKit)
-      .background(Color(white: 0.97).ignoresSafeArea())
+  // mimic grouped list background (use semantic system color for dark mode)
+  .background(Color(.systemGroupedBackground).ignoresSafeArea())
       .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
         viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
         DispatchQueue.main.async { isPresentedCameraView = false }
