@@ -10,8 +10,7 @@ struct ContentView: View {
   @State private var newRowIDs: Set<String> = []
   // 各行の設問表示を折りたたむ/展開するための状態
   @State private var expandedRowIDs: Set<String> = []
-  @State private var showBanner: Bool = false
-  @State private var bannerTitle: String = ""
+  // Banner の表示は ViewModel 側で管理する（URL 追加など外部イベントに反応するため）
   @State private var isPresentedCameraView = false
   @State private var image: UIImage?
   @State private var currentItem: Item?
@@ -65,6 +64,6 @@ struct ContentView: View {
         .ignoresSafeArea()
     }
     // バナー表示を分離したコンポーネントで表示
-    .overlay(BannerView(show: showBanner, title: bannerTitle))
+    .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
   }
 }
