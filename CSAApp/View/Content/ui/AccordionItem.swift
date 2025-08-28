@@ -28,14 +28,18 @@ struct AccordionItem: View {
   // 削除ボタンの幅
   private let deleteButtonWidth: CGFloat = 60
 
+  // ローカルで削除アニメーション用のオフセット（deleteButtonView と mainContentView に適用）
+  @State private var deleteAnimationOffset: CGFloat = 0
+
   var body: some View {
     let isExpanded = vm.isExpanded(in: expandedRowIDs)
     let slideOffset = vm.getSlideOffset(from: viewModel.slideOffsets)
 
     ZStack(alignment: .leading) {
       deleteButtonView
+        .offset(x: deleteAnimationOffset)
       mainContentView(isExpanded: isExpanded)
-        .offset(x: slideOffset + dragOffset)
+        .offset(x: slideOffset + dragOffset + deleteAnimationOffset)
         // 手動スワイプを無効化: 編集モードの切り替え(Editボタン)でのみスライド状態を変更する
         // 削除アクションのときだけアニメーションを抑制できるように制御
         .animation(
@@ -65,25 +69,36 @@ struct AccordionItem: View {
   }
 
   private var deleteButton: some View {
-    Button(action: {
-      // 削除時に slideOffset のアニメーションのみ無効化
-      suppressSlideAnimation = true
+    GeometryReader { geo in
+      Button(action: {
+        // 削除アニメーション用オフセットを親幅分右へアニメーション
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+          deleteAnimationOffset = geo.size.width
+        }
 
-      // ViewModel 側のアニメーション入り処理を呼ばない非アニメーション版を使う
-      viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
+        // アニメーション完了後に ViewModel の非アニメーション削除を呼ぶ
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+          // 削除時に slideOffset のアニメーションのみ無効化
+          suppressSlideAnimation = true
 
-      // 状態変更が反映される短い遅延の後にフラグを戻す
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-        suppressSlideAnimation = false
+          viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
+
+          // すぐにフラグを戻す
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            suppressSlideAnimation = false
+            deleteAnimationOffset = 0
+          }
+        }
+      }) {
+        Image(systemName: "trash")
+          .foregroundColor(.white)
+          .frame(width: deleteButtonWidth, height: nil)
+          .frame(maxHeight: .infinity)
+          .background(Color.red)
       }
-    }) {
-      Image(systemName: "trash")
-        .foregroundColor(.white)
-        .frame(width: deleteButtonWidth, height: nil)
-        .frame(maxHeight: .infinity)
-        .background(Color.red)
+      .buttonStyle(.plain)
     }
-    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity)
   }
 
   @ViewBuilder
