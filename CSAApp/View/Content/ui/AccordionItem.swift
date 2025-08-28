@@ -15,6 +15,7 @@ struct AccordionItem: View {
   let viewModel: ContentViewModel
   let modelContext: ModelContext?
   let onTap: () -> Void
+  let onEdit: (Item, String) -> Void
 
   // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
   private var vm: ContentViewModel.AccordionItemVM {
@@ -148,7 +149,8 @@ struct AccordionItem: View {
         HStack(spacing: 0) {
           // 編集ボタン（機能未実装）
           Button(action: {
-            // 編集アクションはまだ未実装。必要ならここに処理を追加。
+            // 編集ボタン押下時は ContentView 経由でダイアログを表示させる
+            onEdit(item, rowID)
           }) {
             Image(systemName: "pencil")
               .foregroundColor(.white)

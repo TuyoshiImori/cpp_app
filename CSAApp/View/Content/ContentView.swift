@@ -19,6 +19,11 @@ struct ContentView: View {
 
   // 選択されたアイテムの画像を保持する状態
   @State private var selectedImage: UIImage?
+  // 編集ダイアログ用の状態
+  @State private var isShowingEditDialog: Bool = false
+  @State private var editTargetItem: Item? = nil
+  @State private var editTargetRowID: String = ""
+  @State private var editTitleText: String = ""
 
   // タイムスタンプを安定して表示するための DateFormatter
   private static let timestampFormatter: DateFormatter = {
@@ -38,13 +43,21 @@ struct ContentView: View {
           items: items,
           expandedRowIDs: $expandedRowIDs,
           isPresentedCameraView: $isPresentedCameraView,
-          modelContext: modelContext
-        ) { item, rowID in
-          // タップ時の動作は引き続き ContentView が保持
-          viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
-          selectedImage = image
-          isPresentedCameraView = true
-        }
+          modelContext: modelContext,
+          onTap: { item, rowID in
+            // タップ時の動作は引き続き ContentView が保持
+            viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
+            selectedImage = image
+            isPresentedCameraView = true
+          },
+          onEdit: { item, rowID in
+            // 編集ダイアログを表示する準備
+            editTargetItem = item
+            editTargetRowID = rowID
+            editTitleText = item.title
+            isShowingEditDialog = true
+          }
+        )
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
             Button(action: {
@@ -65,5 +78,55 @@ struct ContentView: View {
     }
     // バナー表示を分離したコンポーネントで表示
     .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
+    // 編集タイトル用の中央ダイアログ
+    .overlay {
+      if isShowingEditDialog, let target = editTargetItem {
+        Color.black.opacity(0.35).ignoresSafeArea()
+          .onTapGesture {
+            // 背景タップでキャンセル
+            isShowingEditDialog = false
+          }
+
+        VStack(spacing: 16) {
+          Text("タイトルを編集")
+            .font(.headline)
+
+          TextField("タイトル", text: $editTitleText)
+            .textFieldStyle(.roundedBorder)
+            .padding(.horizontal, 8)
+
+          HStack(spacing: 12) {
+            Button(action: {
+              // キャンセル
+              isShowingEditDialog = false
+            }) {
+              Text("キャンセル")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Button(action: {
+              // 保存: modelContext を使ってタイトルを更新
+              target.title = editTitleText
+              try? modelContext.save()
+              // UI 側の再描画を促す
+              viewModel.dataVersion = UUID()
+              isShowingEditDialog = false
+            }) {
+              Text("保存")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+          }
+        }
+        .padding(20)
+        .background(Color(white: 0.97))
+        .cornerRadius(12)
+        .frame(maxWidth: 420)
+        .padding(.horizontal, 32)
+        .shadow(radius: 20)
+        .zIndex(1000)
+      }
+    }
   }
 }

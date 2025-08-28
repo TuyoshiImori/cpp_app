@@ -9,6 +9,7 @@ struct ItemsListView: View {
   @Binding var isPresentedCameraView: Bool
   let modelContext: ModelContext?
   let onTap: (Item, String) -> Void
+  let onEdit: (Item, String) -> Void
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -29,6 +30,8 @@ struct ItemsListView: View {
               modelContext: modelContext
             ) {
               onTap(row.item, row.id)
+            } onEdit: { item, id in
+              onEdit(item, id)
             }
             .id(row.id)
           }
