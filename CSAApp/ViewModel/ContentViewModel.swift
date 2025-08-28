@@ -10,6 +10,8 @@ final class ContentViewModel: ObservableObject {
   @Published var bannerTitle: String = ""
   // 画面側で検出して ScrollViewReader に適用するための一時的なスクロールターゲット
   @Published var pendingScrollTo: String? = nil
+  // 編集モード状態を ViewModel で管理（View はバインディングで参照）
+  @Published var isEditing: Bool = false
 
   // QR (または URL クエリ) の文字列を解析して (key, questionText, options, rawValue) の配列を返す
   // 例: "single=設問文|選択肢A,選択肢B&multiple=別の設問文|選択肢1,選択肢2"
@@ -166,6 +168,13 @@ final class ContentViewModel: ObservableObject {
   }
 
   func clearPendingScroll() { pendingScrollTo = nil }
+
+  // アイテム削除の責務を ViewModel に持たせる
+  func delete(_ item: Item, modelContext: ModelContext?) {
+    guard let ctx = modelContext else { return }
+    ctx.delete(item)
+    try? ctx.save()
+  }
 
   // AccordionItem 用の軽量ヘルパーをこの ViewModel に統合
   struct AccordionItemVM {
