@@ -217,7 +217,7 @@ final class ContentViewModel: ObservableObject {
     for item in items {
       let rowID = self.rowID(for: item)
       withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-        slideOffsets[rowID] = 60  // 削除ボタンの幅分右にスライド
+        slideOffsets[rowID] = 120  // アクションボタン2つ分（編集+削除）幅分右にスライド
         swipeStates[rowID] = .revealed
       }
     }

@@ -29,7 +29,10 @@ struct AccordionItem: View {
   @State private var suppressSlideAnimation: Bool = false
 
   // 削除ボタンの幅
-  private let deleteButtonWidth: CGFloat = 60
+  // アクションボタン（削除 / 編集）1つあたりの幅
+  private let actionButtonWidth: CGFloat = 60
+  // 表示されるボタン列の合計幅（編集 + 削除）
+  private var totalActionButtonsWidth: CGFloat { actionButtonWidth * 2 }
 
   // ローカルで削除アニメーション用のオフセット（deleteButtonView と mainContentView に適用）
   @State private var deleteAnimationOffset: CGFloat = 0
@@ -141,45 +144,55 @@ struct AccordionItem: View {
   private var deleteButtonView: some View {
     let swipeState = vm.getSwipeState(from: viewModel.swipeStates)
     if viewModel.isEditing || swipeState == .revealed {
-      HStack {
-        deleteButton
-        Spacer()
-      }
-      .transition(.move(edge: .leading))
-    }
-  }
-
-  private var deleteButton: some View {
-    GeometryReader { geo in
-      Button(action: {
-        // 削除アニメーション用オフセットを親幅分右へアニメーション
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-          deleteAnimationOffset = geo.size.width
-        }
-
-        // アニメーション完了後に ViewModel の非アニメーション削除を呼ぶ
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
-          // 削除時に slideOffset のアニメーションのみ無効化
-          suppressSlideAnimation = true
-
-          viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
-
-          // すぐにフラグを戻す
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            suppressSlideAnimation = false
-            deleteAnimationOffset = 0
+      GeometryReader { geo in
+        HStack(spacing: 0) {
+          // 編集ボタン（機能未実装）
+          Button(action: {
+            // 編集アクションはまだ未実装。必要ならここに処理を追加。
+          }) {
+            Image(systemName: "pencil")
+              .foregroundColor(.white)
+              .frame(width: actionButtonWidth, height: nil)
+              .frame(maxHeight: .infinity)
+              .background(Color.blue)
           }
+          .buttonStyle(.plain)
+
+          // 削除ボタン（既存処理）
+          Button(action: {
+            // 削除アニメーション用オフセットを親幅分右へアニメーション
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+              deleteAnimationOffset = geo.size.width
+            }
+
+            // アニメーション完了後に ViewModel の非アニメーション削除を呼ぶ
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+              // 削除時に slideOffset のアニメーションのみ無効化
+              suppressSlideAnimation = true
+
+              viewModel.handleSlideDeleteWithoutAnimation(item, modelContext: modelContext)
+
+              // すぐにフラグを戻す
+              DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                suppressSlideAnimation = false
+                deleteAnimationOffset = 0
+              }
+            }
+          }) {
+            Image(systemName: "trash")
+              .foregroundColor(.white)
+              .frame(width: actionButtonWidth, height: nil)
+              .frame(maxHeight: .infinity)
+              .background(Color.red)
+          }
+          .buttonStyle(.plain)
+
+          Spacer()
         }
-      }) {
-        Image(systemName: "trash")
-          .foregroundColor(.white)
-          .frame(width: deleteButtonWidth, height: nil)
-          .frame(maxHeight: .infinity)
-          .background(Color.red)
+        .transition(.move(edge: .leading))
       }
-      .buttonStyle(.plain)
+      .frame(maxWidth: .infinity)
     }
-    .frame(maxWidth: .infinity)
   }
 
   @ViewBuilder
@@ -342,7 +355,8 @@ struct AccordionItem: View {
 
         // 左方向のドラッグのみ許可（削除ボタンを表示するため）
         if translation < 0 {
-          dragOffset = max(translation, -deleteButtonWidth)
+          // 2つ分のボタン幅までドラッグ可能にする
+          dragOffset = max(translation, -totalActionButtonsWidth)
         } else if vm.getSwipeState(from: viewModel.swipeStates) == .revealed {
           // 既に削除ボタンが表示されている場合は右方向のドラッグも許可
           dragOffset = min(translation, 0)
@@ -356,13 +370,14 @@ struct AccordionItem: View {
         let velocity = value.velocity.width
 
         // スワイプの閾値を判定
-        let threshold = deleteButtonWidth / 2
+        let threshold = totalActionButtonsWidth / 2
         let shouldReveal = translation < -threshold || velocity < -500
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
           if shouldReveal {
             // 削除ボタンを表示
-            viewModel.setSlideState(for: rowID, offset: -deleteButtonWidth, state: .revealed)
+            // 表示は編集 + 削除の2ボタン分をスライドさせる
+            viewModel.setSlideState(for: rowID, offset: -totalActionButtonsWidth, state: .revealed)
           } else {
             // 元の位置に戻す
             viewModel.setSlideState(for: rowID, offset: 0, state: .normal)
