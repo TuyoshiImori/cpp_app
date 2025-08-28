@@ -96,10 +96,12 @@ struct AccordionItem: View {
           .foregroundColor(.secondary)
       }
 
+      // タイトル
       if !item.title.isEmpty {
         titleRowView(isExpanded: isExpanded)
       }
 
+      // 追加した日時
       Text(vm.formattedTimestamp(item.timestamp))
         .font(.subheadline)
         .fontWeight(.light)
@@ -212,6 +214,7 @@ struct AccordionItem: View {
         }
       }
       .padding(.top, 12)
+      .padding(.bottom, 12)
       .zIndex(0)
       .transition(.move(edge: .top).combined(with: .opacity))
       .animation(.easeInOut(duration: 0.25), value: isExpanded)
