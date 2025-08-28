@@ -12,6 +12,8 @@ final class ContentViewModel: ObservableObject {
   @Published var pendingScrollTo: String? = nil
   // 編集モード状態を ViewModel で管理（View はバインディングで参照）
   @Published var isEditing: Bool = false
+  // データ変更があったことを View に伝えるためのバージョントリガー
+  @Published var dataVersion: UUID = UUID()
 
   // スライド削除機能の状態管理
   @Published var slideOffsets: [String: CGFloat] = [:]  // 各アイテムのスライドオフセット
@@ -184,6 +186,10 @@ final class ContentViewModel: ObservableObject {
     guard let ctx = modelContext else { return }
     ctx.delete(item)
     try? ctx.save()
+    // 保存完了後に UI 側で再描画要求を出す
+    DispatchQueue.main.async {
+      self.dataVersion = UUID()
+    }
   }
 
   // スライド削除機能のメソッド群

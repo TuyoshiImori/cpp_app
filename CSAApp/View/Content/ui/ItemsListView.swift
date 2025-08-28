@@ -15,13 +15,14 @@ struct ItemsListView: View {
       ScrollView {
         LazyVStack(spacing: 0) {
           let rows = viewModel.rowModels(from: items)
-          ForEach(rows.indices, id: \.self) { index in
-            let row = rows[index]
+          // 要素ベースでループし、rows.first/last を使って先頭・末尾を判定する
+          // これにより削除後でも各要素の isFirst/isLast が安定して計算される
+          ForEach(rows, id: \.id) { row in
             AccordionItem(
               item: row.item,
               rowID: row.id,
-              isFirst: index == 0,
-              isLast: index == rows.count - 1,
+              isFirst: (rows.first?.id ?? "") == row.id,
+              isLast: (rows.last?.id ?? "") == row.id,
               expandedRowIDs: $expandedRowIDs,
               newRowIDs: $viewModel.newRowIDs,
               viewModel: viewModel,
@@ -32,6 +33,8 @@ struct ItemsListView: View {
             .id(row.id)
           }
         }
+        // dataVersion を id に使い、削除などデータ変化時に LazyVStack の再評価を強制する
+        .id(viewModel.dataVersion)
         .padding(.vertical, 0)
         .padding(.horizontal, 12)
       }
