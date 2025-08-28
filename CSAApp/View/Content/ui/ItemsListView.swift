@@ -47,12 +47,11 @@ struct ItemsListView: View {
         viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
         DispatchQueue.main.async { isPresentedCameraView = false }
       }
-      .onChange(of: viewModel.pendingScrollTo) { target in
-        if let target = target {
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            proxy.scrollTo(target, anchor: .center)
-            viewModel.clearPendingScroll()
-          }
+      .task(id: viewModel.pendingScrollTo) {
+        if let target = viewModel.pendingScrollTo {
+          try? await Task.sleep(nanoseconds: 120_000_000)
+          proxy.scrollTo(target, anchor: .center)
+          viewModel.clearPendingScroll()
         }
       }
     }
