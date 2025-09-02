@@ -202,20 +202,85 @@ using namespace cv;
   cv::Mat blurredOriginalMat;
   cv::GaussianBlur(originalGrayMat, blurredOriginalMat, cv::Size(3, 3), 1.0);
 
-  // 円検出
-  std::vector<cv::Vec3f> circles;
+  // テンプレートマッチングによるマーカー検出 (q.png をテンプレートとして使用)
+  std::vector<cv::Vec3f> circles; // (x, y, r) の配列として扱う
   try {
-    cv::HoughCircles(blurredOriginalMat, circles, cv::HOUGH_GRADIENT,
-                     1,    // dp: 解像度の逆比
-                     30,   // minDist: 円の中心間の最小距離
-                     100,  // param1: Cannyエッジ検出の上限閾値
-                     50,   // param2: 円検出の閾値（大きいほど厳密）
-                     10,   // minRadius: 最小半径
-                     100); // maxRadius: 最大半径
+    // テンプレート画像をバンドルから読み込む
+    UIImage *tplUIImage = [UIImage imageNamed:@"q"];
+    if (tplUIImage == nil) {
+      // 直接ファイルを探す（fallback）
+      NSString *path = [[NSBundle mainBundle] pathForResource:@"q"
+                                                       ofType:@"png"];
+      if (path && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        tplUIImage = [UIImage imageWithContentsOfFile:path];
+      }
+    }
 
-    NSLog(@"OpenCVWrapper: 検出された円の数: %zu", circles.size());
+    if (tplUIImage == nil) {
+      NSLog(@"OpenCVWrapper: テンプレート画像 q.png を読み込めませんでした");
+      return @{
+        @"processedImage" : [NSNull null],
+        @"circleCenters" : @[],
+        @"croppedImages" : @[]
+      };
+    }
+
+    cv::Mat tplMat;
+    UIImageToMat(tplUIImage, tplMat);
+    if (tplMat.empty()) {
+      NSLog(@"OpenCVWrapper: テンプレート画像が空です");
+      return @{
+        @"processedImage" : [NSNull null],
+        @"circleCenters" : @[],
+        @"croppedImages" : @[]
+      };
+    }
+
+    // テンプレートもグレースケール化しておく
+    cv::Mat tplGray;
+    if (tplMat.channels() == 4)
+      cv::cvtColor(tplMat, tplGray, cv::COLOR_RGBA2GRAY);
+    else if (tplMat.channels() == 3)
+      cv::cvtColor(tplMat, tplGray, cv::COLOR_BGR2GRAY);
+    else
+      tplGray = tplMat.clone();
+
+    // matchTemplate を実行（TM_CCOEFF_NORMED）
+    cv::Mat result;
+    cv::matchTemplate(blurredOriginalMat, tplGray, result,
+                      cv::TM_CCOEFF_NORMED);
+
+    // 閾値でピークを逐次検出していく
+    const double threshold = 0.65; // 調整可能
+    while (true) {
+      double minVal, maxVal;
+      cv::Point minLoc, maxLoc;
+      cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
+      if (maxVal < threshold)
+        break;
+
+      // テンプレートの中心を円の中心とみなす
+      float centerX = static_cast<float>(maxLoc.x) + tplGray.cols / 2.0f;
+      float centerY = static_cast<float>(maxLoc.y) + tplGray.rows / 2.0f;
+      float radius = std::max(tplGray.cols, tplGray.rows) / 2.0f;
+      circles.push_back(cv::Vec3f(centerX, centerY, radius));
+
+      // 検出領域を抑制して重複検出を防ぐ
+      int x0 = std::max(0, maxLoc.x - tplGray.cols / 2);
+      int y0 = std::max(0, maxLoc.y - tplGray.rows / 2);
+      int x1 = std::min(result.cols - 1, maxLoc.x + tplGray.cols / 2);
+      int y1 = std::min(result.rows - 1, maxLoc.y + tplGray.rows / 2);
+      for (int y = y0; y <= y1; ++y) {
+        for (int x = x0; x <= x1; ++x) {
+          result.at<float>(y, x) = 0.0f;
+        }
+      }
+    }
+
+    NSLog(@"OpenCVWrapper: テンプレートマッチングで検出された個数: %zu",
+          circles.size());
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: HoughCirclesでエラー: %s", e.what());
+    NSLog(@"OpenCVWrapper: テンプレートマッチングでエラー: %s", e.what());
     return @{
       @"processedImage" : processedImage ?: image,
       @"circleCenters" : @[],
@@ -223,9 +288,9 @@ using namespace cv;
     };
   }
 
-  // 円が検出されなかった場合は処理を終了
+  // テンプレート検出結果がなければ終了
   if (circles.empty()) {
-    NSLog(@"OpenCVWrapper: 円が検出されませんでした");
+    NSLog(@"OpenCVWrapper: テンプレートマッチで何も検出されませんでした");
     return @{
       @"processedImage" : [NSNull null],
       @"circleCenters" : @[],
@@ -233,7 +298,7 @@ using namespace cv;
     };
   }
 
-  // 円の座標をNSArrayに変換
+  // 検出された中心点を NSArray に変換
   NSMutableArray<NSValue *> *circleCenters = [NSMutableArray array];
   for (const auto &circle : circles) {
     CGPoint center = CGPointMake(circle[0], circle[1]);
