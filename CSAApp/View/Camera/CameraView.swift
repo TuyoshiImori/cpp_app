@@ -98,11 +98,24 @@ public struct CameraView: View {
               .padding(.vertical, 8)
           }
           Spacer()
+          // アンケートのタイトルとタイムスタンプを表示
           if let item = item {
-            Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-              .foregroundColor(.white)
-              .font(.headline)
-              .padding(.trailing, 16)
+            VStack(alignment: .trailing, spacing: 2) {
+              if !item.title.isEmpty {
+                Text(item.title)
+                  .foregroundColor(.white)
+                  .font(.headline)
+                  .bold()
+                  .lineLimit(1)
+                  .truncationMode(.tail)
+              }
+              HStack(spacing: 8) {
+                Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                  .foregroundColor(.white.opacity(0.85))
+                  .font(.subheadline)
+              }
+            }
+            .padding(.trailing, 16)
           }
         }
         .frame(height: 60)

@@ -47,7 +47,10 @@ struct ContentView: View {
           onTap: { item, rowID in
             // タップ時の動作は引き続き ContentView が保持
             viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
-            selectedImage = image
+            // 選択されたアイテムを currentItem にセットして CameraView に渡す
+            currentItem = item
+            // 直前の選択画像があればクリアしておく
+            selectedImage = nil
             isPresentedCameraView = true
           },
           onEdit: { item, rowID in
