@@ -47,8 +47,8 @@ struct AccordionItem: View {
           suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
           value: slideOffset)
     }
-  // 背景はシステムの背景色を使う（ダークモード対応）
-  .background(Color(.systemBackground))
+    // 背景はシステムの背景色を使う（ダークモード対応）
+    .background(Color(.systemBackground))
     .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
     // 設定アプリ風の区切り線を各アイテム下部に表示（左にインセットを入れる）
     .overlay(

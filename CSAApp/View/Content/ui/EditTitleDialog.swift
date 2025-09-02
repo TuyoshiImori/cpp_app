@@ -49,7 +49,7 @@ struct EditTitleDialog: View {
         }
       }
       .padding(20)
-  .background(Color(.systemBackground))
+      .background(Color(.systemBackground))
       .cornerRadius(12)
       .frame(maxWidth: 420)
       .padding(.horizontal, 32)
