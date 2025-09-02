@@ -247,7 +247,8 @@ struct AccordionItem: View {
     Text(item.title)
       .font(.title3)
       .fontWeight(.semibold)
-      .lineLimit(2)
+      .lineLimit(nil)  // 行数制限を外し、必要に応じて改行させる
+      .fixedSize(horizontal: false, vertical: true)
       .layoutPriority(1)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
