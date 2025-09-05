@@ -16,6 +16,22 @@ extension UIImage {
     return (processedImage, circleCenters, croppedImages)
   }
 
+  /// StoredTypeの文字列配列を渡して OpenCV 側でタイプ別処理を実行する（まずはログ出力）
+  func processWithOpenCV(storedTypes: [String]) -> (UIImage, [CGPoint], [UIImage]) {
+    guard
+      let result = OpenCVWrapper.processImage(
+        withCircleDetectionAndCrop: self, withStoredTypes: storedTypes)
+    else {
+      return (self, [], [self])
+    }
+
+    let processedImage = result["processedImage"] as? UIImage ?? self
+    let circleCenters = (result["circleCenters"] as? [NSValue])?.map { $0.cgPointValue } ?? []
+    let croppedImages = result["croppedImages"] as? [UIImage] ?? [self]
+
+    return (processedImage, circleCenters, croppedImages)
+  }
+
   /// 画像をリサイズ→グレースケール→鮮鋭化→二値化→モルフォロジー処理（OpenCVで実装）→文字認識し、
   /// グレースケール画像と認識された文字列を返す
   func recognizeTextWithVisionSync() -> (UIImage, [String]) {

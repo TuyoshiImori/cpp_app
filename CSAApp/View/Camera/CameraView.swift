@@ -1,6 +1,10 @@
 import SwiftUI
 import Vision
 
+#if canImport(UIKit)
+  import UIKit
+#endif
+
 public struct CameraView: View {
   @StateObject private var viewModel: CameraViewModel
   @Binding public var image: UIImage?
@@ -186,7 +190,21 @@ public struct CameraView: View {
             let loadedSample = sample1 ?? sample2
             if let sample = loadedSample {
               let (graySample, texts) = sample.recognizeTextWithVisionSync()
-              let croppedImages = sample.cropImagesByCircles()
+
+              // item の StoredType を文字列配列へ変換して OpenCV に渡す
+              var storedTypes: [String] = []
+              if let item = item {
+                storedTypes = item.questionTypes.map { qt in
+                  switch qt {
+                  case .single: return "single"
+                  case .multiple: return "multiple"
+                  case .text: return "text"
+                  case .info: return "info"
+                  }
+                }
+              }
+
+              let (_, _, croppedImages) = sample.processWithOpenCV(storedTypes: storedTypes)
 
               capturedImages.append(graySample)
               croppedImageSets.append(croppedImages)
@@ -225,7 +243,19 @@ public struct CameraView: View {
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
       let (gray, texts) = img.recognizeTextWithVisionSync()
-      let croppedImages = img.cropImagesByCircles()
+      // item の StoredType を文字列配列へ変換して OpenCV に渡す
+      var storedTypes: [String] = []
+      if let item = item {
+        storedTypes = item.questionTypes.map { qt in
+          switch qt {
+          case .single: return "single"
+          case .multiple: return "multiple"
+          case .text: return "text"
+          case .info: return "info"
+          }
+        }
+      }
+      let (_, _, croppedImages) = img.processWithOpenCV(storedTypes: storedTypes)
 
       if croppedImages.isEmpty {
         isCircleDetectionFailed = true

@@ -383,4 +383,58 @@ using namespace cv;
   };
 }
 
+// 新 API 実装: StoredType の文字列配列を受け取り、OpenCV
+// 側でタイプごとの分岐ログを出力する
++ (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image
+                                         withStoredTypes:
+                                             (NSArray<NSString *> *)types {
+  NSDictionary *baseResult =
+      [self processImageWithCircleDetectionAndCrop:image];
+
+  if (!types || types.count == 0) {
+    NSLog(@"OpenCVWrapper: StoredTypes が渡されていません。通常処理のみ実行。");
+    return baseResult;
+  }
+
+  NSArray *cropped = baseResult[@"croppedImages"];
+  if (!cropped || cropped.count == 0) {
+    NSLog(@"OpenCVWrapper: "
+          @"切り取り画像がありません。StoredTypeごとの解析をスキップします。");
+    return baseResult;
+  }
+
+  // 各 StoredType に沿って切り取り画像を順に処理（まずはログ出力）
+  NSUInteger count = MIN(types.count, cropped.count);
+  for (NSUInteger i = 0; i < count; i++) {
+    NSString *t = types[i];
+    NSLog(@"OpenCVWrapper: StoredType[%lu] = %@ を処理開始 (画像 index=%lu)",
+          (unsigned long)i, t, (unsigned long)i);
+
+    // 簡易的な分岐ログ（将来的に各タイプごとの OpenCV 実装を呼ぶ）
+    if ([t isEqualToString:@"single"]) {
+      NSLog(@"OpenCVWrapper: single question -> "
+            @"ここで単一選択の検出ロジックを呼び出します (index=%lu)",
+            (unsigned long)i);
+    } else if ([t isEqualToString:@"multiple"]) {
+      NSLog(@"OpenCVWrapper: multiple question -> "
+            @"ここで複数選択の検出ロジックを呼び出します (index=%lu)",
+            (unsigned long)i);
+    } else if ([t isEqualToString:@"text"]) {
+      NSLog(@"OpenCVWrapper: text question -> "
+            @"ここでテキスト回答の検出ロジックを呼び出します (index=%lu)",
+            (unsigned long)i);
+    } else if ([t isEqualToString:@"info"]) {
+      NSLog(@"OpenCVWrapper: info question -> "
+            @"ここで個人情報フィールド抽出ロジックを呼び出します (index=%lu)",
+            (unsigned long)i);
+    } else {
+      NSLog(
+          @"OpenCVWrapper: 未知の StoredType=%@ (index=%lu)。スキップします。",
+          t, (unsigned long)i);
+    }
+  }
+
+  return baseResult;
+}
+
 @end
