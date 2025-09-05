@@ -12,6 +12,7 @@ public struct CameraView: View {
 
   @State private var capturedImages: [UIImage] = []
   @State private var croppedImageSets: [[UIImage]] = []  // 各キャプチャごとの切り取り画像セット
+  @State private var parsedResults: [[String]] = []  // 各キャプチャごとの解析結果（parsedAnswers）
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
@@ -50,18 +51,19 @@ public struct CameraView: View {
               ScrollView(.vertical) {
                 VStack(spacing: 10) {
                   ForEach(Array(imageSet.enumerated()), id: \.offset) { imgIdx, img in
-                    VStack {
-                      Text("設問 \(imgIdx + 1)つ目")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                        .padding(.top, 10)
+                    // 安全に検出文字列を取り出す
+                    let detectedOpt: String? =
+                      (parsedResults.indices.contains(setIdx)
+                        && parsedResults[setIdx].indices.contains(imgIdx))
+                      ? parsedResults[setIdx][imgIdx] : nil
+                    let displayText = displayTextFor(
+                      setIdx: setIdx, imgIdx: imgIdx, detectedOptional: detectedOpt)
 
-                      Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: geo.size.width - 20)
-                        .padding(.horizontal, 10)
-                    }
+                    PreviewImageCell(
+                      title: "設問 \(imgIdx + 1)つ目", image: img, displayText: displayText
+                    )
+                    .frame(maxWidth: geo.size.width - 20)
+                    .padding(.horizontal, 10)
                   }
                 }
                 .padding(.top, 50)
@@ -204,10 +206,16 @@ public struct CameraView: View {
                 }
               }
 
-              let (_, _, croppedImages) = sample.processWithOpenCV(storedTypes: storedTypes)
+              // まず切り取りだけを取得し、その切り取り画像リストと storedTypes を
+              // 明示的に OpenCV 側に渡して解析を行う
+              let base = OpenCVWrapper.detectCirclesAndCrop(sample)
+              let baseCropped = base?["croppedImages"] as? [UIImage] ?? [sample]
+              let (_, _, croppedImages, parsed) = sample.processWithOpenCVAndParsedAnswers(
+                storedTypes: storedTypes)
 
               capturedImages.append(graySample)
               croppedImageSets.append(croppedImages)
+              parsedResults.append(parsed)
               recognizedTexts.append(texts)
               image = graySample
             }
@@ -255,13 +263,19 @@ public struct CameraView: View {
           }
         }
       }
-      let (_, _, croppedImages) = img.processWithOpenCV(storedTypes: storedTypes)
+
+      // 既存画像についても同様に、まず切り取りを取得してから解析を行う
+      let base = OpenCVWrapper.detectCirclesAndCrop(img)
+      let baseCropped = base?["croppedImages"] as? [UIImage] ?? [img]
+      let (_, _, croppedImages, parsed) = img.processWithOpenCVAndParsedAnswers(
+        storedTypes: storedTypes)
 
       if croppedImages.isEmpty {
         isCircleDetectionFailed = true
       } else {
         capturedImages.append(gray)
         croppedImageSets.append(croppedImages)
+        parsedResults.append(parsed)
         recognizedTexts.append(texts)
         image = gray
       }
@@ -276,4 +290,39 @@ public struct CameraView: View {
     }
     return window.safeAreaInsets.top
   }
+}
+
+// 小さなセルビュー: 画像と検出テキストを表示
+private struct PreviewImageCell: View {
+  let title: String
+  let image: UIImage
+  let displayText: String?
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Text(title)
+        .foregroundColor(.white)
+        .font(.headline)
+        .padding(.top, 10)
+
+      Image(uiImage: image)
+        .resizable()
+        .scaledToFit()
+
+      if let displayText = displayText {
+        Text("検出: \(displayText)")
+          .foregroundColor(.white)
+          .font(.subheadline)
+          .padding(.bottom, 8)
+      }
+    }
+  }
+}
+
+// 表示文字列を安全に構築する小さな関数
+private func displayTextFor(setIdx: Int, imgIdx: Int, detectedOptional: String?) -> String? {
+  guard let detected = detectedOptional else { return nil }
+  // ここでは Item 型や questionTypes にアクセスせず単純に detected を返す
+  // 追加のロジックが必要なら CameraView 内で別途処理する
+  return detected
 }
