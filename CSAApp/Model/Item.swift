@@ -142,6 +142,22 @@ public final class Item {
   // 新規追加を表すフラグ（タップで消すために永続化）
   public var isNew: Bool
 
+  // 各設問の選択肢数を数値配列で返すヘルパー
+  public var optionCounts: [Int] {
+    return questionTypes.map { qt in
+      switch qt {
+      case .single(_, let options):
+        return options.count
+      case .multiple(_, let options):
+        return options.count
+      case .text(_):
+        return 0
+      case .info(_, _):
+        return 0
+      }
+    }
+  }
+
   public init(
     timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
     title: String = "", isNew: Bool = false

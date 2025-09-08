@@ -17,13 +17,13 @@ extension UIImage {
   }
 
   /// 画像をリサイズ→グレースケール→鮮鋭化→二値化→モルフォロジー処理（OpenCVで実装）→文字認識し、
-  /// グレースケール画像と認識された文字列を返す
-  func recognizeTextWithVisionSync() -> (UIImage, [String]) {
-    // OpenCVWrapper経由で統合処理を行い、処理済み画像を取得
-    let (processedImage, _, _) = processWithOpenCV()
+  /// グレースケール画像、認識された文字列、及び円検出に基づく切り取り画像配列を返す
+  func recognizeTextWithVisionSync() -> (UIImage, [String], [UIImage]) {
+    // OpenCVWrapper経由で統合処理を行い、処理済み画像と切り取り画像を取得
+    let (processedImage, _, croppedImages) = processWithOpenCV()
 
     // Vision用にCGImage化
-    guard let cgimg = processedImage.cgImage else { return (self, []) }
+    guard let cgimg = processedImage.cgImage else { return (self, [], [self]) }
 
     // --- 以降はVisionで文字認識 ---
     var recognizedTexts: [String] = []
@@ -50,19 +50,7 @@ extension UIImage {
       }
     }
     semaphore.wait()
-    // グレースケール画像を返す
-    return (processedImage, recognizedTexts)
-  }
-
-  /// 円の検出を行い、円の中心座標と前処理済み画像を返す
-  func detectCirclesWithVisionSync() -> ([CGPoint], UIImage) {
-    let (processedImage, circleCenters, _) = processWithOpenCV()
-    return (circleCenters, processedImage)
-  }
-
-  /// 円の検出に基づいて画像を複数の領域に切り取る
-  func cropImagesByCircles() -> [UIImage] {
-    let (_, _, croppedImages) = processWithOpenCV()
-    return croppedImages
+    // グレースケール画像、認識テキスト、切り取り画像を返す
+    return (processedImage, recognizedTexts, croppedImages)
   }
 }

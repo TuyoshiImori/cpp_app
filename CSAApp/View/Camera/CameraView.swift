@@ -12,6 +12,7 @@ public struct CameraView: View {
   @State private var previewIndex: Int = 0
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
   @State private var isCircleDetectionFailed: Bool = false
+  @State private var isProcessingSample: Bool = false
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -181,22 +182,30 @@ public struct CameraView: View {
         HStack {
           Spacer()
           Button(action: {
-            let sample1 = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
-            let sample2 = UIImage(named: "form")
-            let loadedSample = sample1 ?? sample2
+            let loadedSample = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
             if let sample = loadedSample {
-              let (graySample, texts) = sample.recognizeTextWithVisionSync()
-              let croppedImages = sample.cropImagesByCircles()
-
-              capturedImages.append(graySample)
-              croppedImageSets.append(croppedImages)
-              recognizedTexts.append(texts)
-              image = graySample
+              // ボタンを無効化して処理中フラグを立てる
+              isProcessingSample = true
+              // ViewModel に処理を任せる。
+              // 注意: ViewModel は処理中に `capturedImage` を publish するため、
+              // `.onReceive(viewModel.$capturedImage)` 側で UI 更新（配列追加）を行う。
+              // ここで同じ追加処理を行うと二重追加になるため、completion 内では
+              // UI の配列追加を行わず、処理中フラグの解除のみ行う。
+              viewModel.processCapturedImage(sample) {
+                // 処理完了でボタンを再度有効化
+                isProcessingSample = false
+              }
             }
           }) {
             HStack(spacing: 8) {
-              Image(systemName: "photo.on.rectangle")
-              Text("サンプル読み込み")
+              if isProcessingSample {
+                ProgressView()
+                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                  .frame(width: 20, height: 20)
+              } else {
+                Image(systemName: "photo.on.rectangle")
+              }
+              Text(isProcessingSample ? "読み込み中..." : "サンプル読み込み")
             }
             .font(.headline)
             .foregroundColor(.white)
@@ -206,6 +215,7 @@ public struct CameraView: View {
             .cornerRadius(16)
             .shadow(radius: 4)
           }
+          .disabled(isProcessingSample)
           .padding(.top, 16 + safeAreaInsets.top)
           .padding(.trailing, 16)
         }
@@ -224,16 +234,18 @@ public struct CameraView: View {
       previewFullScreenView()
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
-      let (gray, texts) = img.recognizeTextWithVisionSync()
-      let croppedImages = img.cropImagesByCircles()
+      // ViewModel が既に画像処理と切り取りを実行しているため、
+      // ここでは ViewModel が保持する結果を利用して UI を更新する
+      let croppedImages = viewModel.lastCroppedImages
+      let texts = viewModel.recognizedTexts
 
       if croppedImages.isEmpty {
         isCircleDetectionFailed = true
       } else {
-        capturedImages.append(gray)
+        capturedImages.append(img)
         croppedImageSets.append(croppedImages)
         recognizedTexts.append(texts)
-        image = gray
+        image = img
       }
     }
   }
