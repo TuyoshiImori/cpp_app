@@ -48,7 +48,7 @@ public struct CameraView: View {
                 VStack(spacing: 10) {
                   ForEach(Array(imageSet.enumerated()), id: \.offset) { imgIdx, img in
                     VStack {
-                      Text("設問 \(imgIdx + 1)つ目")
+                      Text("設問 \(imgIdx + 1)")
                         .foregroundColor(.white)
                         .font(.headline)
                         .padding(.top, 10)
@@ -58,6 +58,71 @@ public struct CameraView: View {
                         .scaledToFit()
                         .frame(maxWidth: geo.size.width - 20)
                         .padding(.horizontal, 10)
+
+                      // 検出結果を表示
+                      if setIdx < viewModel.parsedAnswers.count
+                        && imgIdx < viewModel.parsedAnswers.count
+                      {
+                        let answerIndex = viewModel.parsedAnswers[imgIdx]
+                        VStack(alignment: .leading, spacing: 4) {
+                          Text("検出結果:")
+                            .foregroundColor(.white)
+                            .font(.subheadline)
+                            .bold()
+
+                          if let item = item, imgIdx < item.questionTypes.count {
+                            let questionType = item.questionTypes[imgIdx]
+                            switch questionType {
+                            case .single(let question, let options):
+                              Text("設問: \(question)")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+
+                              if let index = Int(answerIndex), index >= 0 && index < options.count {
+                                Text("回答: \(options[index])")
+                                  .foregroundColor(.green)
+                                  .font(.subheadline)
+                                  .bold()
+                              } else if answerIndex == "-1" {
+                                Text("回答: 未選択")
+                                  .foregroundColor(.orange)
+                                  .font(.subheadline)
+                              } else {
+                                Text("回答: 検出エラー")
+                                  .foregroundColor(.red)
+                                  .font(.subheadline)
+                              }
+                            case .multiple(let question, _):
+                              Text("設問: \(question)")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+                              Text("回答: 複数選択 (未実装)")
+                                .foregroundColor(.gray)
+                                .font(.subheadline)
+                            case .text(let question):
+                              Text("設問: \(question)")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+                              Text("回答: 自由記述")
+                                .foregroundColor(.blue)
+                                .font(.subheadline)
+                            case .info(let question, _):
+                              Text("設問: \(question)")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+                              Text("回答: 個人情報")
+                                .foregroundColor(.purple)
+                                .font(.subheadline)
+                            }
+                          } else {
+                            Text("設問情報なし")
+                              .foregroundColor(.gray)
+                              .font(.subheadline)
+                          }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 10)
+                      }
                     }
                   }
                 }

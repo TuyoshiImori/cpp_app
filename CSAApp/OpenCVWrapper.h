@@ -15,4 +15,8 @@
 								 withCroppedImages:(NSArray<UIImage *> *)croppedImages
 									 withStoredTypes:(NSArray<NSString *> *)types
 									 withOptionTexts:(NSArray<NSArray<NSString *> *> *)optionTexts;
+
+// チェックボックス検出用のヘルパーメソッド
++ (NSString *)detectSingleAnswerFromImage:(UIImage *)image withOptions:(NSArray<NSString *> *)options;
+
 @end

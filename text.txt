@@ -1,154 +1,69 @@
-import Combine
-import SwiftData
-import SwiftUI
+This is one way to solve it.
 
-// コンパイル時の型チェック負荷を軽減するため、ContentView から切り出しました。
-struct AccordionItem: View {
-  let item: Item
-  let rowID: String
-  @Binding var expandedRowIDs: Set<String>
-  @Binding var newRowIDs: Set<String>
-  let onTap: () -> Void
+Step 1: Binarisation
+import os
+import cv2
+import numpy as np
+import pandas as pd
 
-  // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
-  private var vm: ContentViewModel.AccordionItemVM {
-    ContentViewModel.AccordionItemVM(item: item, rowID: rowID)
-  }
+### reading input image
+image_path='test_sample.jpg'
+image=cv2.imread(image_path)
 
-  var body: some View {
-    let isExpanded = vm.isExpanded(in: expandedRowIDs)
+### converting BGR to Grayscale
+gray_scale=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
 
-    // アイテム間の余白をなくすため spacing を 0 にする
-    VStack(alignment: .leading, spacing: 0) {
-      // 常に表示されるヘッダ領域（ID/タイトル/タイムスタンプ）
-      VStack(alignment: .leading, spacing: 6) {
-        // ID
-        if !item.surveyID.isEmpty {
-          Text("ID: \(item.surveyID)")
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
+### Binarising image
+th1,img_bin = cv2.threshold(gray_scale,180,225,cv2.THRESH_OTSU)
 
-        if !item.title.isEmpty {
-          HStack(alignment: .center, spacing: 8) {
-            // タイトル
-            Text(item.title)
-              .font(.title3)
-              .fontWeight(.semibold)
-              .lineLimit(2)
-              .layoutPriority(1)
-              .frame(maxWidth: .infinity, alignment: .leading)
+Binary image:
 
-            // Newバッジ
-            Text("NEW")
-              .font(.caption2)
-              .bold()
-              .foregroundColor(.white)
-              .padding(.vertical, 4)
-              .padding(.horizontal, 8)
-              .background(Color.red)
-              .cornerRadius(6)
-              .frame(minWidth: 44, alignment: .center)
-              .opacity(vm.isNew(in: newRowIDs) ? 1.0 : 0.0)
+binary image
 
-            if !item.questionTypes.isEmpty {
-              Button(action: {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                  vm.toggleExpanded(&expandedRowIDs)
-                }
-              }) {
-                Image(systemName: vm.chevronImageName(isExpanded: isExpanded))
-                  .foregroundColor(vm.chevronForegroundColor(isExpanded: isExpanded))
-                  .imageScale(.medium)
-                  .frame(width: 36, height: 36)
-                  .background(vm.chevronBackgroundColor(isExpanded: isExpanded))
-                  .cornerRadius(8)
-                  .overlay(
-                    RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.15), lineWidth: 1)
-                  )
-              }
-              .buttonStyle(.plain)
-              .contentShape(Rectangle())
-            }
-          }
-        }
+Step 2: Finding horizontal and vertical lines
+### defining kernels
 
-        Text(vm.formattedTimestamp(item.timestamp))
-          .font(.subheadline)
-          .fontWeight(.light)
-          .foregroundColor(.secondary)
-      }
-      .padding(12)
-      // ヘッダは横幅いっぱいに広げ、背景色を設定して透けないようにする
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(.background)  // SwiftUI標準の背景色を追加
-      .zIndex(2)  // ヘッダを展開コンテンツより前面に表示
-      .animation(nil, value: isExpanded)
+lWidth = 2
+lineMinWidth = 15
 
-      // 展開コンテンツ：常にビュー階層に残すが、折りたたむ際は
-      // maxHeight = 0 と clipped を用いてレイアウトを押し下げ、
-      // 固有の高さを測定しないようにする。
-      if !item.questionTypes.isEmpty {
-        // 折りたたまれたときはコンテンツを表示しない（高さ0）
-        if isExpanded {
-          VStack(spacing: 8) {
-            ForEach(item.questionTypes, id: \.self) { questionType in
-              HStack(alignment: .top) {
-                Spacer().frame(width: 16)
-                switch questionType {
-                case .single(let question, let options):
-                  Image(systemName: "checkmark.circle").foregroundColor(.blue)
-                  VStack(alignment: .leading) {
-                    Text("\(question)")
-                      .fixedSize(horizontal: false, vertical: true)
-                    Text(options.joined(separator: ","))
-                      .font(.subheadline).foregroundColor(.gray)
-                      .lineLimit(1).truncationMode(.tail)
-                  }
-                case .multiple(let question, let options):
-                  Image(systemName: "list.bullet").foregroundColor(.green)
-                  VStack(alignment: .leading) {
-                    Text("\(question)")
-                      .fixedSize(horizontal: false, vertical: true)
-                    Text(options.joined(separator: ","))
-                      .font(.subheadline).foregroundColor(.gray)
-                      .lineLimit(1).truncationMode(.tail)
-                  }
-                case .text(let question):
-                  Image(systemName: "textformat").foregroundColor(.orange)
-                  Text("\(question)")
-                    .fixedSize(horizontal: false, vertical: true)
-                case .info(let question, let fields):
-                  Image(systemName: "person.crop.circle").foregroundColor(.purple)
-                  VStack(alignment: .leading) {
-                    Text("\(question)")
-                      .fixedSize(horizontal: false, vertical: true)
-                    Text(fields.map { $0.displayName }.joined(separator: ","))
-                      .font(.subheadline)
-                      .foregroundColor(.gray).lineLimit(1).truncationMode(.tail)
-                  }
-                }
-                Spacer()
-              }
-            }
-          }
-          .padding(.top, 12)  // ヘッダとの間隔を確保
-          .zIndex(0)  // 展開コンテンツは背景層に配置
-          .transition(.move(edge: .top).combined(with: .opacity))
-          .animation(.easeInOut(duration: 0.25), value: isExpanded)
-        }
-      }
-    }
-    // 展開／折りたたみ時にレイアウトの変化（コンテンツを押し下げる）をアニメーションする
-    .animation(.easeInOut(duration: 0.25), value: isExpanded)
-    .cornerRadius(10)
-    .overlay(
-      RoundedRectangle(cornerRadius: 10).stroke(
-        Color.secondary.opacity(0.6), lineWidth: 0.5)
-    )
-    .onTapGesture(perform: onTap)
-    // アイテム間の余白を無くすため縦パディングを0にする
-    .padding(.horizontal, 0)
-    .padding(.vertical, 0)
-  }
-}
+kernal1 = np.ones((lWidth,lWidth), np.uint8)
+kernal1h = np.ones((1,lWidth), np.uint8)
+kernal1v = np.ones((lWidth,1), np.uint8)
+
+kernal6 = np.ones((lineMinWidth,lineMinWidth), np.uint8)
+kernal6h = np.ones((1,lineMinWidth), np.uint8)
+kernal6v = np.ones((lineMinWidth,1), np.uint8)
+
+### finding horizontal lines
+img_bin_h = cv2.morphologyEx(~img_bin, cv2.MORPH_CLOSE, kernal1h) # bridge small gap in horizonntal lines
+img_bin_h = cv2.morphologyEx(img_bin_h, cv2.MORPH_OPEN, kernal6h) # kep ony horiz lines by eroding everything else in hor direction
+Horizontal Lines:
+
+horizontal lines
+
+## detect vert lines
+img_bin_v = cv2.morphologyEx(~img_bin, cv2.MORPH_CLOSE, kernal1v)  # bridge small gap in vert lines
+img_bin_v = cv2.morphologyEx(img_bin_v, cv2.MORPH_OPEN, kernal6v)# kep ony vert lines by eroding everything else in vert direction
+Vertical Lines:
+
+vertical lines
+
+Step 3: combining horizontal and vertical lines
+def fix(img):
+    img[img>127]=255
+    img[img<127]=0
+    return img
+img_bin_final = fix(fix(img_bin_h)|fix(img_bin_v))
+
+Combined binary output:
+
+binary final
+
+Step 4: Find rectangles using Connected Components
+### getting labels
+ret, labels, stats,centroids = cv2.connectedComponentsWithStats(~img_bin_final, connectivity=8, ltype=cv2.CV_32S)
+
+### drawing recangles for visualisation
+for x,y,w,h,area in stats[2:]:
+    cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
+Final output:

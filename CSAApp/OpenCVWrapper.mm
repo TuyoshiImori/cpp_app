@@ -436,13 +436,16 @@ using namespace cv;
       NSLog(@"  option[%lu]: %@", (unsigned long)j, option);
     }
 
-    // StoredType ごとの分岐（今はログ出力のみ）。後で OpenCV
-    // ロジックをここに入れる。
+    // StoredType ごとの分岐：実際のOpenCV処理を実装
     if ([storedType isEqualToString:@"single"]) {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as SINGLE with %ld options",
             i, (long)optCount);
-      // TODO: OpenCV で single チェックをここで実行
-      [parsedAnswers addObject:@"-1"]; // ダミー: 未選択
+
+      // チェックボックス検出処理を実行
+      UIImage *croppedImage = croppedImages[i];
+      NSString *result = [self detectSingleAnswerFromImage:croppedImage
+                                               withOptions:optionArray];
+      [parsedAnswers addObject:result];
     } else if ([storedType isEqualToString:@"multiple"]) {
       NSLog(
           @"OpenCVWrapper: index=%zu -> handling as MULTIPLE with %ld options",
@@ -465,6 +468,171 @@ using namespace cv;
     @"processedImage" : image ?: [NSNull null],
     @"parsedAnswers" : parsedAnswers
   };
+}
+
+// チェックボックス検出のヘルパーメソッド
++ (NSString *)detectSingleAnswerFromImage:(UIImage *)image
+                              withOptions:(NSArray<NSString *> *)options {
+  if (image == nil || [options count] == 0) {
+    NSLog(@"OpenCVWrapper: detectSingleAnswer - 無効な入力");
+    return @"-1";
+  }
+
+  // UIImage -> cv::Mat
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: detectSingleAnswer - 空の画像");
+    return @"-1";
+  }
+
+  // グレースケール変換
+  cv::Mat gray;
+  if (mat.channels() == 4) {
+    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
+  } else if (mat.channels() == 3) {
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = mat.clone();
+  }
+
+  // チェックボックス検出処理
+  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
+
+  if (checkboxes.empty()) {
+    NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+          @"チェックボックスが見つかりません");
+    return @"-1";
+  }
+
+  // チェック状態を確認
+  for (size_t i = 0; i < checkboxes.size() && i < [options count]; i++) {
+    if ([self isCheckboxChecked:gray rect:checkboxes[i]]) {
+      NSLog(@"OpenCVWrapper: detectSingleAnswer - チェック検出: index=%zu, "
+            @"option=%@",
+            i, options[i]);
+      return [NSString stringWithFormat:@"%zu", i];
+    }
+  }
+
+  NSLog(@"OpenCVWrapper: detectSingleAnswer - チェックが見つかりません");
+  return @"-1";
+}
+
+// チェックボックス矩形検出
++ (std::vector<cv::Rect>)detectCheckboxes:(cv::Mat)gray {
+  std::vector<cv::Rect> checkboxes;
+
+  try {
+    // text.txtの方法を参考に実装
+    // Step 1: 二値化
+    cv::Mat binary;
+    cv::threshold(gray, binary, 180, 255, cv::THRESH_OTSU);
+
+    // Step 2: 水平線と垂直線の検出
+    int lWidth = 2;
+    int lineMinWidth = 15;
+
+    // カーネル定義
+    cv::Mat kernel1h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lWidth, 1));
+    cv::Mat kernel1v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lWidth));
+    cv::Mat kernel6h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lineMinWidth, 1));
+    cv::Mat kernel6v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lineMinWidth));
+
+    // 水平線検出
+    cv::Mat binaryInv;
+    cv::bitwise_not(binary, binaryInv);
+
+    cv::Mat imgBinH;
+    cv::morphologyEx(binaryInv, imgBinH, cv::MORPH_CLOSE, kernel1h);
+    cv::morphologyEx(imgBinH, imgBinH, cv::MORPH_OPEN, kernel6h);
+
+    // 垂直線検出
+    cv::Mat imgBinV;
+    cv::morphologyEx(binaryInv, imgBinV, cv::MORPH_CLOSE, kernel1v);
+    cv::morphologyEx(imgBinV, imgBinV, cv::MORPH_OPEN, kernel6v);
+
+    // 水平線と垂直線を結合
+    cv::Mat imgBinFinal;
+    cv::bitwise_or(imgBinH, imgBinV, imgBinFinal);
+
+    // 結果を修正（text.txtのfix関数相当）
+    imgBinFinal.setTo(255, imgBinFinal > 127);
+    imgBinFinal.setTo(0, imgBinFinal <= 127);
+
+    // Step 4: 連結成分で矩形検出
+    cv::Mat labels, stats, centroids;
+    cv::bitwise_not(imgBinFinal, imgBinFinal);
+    int numLabels =
+        cv::connectedComponentsWithStats(imgBinFinal, labels, stats, centroids);
+
+    // 矩形をサイズでフィルタリング（チェックボックスサイズに合うもの）
+    for (int i = 1; i < numLabels; i++) {
+      int x = stats.at<int>(i, cv::CC_STAT_LEFT);
+      int y = stats.at<int>(i, cv::CC_STAT_TOP);
+      int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
+      int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
+      int area = stats.at<int>(i, cv::CC_STAT_AREA);
+
+      // チェックボックスのサイズ判定（正方形に近く、適切なサイズ）
+      if (w > 10 && h > 10 && w < 100 && h < 100 && abs(w - h) < 10 &&
+          area > 100) {
+        checkboxes.push_back(cv::Rect(x, y, w, h));
+      }
+    }
+
+    // y座標でソート（上から下へ）、同じy座標なら左から右へ
+    std::sort(checkboxes.begin(), checkboxes.end(),
+              [](const cv::Rect &a, const cv::Rect &b) {
+                if (abs(a.y - b.y) < 20) { // 同じ行とみなす
+                  return a.x < b.x;
+                }
+                return a.y < b.y;
+              });
+
+    NSLog(@"OpenCVWrapper: detectCheckboxes - %zu個のチェックボックスを検出",
+          checkboxes.size());
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: detectCheckboxes でエラー: %s", e.what());
+  }
+
+  return checkboxes;
+}
+
+// チェックボックスがチェックされているかを判定
++ (BOOL)isCheckboxChecked:(cv::Mat)gray rect:(cv::Rect)rect {
+  try {
+    // チェックボックス領域を抽出
+    cv::Mat roi = gray(rect);
+
+    // 二値化
+    cv::Mat binary;
+    cv::threshold(roi, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    // 黒いピクセルの割合を計算
+    int totalPixels = roi.rows * roi.cols;
+    int blackPixels = totalPixels - cv::countNonZero(binary);
+    double blackRatio = (double)blackPixels / totalPixels;
+
+    // 閾値以上の黒いピクセルがあればチェック済みと判定
+    bool isChecked = blackRatio > 0.1; // 10%以上が黒ならチェック済み
+
+    NSLog(@"OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: %.2f%%, "
+          @"チェック済み: %s",
+          blackRatio * 100, isChecked ? "YES" : "NO");
+
+    return isChecked;
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: isCheckboxChecked でエラー: %s", e.what());
+    return false;
+  }
 }
 
 @end
