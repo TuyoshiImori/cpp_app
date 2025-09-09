@@ -35,6 +35,7 @@ struct CSAAppApp: App {
           let vm = ContentViewModel()
           let parsed = vm.parse(url.absoluteString)
           var qtypes: [QuestionType] = []
+          var optionTextsArray: [[String]] = []
           var surveyID: String? = nil
           var title: String? = nil
 
@@ -52,14 +53,18 @@ struct CSAAppApp: App {
             switch key {
             case "single", "type=single":
               qtypes.append(.single(questionText, options))
+              optionTextsArray.append(options)
             case "multiple", "type=multiple":
               qtypes.append(.multiple(questionText, options))
+              optionTextsArray.append(options)
             case "text", "type=text":
               qtypes.append(.text(questionText))
+              optionTextsArray.append([])
             case "info", "type=info":
               // options は文字列の配列なので InfoField に変換する（不明なフィールドは無視）
               let infoFields = options.compactMap { QuestionType.InfoField(from: $0) }
               qtypes.append(.info(questionText, infoFields))
+              optionTextsArray.append([])
             default:
               continue
             }
@@ -82,7 +87,7 @@ struct CSAAppApp: App {
 
           let newItem = Item(
             timestamp: Date(), questionTypes: qtypes, surveyID: surveyID ?? "", title: title ?? "",
-            isNew: true)
+            isNew: true, optionTexts: optionTextsArray)
           context.insert(newItem)
           try? context.save()
           // 新規追加の通知を出す（timestamp を送る）

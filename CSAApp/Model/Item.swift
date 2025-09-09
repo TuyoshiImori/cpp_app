@@ -141,31 +141,18 @@ public final class Item {
   public var title: String
   // 新規追加を表すフラグ（タップで消すために永続化）
   public var isNew: Bool
-
-  // 各設問の選択肢数を数値配列で返すヘルパー
-  public var optionCounts: [Int] {
-    return questionTypes.map { qt in
-      switch qt {
-      case .single(_, let options):
-        return options.count
-      case .multiple(_, let options):
-        return options.count
-      case .text(_):
-        return 0
-      case .info(_, _):
-        return 0
-      }
-    }
-  }
+  // 各設問の選択肢テキストを格納するストアドプロパティ
+  public var optionTexts: [[String]]
 
   public init(
     timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
-    title: String = "", isNew: Bool = false
+    title: String = "", isNew: Bool = false, optionTexts: [[String]] = []
   ) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
     self.surveyID = surveyID
     self.title = title
     self.isNew = isNew
+    self.optionTexts = optionTexts
   }
 }

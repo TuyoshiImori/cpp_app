@@ -74,7 +74,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
   }
 
-  /// initialQuestionTypes を元に types (String) と optionCounts ([NSNumber]) を構築し、
+  /// initialQuestionTypes を元に types (String) と optionTexts ([[String]]) を構築し、
   /// 切り取った画像配列と共に OpenCV の解析 API を呼び出すサンプルメソッド
   func parseCroppedImagesWithStoredTypes(_ croppedImages: [UIImage]) -> [String] {
     // StoredType 文字列配列
@@ -87,14 +87,20 @@ final class CameraViewModel: NSObject, ObservableObject {
       }
     }
 
-    // optionCounts を NSNumber 配列に変換
-    let counts: [NSNumber] = initialQuestionTypes.map { qt in
+    // optionTexts を二次元配列として構築
+    let optionTexts: [[String]] = initialQuestionTypes.map { qt in
       switch qt {
-      case .single(_, let options): return NSNumber(value: options.count)
-      case .multiple(_, let options): return NSNumber(value: options.count)
-      case .text(_): return NSNumber(value: 0)
-      case .info(_, _): return NSNumber(value: 0)
+      case .single(_, let options): return options
+      case .multiple(_, let options): return options
+      case .text(_): return []
+      case .info(_, _): return []
       }
+    }
+
+    // デバッグ: Swift側でのoptionTextsの内容を確認
+    print("Swift側 optionTexts:")
+    for (index, texts) in optionTexts.enumerated() {
+      print("  index[\(index)]: \(texts)")
     }
 
     // OpenCVWrapper の新 API を呼び出す
@@ -102,7 +108,7 @@ final class CameraViewModel: NSObject, ObservableObject {
       self.capturedImage ?? UIImage(),
       withCroppedImages: croppedImages,
       withStoredTypes: types,
-      withOptionCounts: counts)
+      withOptionTexts: optionTexts)
     guard let parsed = raw?["parsedAnswers"] as? [String] else { return [] }
     return parsed
   }

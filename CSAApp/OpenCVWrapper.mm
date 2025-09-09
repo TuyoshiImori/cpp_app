@@ -383,13 +383,12 @@ using namespace cv;
   };
 }
 
-// 新しい解析 API: 切り取った設問画像ごとに StoredType と optionCounts
-// を受け取り、
-// 種類ごとに処理を振り分けるためのエントリポイント（現時点ではログ出力のみ）
+// 切り取った設問画像ごとにStoredTypeとoptionTextsを受け取り、種類ごとに処理を振り分ける
 + (NSDictionary *)parseCroppedImages:(UIImage *)image
                    withCroppedImages:(NSArray<UIImage *> *)croppedImages
                      withStoredTypes:(NSArray<NSString *> *)types
-                    withOptionCounts:(NSArray<NSNumber *> *)optionCounts {
+                     withOptionTexts:
+                         (NSArray<NSArray<NSString *> *> *)optionTexts {
   // 引数チェック
   if (croppedImages == nil || [croppedImages count] == 0) {
     NSLog(@"OpenCVWrapper.parseCroppedImages: croppedImages が空です");
@@ -399,36 +398,55 @@ using namespace cv;
 
   size_t n = [croppedImages count];
   NSLog(@"OpenCVWrapper.parseCroppedImages: images=%zu, types=%zu, "
-        @"optionCounts=%zu",
+        @"optionTexts=%zu",
         n, (size_t)(types ? [types count] : 0),
-        (size_t)(optionCounts ? [optionCounts count] : 0));
+        (size_t)(optionTexts ? [optionTexts count] : 0));
 
-  // 全体の types と optionCounts を出力（デバッグ用）
+  // 全体の types と optionTexts を出力（デバッグ用）
   NSLog(@"OpenCVWrapper.parseCroppedImages: provided types=%@", types ?: @[]);
-  NSLog(@"OpenCVWrapper.parseCroppedImages: provided optionCounts=%@",
-        optionCounts ?: @[]);
+  NSLog(@"OpenCVWrapper.parseCroppedImages: provided optionTexts (count=%lu):",
+        (unsigned long)(optionTexts ? [optionTexts count] : 0));
+
+  // optionTexts の内容も個別に出力して文字化けを回避
+  if (optionTexts) {
+    for (NSUInteger idx = 0; idx < [optionTexts count]; idx++) {
+      NSArray<NSString *> *optionsAtIndex = optionTexts[idx];
+      NSLog(@"  optionTexts[%lu] (count=%lu):", (unsigned long)idx,
+            (unsigned long)[optionsAtIndex count]);
+      for (NSUInteger j = 0; j < [optionsAtIndex count]; j++) {
+        NSLog(@"    [%lu]: %@", (unsigned long)j, optionsAtIndex[j]);
+      }
+    }
+  }
 
   NSMutableArray<NSString *> *parsedAnswers = [NSMutableArray array];
 
   for (size_t i = 0; i < n; ++i) {
     NSString *storedType = (types && i < [types count]) ? types[i] : @"unknown";
-    NSNumber *optCount =
-        (optionCounts && i < [optionCounts count]) ? optionCounts[i] : @(0);
+    NSArray<NSString *> *optionArray =
+        (optionTexts && i < [optionTexts count]) ? optionTexts[i] : @[];
+    NSInteger optCount = [optionArray count];
 
     // 各要素ごとに storedType と対応する optionCount を明示的に出力
-    NSLog(@"OpenCVWrapper: index=%zu -> storedType=%@, optionCount=%d (raw=%@)",
-          i, storedType, [optCount intValue], optCount);
+    // optionTexts の内容を個別に出力して文字化けを回避
+    NSLog(@"OpenCVWrapper: index=%zu -> storedType=%@, optionCount=%ld", i,
+          storedType, (long)optCount);
+    for (NSUInteger j = 0; j < [optionArray count]; j++) {
+      NSString *option = optionArray[j];
+      NSLog(@"  option[%lu]: %@", (unsigned long)j, option);
+    }
 
     // StoredType ごとの分岐（今はログ出力のみ）。後で OpenCV
     // ロジックをここに入れる。
     if ([storedType isEqualToString:@"single"]) {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as SINGLE with %d options",
-            i, [optCount intValue]);
+      NSLog(@"OpenCVWrapper: index=%zu -> handling as SINGLE with %ld options",
+            i, (long)optCount);
       // TODO: OpenCV で single チェックをここで実行
       [parsedAnswers addObject:@"-1"]; // ダミー: 未選択
     } else if ([storedType isEqualToString:@"multiple"]) {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as MULTIPLE with %d options",
-            i, [optCount intValue]);
+      NSLog(
+          @"OpenCVWrapper: index=%zu -> handling as MULTIPLE with %ld options",
+          i, (long)optCount);
       // TODO: OpenCV で multiple チェックをここで実行
       [parsedAnswers addObject:@"-1"]; // ダミー
     } else if ([storedType isEqualToString:@"text"]) {
