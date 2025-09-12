@@ -451,8 +451,12 @@ using namespace cv;
       NSLog(
           @"OpenCVWrapper: index=%zu -> handling as MULTIPLE with %ld options",
           i, (long)optCount);
-      // TODO: OpenCV で multiple チェックをここで実行
-      [parsedAnswers addObject:@"-1"]; // ダミー
+
+      // 複数回答チェックボックス検出処理を実行
+      UIImage *croppedImage = croppedImages[i];
+      NSString *result = [self detectMultipleAnswerFromImage:croppedImage
+                                                 withOptions:optionArray];
+      [parsedAnswers addObject:result];
     } else if ([storedType isEqualToString:@"text"]) {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as TEXT", i);
       [parsedAnswers addObject:@"0"]; // テキストは選択肢なし
@@ -599,6 +603,152 @@ using namespace cv;
 
   NSLog(@"OpenCVWrapper: detectSingleAnswer - チェックが見つかりません");
   return @"-1";
+}
+
+// 複数回答チェックボックス検出のヘルパーメソッド
++ (NSString *)detectMultipleAnswerFromImage:(UIImage *)image
+                                withOptions:(NSArray<NSString *> *)options {
+  if (image == nil || [options count] == 0) {
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - 無効な入力");
+    return @"-1";
+  }
+
+  // UIImage -> cv::Mat
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - 空の画像");
+    return @"-1";
+  }
+
+  // グレースケール変換
+  cv::Mat gray;
+  if (mat.channels() == 4) {
+    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
+  } else if (mat.channels() == 3) {
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = mat.clone();
+  }
+
+  // チェックボックス検出処理
+  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
+
+  if (checkboxes.empty()) {
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+          @"チェックボックスが見つかりません");
+    return @"-1";
+  }
+
+  // チェック状態を確認（複数回答なので全てチェック）
+  NSMutableArray<NSString *> *checkedOptions = [NSMutableArray array];
+  for (size_t i = 0; i < checkboxes.size() && i < [options count]; i++) {
+    if ([self isCheckboxChecked:gray rect:checkboxes[i]]) {
+      NSString *option = options[i];
+      NSLog(@"OpenCVWrapper: detectMultipleAnswer - チェック検出: index=%zu, "
+            @"option=%@",
+            i, option);
+      [checkedOptions addObject:option];
+    }
+  }
+
+  // チェックされた選択肢の中に「その他」があるかチェック
+  NSString *otherText = nil;
+  for (NSString *checkedOption in checkedOptions) {
+    BOOL isOtherOption = ([checkedOption containsString:@"その他"] ||
+                          [checkedOption containsString:@"そのた"] ||
+                          [checkedOption containsString:@"other"] ||
+                          [checkedOption containsString:@"Other"]);
+
+    if (isOtherOption) {
+      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+            @"チェックされた選択肢に「その他」が含まれています: %@",
+            checkedOption);
+      NSString *freeText = [self detectOtherFreeText:gray
+                                          checkboxes:checkboxes];
+      if (freeText && ![freeText isEqualToString:@""]) {
+        otherText = freeText;
+        NSLog(
+            @"OpenCVWrapper: detectMultipleAnswer - その他の自由回答を検出: %@",
+            otherText);
+      }
+      break;
+    }
+  }
+
+  // チェックが見つからない場合は「その他」の可能性をチェック
+  if ([checkedOptions count] == 0) {
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+          @"チェックが見つからないため、その他を確認");
+
+    // 選択肢に「その他」が含まれているかチェック
+    BOOL hasOtherOption = false;
+    int otherOptionIndex = -1;
+
+    for (int i = 0; i < [options count]; i++) {
+      NSString *option = options[i];
+      if ([option containsString:@"その他"] ||
+          [option containsString:@"そのた"] ||
+          [option containsString:@"other"] ||
+          [option containsString:@"Other"]) {
+        hasOtherOption = true;
+        otherOptionIndex = i;
+        NSLog(@"OpenCVWrapper: detectMultipleAnswer - 「その他」選択肢を発見: "
+              @"index=%d, option=%@",
+              i, option);
+        break;
+      }
+    }
+
+    if (hasOtherOption && otherOptionIndex >= 0 &&
+        otherOptionIndex < checkboxes.size()) {
+      // 「その他」の選択肢があり、対応するチェックボックスが存在するため、自由回答を検出
+      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+            @"「その他」の自由回答を検出試行中（チェックなし）");
+
+      NSString *freeText = [self detectOtherFreeTextAtIndex:gray
+                                                 checkboxes:checkboxes
+                                                      index:otherOptionIndex];
+
+      if (freeText && ![freeText isEqualToString:@""]) {
+        NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+              @"チェックなしでその他の自由回答を検出: %@",
+              freeText);
+        return freeText;
+      } else {
+        NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+              @"「その他」の自由回答が見つからない");
+      }
+    }
+
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - チェックが見つかりません");
+    return @"-1";
+  }
+
+  // 結果を構築
+  NSMutableArray<NSString *> *results = [NSMutableArray array];
+
+  // チェックされた通常の選択肢を追加
+  for (NSString *checkedOption in checkedOptions) {
+    BOOL isOtherOption = ([checkedOption containsString:@"その他"] ||
+                          [checkedOption containsString:@"そのた"] ||
+                          [checkedOption containsString:@"other"] ||
+                          [checkedOption containsString:@"Other"]);
+
+    if (isOtherOption && otherText) {
+      // 「その他」の場合は自由回答テキストを使用
+      [results addObject:otherText];
+    } else {
+      // 通常の選択肢
+      [results addObject:checkedOption];
+    }
+  }
+
+  // 複数の選択肢を「,」で区切って返す
+  NSString *finalResult = [results componentsJoinedByString:@","];
+  NSLog(@"OpenCVWrapper: detectMultipleAnswer - 最終結果: %@", finalResult);
+  return finalResult;
 }
 
 // チェックボックス矩形検出

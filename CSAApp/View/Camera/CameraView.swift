@@ -99,9 +99,43 @@ public struct CameraView: View {
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
                                 .font(.caption)
-                              Text("回答: 複数選択 (未実装)")
-                                .foregroundColor(.gray)
-                                .font(.subheadline)
+
+                              if answerIndex == "-1" {
+                                // 未選択
+                                Text("回答: 未選択")
+                                  .foregroundColor(.orange)
+                                  .font(.subheadline)
+                              } else if !answerIndex.isEmpty {
+                                // 複数の選択肢または自由回答（カンマ区切り）
+                                let answers = answerIndex.components(separatedBy: ",")
+                                if answers.count > 1 {
+                                  VStack(alignment: .leading, spacing: 2) {
+                                    Text("回答: 複数選択")
+                                      .foregroundColor(.purple)
+                                      .font(.subheadline)
+                                      .bold()
+                                    ForEach(Array(answers.enumerated()), id: \.offset) {
+                                      idx, answer in
+                                      Text(
+                                        "  \(idx + 1). \(answer.trimmingCharacters(in: .whitespaces))"
+                                      )
+                                      .foregroundColor(.purple.opacity(0.8))
+                                      .font(.caption)
+                                    }
+                                  }
+                                } else {
+                                  // 単一選択または自由回答
+                                  Text("回答: \(answerIndex)")
+                                    .foregroundColor(.purple)
+                                    .font(.subheadline)
+                                    .bold()
+                                }
+                              } else {
+                                // 空文字などの予期しない値
+                                Text("回答: 検出エラー")
+                                  .foregroundColor(.red)
+                                  .font(.subheadline)
+                              }
                             case .text(let question):
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
