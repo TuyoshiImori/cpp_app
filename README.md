@@ -116,3 +116,58 @@ info=次回の演奏会についてご案内を希望される方はご記入く
 7. その他のチェックボックス3つ分右の座標を割り出す（文字検出時にその他を入れないため）
 8. 割り出した座標から上に少し、下にチェックボックスの高さと少し、右側を切り取る
 9. 文字検出後の文字列から()を除外してその文字列を保持
+
+## 回答検出フロー (single / multiple / text)
+
+以下は実装側で使用している高レベルの検出フローの説明です。詳細実装は `OpenCVWrapper.mm` にあり、UI 側では `CameraView.swift` が結果を表示します。
+
+共通の前処理
+- 画像をグレースケール化し、ノイズ低減（Blur）を行う。
+- 大津閾値（OTSU）などで二値化し、必要に応じて反転（白黒を反転）する。
+- 円検出で設問ごとに切り出した小画像を入力として処理する（円検出・切り取りは既存処理に従う）。
+
+single / multiple（チェックボックス検出）
+- 目的: 各選択肢に対応するチェックボックス座標を検出し、選択有無を判定して文字列にマップする。
+- 手順:
+   1. 二値化結果から水平／垂直方向の線抽出を行う（モルフォロジー: カーネル幅 lWidth=2, 枠の太さに合わせた lineMinWidth=15 を使用）。
+   2. 水平マスクと垂直マスクを合成して枠線マスクを作る。
+   3. `connectedComponentsWithStats` で候補領域を抽出する。
+   4. 幾何学的フィルタを適用（幅・高さ・面積・縁からの余白・概ね正方形など）してチェックボックス候補を絞る。
+   5. 候補を上→左の順でソートしてインデックスを割り振る（左上基準で index を付ける）。
+   6. 各候補の内部領域（枠内）を見て黒ピクセル比率を計算し、閾値以上ならチェックありと判断（isCheckboxChecked）。
+   7. single なら最初に検出されたチェックを採用、multiple なら全チェックを採用して選択肢文字列にマップする。
+
+text（自由記述の枠内文字検出）
+- 目的: 設問内の矩形枠（長方形）を検出し、その内部を OCR して一行の文字列として返す。
+- 手順:
+   1. チェックボックス検出と同じ前処理（グレースケール、二値化、水平／垂直線抽出）を行う。枠の線幅はチェックボックスと同じなので `lineMinWidth=15` を使用する。
+   2. 水平／垂直マスクを合成して枠線マスク（imgBinFinal）を作る。
+   3. `findContours`（または接続成分）で輪郭／領域候補を抽出する。
+   4. 候補に対して幾何学的フィルタを適用する（例: 幅 > 50, 高さ > 20, 面積 > 1000, 画像全体を占めない w < 0.95*cols 等、縦横比の緩い条件）。
+   5. フィルタを通った候補の中から面積最大の矩形を選ぶ（ただし画像全体をそのまま選ばないように境界係数で除外する）。
+   6. 選ばれた矩形の内側（少し余白を取って）を切り出し、`recognizeTextFromImage:`（Vision）で OCR を実行する。
+   7. OCR 結果は改行を削除して 1 行にまとめる（`removeNewlinesFromText:` を使用）。
+   8. 候補が見つからない場合は閾値を緩めるか、Hough 直線検出等の代替手法で再試行する。
+
+実装上の主要シンボル／ファイル
+- `OpenCVWrapper.mm`:
+   - `detectCheckboxes`（チェックボックス検出のロジック）
+   - `isCheckboxChecked`（チェック判定）
+   - `detectTextAnswerFromImage:`（画像から自由記述を抽出するエントリ）
+   - `detectLargestTextBox:`（枠検出関数、モルフォロジー→輪郭抽出→フィルタ）
+   - `recognizeTextFromImage:`（Vision による OCR）
+   - `removeNewlinesFromText:`（改行を削除して 1 行にする）
+- `CameraView.swift`: 検出結果（text の場合の OCR 文字列）を UI に表示する部分を担当。
+
+デバッグ・チューニングのヒント
+- 実行ログには検出過程の情報が出力されるようにしています。デバッグ時は以下のログ文字列を探してください:
+   - "OpenCVWrapper: detectLargestTextBox - binary nonZero="
+   - "OpenCVWrapper: detectLargestTextBox - imgBinH nonZero="
+   - "OpenCVWrapper: detectLargestTextBox - imgBinV nonZero="
+   - "OpenCVWrapper: detectLargestTextBox - imgBinFinal nonZero="
+   - "OpenCVWrapper: detectLargestTextBox - contourCount="
+   - "OpenCVWrapper: detectLargestTextBox - contour="（個々の候補のフィルタ通過ログ）
+- 枠が検出できない場合: `lineMinWidth`（枠の太さ）を入力画像の実際の線幅にあわせて調整する、または横/縦カーネルのサイズ（lWidth）を変えてみてください。
+- connectedComponents が画像全体を返すケースでは `findContours` に切り替えて候補を絞ると安定することが多いです。
+
+このセクションは今後のパラメータ調整や追加のフォールバックを記録するために更新していきます。
