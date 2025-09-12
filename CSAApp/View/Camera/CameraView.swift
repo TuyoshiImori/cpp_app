@@ -106,30 +106,11 @@ public struct CameraView: View {
                                   .foregroundColor(.orange)
                                   .font(.subheadline)
                               } else if !answerIndex.isEmpty {
-                                // 複数の選択肢または自由回答（カンマ区切り）
-                                let answers = answerIndex.components(separatedBy: ",")
-                                if answers.count > 1 {
-                                  VStack(alignment: .leading, spacing: 2) {
-                                    Text("回答: 複数選択")
-                                      .foregroundColor(.purple)
-                                      .font(.subheadline)
-                                      .bold()
-                                    ForEach(Array(answers.enumerated()), id: \.offset) {
-                                      idx, answer in
-                                      Text(
-                                        "  \(idx + 1). \(answer.trimmingCharacters(in: .whitespaces))"
-                                      )
-                                      .foregroundColor(.purple.opacity(0.8))
-                                      .font(.caption)
-                                    }
-                                  }
-                                } else {
-                                  // 単一選択または自由回答
-                                  Text("回答: \(answerIndex)")
-                                    .foregroundColor(.purple)
-                                    .font(.subheadline)
-                                    .bold()
-                                }
+                                // ネイティブから受け取った文字列をそのまま表示する
+                                Text("回答: \(answerIndex)")
+                                  .foregroundColor(.purple)
+                                  .font(.subheadline)
+                                  .bold()
                               } else {
                                 // 空文字などの予期しない値
                                 Text("回答: 検出エラー")
@@ -359,5 +340,29 @@ public struct CameraView: View {
       return 0
     }
     return window.safeAreaInsets.top
+  }
+}
+
+// MARK: - Helpers
+extension CameraView {
+  /// ネイティブから返された回答文字列を配列に変換する。
+  /// - 優先: JSON 配列 (例: ["A","B,C","その他"]) をデコード
+  /// - 代替: カンマ区切りで分割 (従来互換)
+  fileprivate func decodeAnswerList(from raw: String) -> [String] {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    // JSON array の形をしているかを簡易判定
+    if trimmed.first == "[" && trimmed.last == "]" {
+      if let data = trimmed.data(using: .utf8) {
+        do {
+          let arr = try JSONDecoder().decode([String].self, from: data)
+          return arr
+        } catch {
+          // JSON デコード失敗 -> フォールバックへ
+          print("CameraView.decodeAnswerList: JSON decode failed: \(error)")
+        }
+      }
+    }
+    // フォールバック: カンマで分割（従来互換）
+    return raw.components(separatedBy: ",")
   }
 }

@@ -99,18 +99,38 @@ final class ContentViewModel: ObservableObject {
         questionText = decodedValue.trimmingCharacters(in: .whitespacesAndNewlines)
       }
 
-      // 選択肢を決定: '|' があれば右側を選択肢／項目リストとしてカンマで分割
+      // 選択肢を決定: '|' があれば右側を選択肢／項目リストとして解析
       let options: [String]
       if let barIndex = decodedValue.firstIndex(of: "|") {
-        // '|' があれば右側を選択肢としてカンマで分割
+        // '|' があれば右側を選択肢として解析
         let after = decodedValue.index(after: barIndex)
-        let optionsPart = String(decodedValue[after...])
-        options =
-          optionsPart
-          .split(separator: ",")
-          .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-          .map { String($0) }
-          .filter { !$0.isEmpty }
+        let optionsPart = String(decodedValue[after...]).trimmingCharacters(
+          in: .whitespacesAndNewlines)
+
+        // JSON配列形式の判定と解析（新形式）
+        if optionsPart.hasPrefix("[") && optionsPart.hasSuffix("]") {
+          // JSON配列として解析を試行
+          if let data = optionsPart.data(using: .utf8) {
+            do {
+              let jsonArray = try JSONDecoder().decode([String].self, from: data)
+              options = jsonArray.filter { !$0.isEmpty }
+            } catch {
+              print("ContentViewModel: JSON decode error: \(error)")
+              // JSON解析失敗時は空配列を返す
+              options = []
+            }
+          } else {
+            options = []
+          }
+        } else {
+          // 従来のカンマ区切り形式（後方互換性）
+          options =
+            optionsPart
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { String($0) }
+            .filter { !$0.isEmpty }
+        }
       } else {
         // '|' が無ければ旧フォーマット扱い: 値全体をカンマ区切りの選択肢リストとして扱う
         options =
