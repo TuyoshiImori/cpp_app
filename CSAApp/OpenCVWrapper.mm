@@ -525,7 +525,8 @@ using namespace cv;
   std::vector<cv::Rect> checkboxes;
 
   try {
-    // text.txtの方法を参考に実装
+    // https://stackoverflow.com/questions/63084676/checkbox-detection-opencv
+    // 上の方法を参考に実装
     // Step 1: 二値化
     cv::Mat binary;
     cv::threshold(gray, binary, 180, 255, cv::THRESH_OTSU);
