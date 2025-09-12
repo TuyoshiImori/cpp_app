@@ -117,8 +117,7 @@ using namespace cv;
   // 白黒反転前にさらに平滑化処理を追加
   cv::Mat extraBlurMat;
   try {
-    cv::GaussianBlur(binaryMat, extraBlurMat, cv::Size(5, 5),
-                     2.0); // カーネルサイズを5x5に変更し、標準偏差を2.0に設定
+    cv::GaussianBlur(binaryMat, extraBlurMat, cv::Size(5, 5), 2.0);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
     return @{
@@ -131,7 +130,7 @@ using namespace cv;
   // 5. 白黒反転
   cv::Mat invMat;
   try {
-    cv::bitwise_not(extraBlurMat, invMat); // extraBlurMatを使用
+    cv::bitwise_not(extraBlurMat, invMat);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return @{
@@ -143,10 +142,8 @@ using namespace cv;
 
   // 6. ノイズ除去（モルフォロジーオープン）
   cv::Mat noNoiseMat;
-  // モルフォロジーオープンのカーネルサイズを拡大
   try {
-    cv::Mat kernel = cv::getStructuringElement(
-        cv::MORPH_RECT, cv::Size(3, 3)); // カーネルサイズを2x2から3x3に変更
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
     cv::morphologyEx(invMat, noNoiseMat, cv::MORPH_OPEN, kernel);
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
@@ -459,7 +456,11 @@ using namespace cv;
       [parsedAnswers addObject:result];
     } else if ([storedType isEqualToString:@"text"]) {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as TEXT", i);
-      [parsedAnswers addObject:@"0"]; // テキストは選択肢なし
+
+      // テキスト検出処理を実行
+      UIImage *croppedImage = croppedImages[i];
+      NSString *result = [self detectTextAnswerFromImage:croppedImage];
+      [parsedAnswers addObject:result];
     } else if ([storedType isEqualToString:@"info"]) {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as INFO", i);
       [parsedAnswers addObject:@"0"]; // 情報フィールドは選択肢なし
@@ -1168,6 +1169,237 @@ using namespace cv;
   }
 
   return recognizedText;
+}
+
+// テキスト回答検出のメソッド
++ (NSString *)detectTextAnswerFromImage:(UIImage *)image {
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: detectTextAnswer - 無効な入力");
+    return @"";
+  }
+
+  // UIImage -> cv::Mat
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: detectTextAnswer - 空の画像");
+    return @"";
+  }
+
+  // グレースケール変換
+  cv::Mat gray;
+  if (mat.channels() == 4) {
+    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
+  } else if (mat.channels() == 3) {
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = mat.clone();
+  }
+
+  // テキストボックス検出処理
+  cv::Rect textBox = [self detectLargestTextBox:gray];
+
+  if (textBox.width <= 0 || textBox.height <= 0) {
+    NSLog(
+        @"OpenCVWrapper: detectTextAnswer - テキストボックスが見つかりません");
+    return @"";
+  }
+
+  // テキストボックス領域を抽出
+  cv::Mat textROI = gray(textBox);
+
+  NSLog(@"OpenCVWrapper: detectTextAnswer - テキストボックス領域: x=%d, y=%d, "
+        @"w=%d, h=%d",
+        textBox.x, textBox.y, textBox.width, textBox.height);
+
+  // ROIをUIImageに変換してVisionで文字認識
+  UIImage *textImage = MatToUIImage(textROI);
+
+  // Vision APIを使用して文字認識
+  NSString *recognizedText = [self recognizeTextFromImage:textImage];
+
+  if (recognizedText) {
+    // 改行を除去して1行にする
+    NSString *cleanedText = [self removeNewlinesFromText:recognizedText];
+    NSLog(@"OpenCVWrapper: detectTextAnswer - 認識されたテキスト: '%@' -> "
+          @"クリーンアップ後: '%@'",
+          recognizedText, cleanedText);
+    return cleanedText;
+  }
+
+  return @"";
+}
+
+// 最大のテキストボックスを検出するメソッド
++ (cv::Rect)detectLargestTextBox:(cv::Mat)gray {
+  cv::Rect largestBox;
+
+  try {
+    // Step 1: 二値化
+    cv::Mat binary;
+    cv::threshold(gray, binary, 180, 255, cv::THRESH_OTSU);
+
+    // ログ: 二値化結果の非ゼロピクセル数
+    int binaryNonZero = cv::countNonZero(binary);
+    NSLog(
+        @"OpenCVWrapper: detectLargestTextBox - binary nonZero=%d, image=%dx%d",
+        binaryNonZero, binary.cols, binary.rows);
+
+    // Step 2: 水平線と垂直線の検出（チェックボックス検出と同様の手法）
+    int lWidth = 2;
+    int lineMinWidth = 15; // チェックボックス検出と同じ線幅に合わせる
+
+    // カーネル定義
+    cv::Mat kernel1h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lWidth, 1));
+    cv::Mat kernel1v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lWidth));
+    cv::Mat kernel6h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lineMinWidth, 1));
+    cv::Mat kernel6v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lineMinWidth));
+
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - kernels: lWidth=%d, "
+          @"lineMinWidth=%d, kernel1h=(%d,%d), kernel6h=(%d,%d)",
+          lWidth, lineMinWidth, kernel1h.size().width, kernel1h.size().height,
+          kernel6h.size().width, kernel6h.size().height);
+
+    // 水平線検出
+    cv::Mat binaryInv;
+    cv::bitwise_not(binary, binaryInv);
+    int binaryInvNonZero = cv::countNonZero(binaryInv);
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - binaryInv nonZero=%d",
+          binaryInvNonZero);
+
+    cv::Mat imgBinH;
+    cv::morphologyEx(binaryInv, imgBinH, cv::MORPH_CLOSE, kernel1h);
+    cv::morphologyEx(imgBinH, imgBinH, cv::MORPH_OPEN, kernel6h);
+    int imgBinHNonZero = cv::countNonZero(imgBinH);
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinH nonZero=%d",
+          imgBinHNonZero);
+
+    // 垂直線検出
+    cv::Mat imgBinV;
+    cv::morphologyEx(binaryInv, imgBinV, cv::MORPH_CLOSE, kernel1v);
+    cv::morphologyEx(imgBinV, imgBinV, cv::MORPH_OPEN, kernel6v);
+    int imgBinVNonZero = cv::countNonZero(imgBinV);
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinV nonZero=%d",
+          imgBinVNonZero);
+
+    // 水平線と垂直線を結合
+    cv::Mat imgBinFinal;
+    cv::bitwise_or(imgBinH, imgBinV, imgBinFinal);
+    int imgBinFinalNonZero = cv::countNonZero(imgBinFinal);
+    double percentCoverage = 0.0;
+    if (gray.cols > 0 && gray.rows > 0) {
+      percentCoverage =
+          (double)imgBinFinalNonZero / (double)(gray.cols * gray.rows) * 100.0;
+    }
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinFinal nonZero=%d "
+          @"(%.2f%% of image)",
+          imgBinFinalNonZero, percentCoverage);
+
+    // 結果を修正
+    imgBinFinal.setTo(255, imgBinFinal > 127);
+    imgBinFinal.setTo(0, imgBinFinal <= 127);
+
+    // Step 3: 連結成分で矩形検出
+    cv::Mat labels, stats, centroids;
+    cv::bitwise_not(imgBinFinal, imgBinFinal);
+    int numLabels =
+        cv::connectedComponentsWithStats(imgBinFinal, labels, stats, centroids);
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - connectedComponents "
+          @"numLabels=%d",
+          numLabels);
+
+    // 矩形をサイズでフィルタリング（テキストボックスに適したサイズ）
+    std::vector<cv::Rect> textBoxCandidates;
+    int maxArea = 0;
+
+    for (int i = 1; i < numLabels; i++) {
+      int x = stats.at<int>(i, cv::CC_STAT_LEFT);
+      int y = stats.at<int>(i, cv::CC_STAT_TOP);
+      int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
+      int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
+      int area = stats.at<int>(i, cv::CC_STAT_AREA);
+
+      // テキストボックスのサイズ判定
+      bool isValidSize =
+          (w > 50 && h > 20 && w < gray.cols * 0.9 && h < gray.rows * 0.9);
+      bool isRectangular = (w > h * 1.5); // 幅が高さの1.5倍以上
+      bool hasReasonableArea =
+          (area > 1000 && area < gray.cols * gray.rows * 0.8);
+      bool notImageBorder =
+          (x > 5 && y > 5 && x + w < gray.cols - 5 && y + h < gray.rows - 5);
+
+      NSLog(@"OpenCVWrapper: detectLargestTextBox - label=%d "
+            @"rect=(x=%d,y=%d,w=%d,h=%d) area=%d sizeOK=%d rectOK=%d areaOK=%d "
+            @"borderOK=%d",
+            i, x, y, w, h, area, isValidSize ? 1 : 0, isRectangular ? 1 : 0,
+            hasReasonableArea ? 1 : 0, notImageBorder ? 1 : 0);
+
+      if (isValidSize && isRectangular && hasReasonableArea && notImageBorder) {
+        textBoxCandidates.push_back(cv::Rect(x, y, w, h));
+
+        // 最大面積を記録
+        if (area > maxArea) {
+          maxArea = area;
+          largestBox = cv::Rect(x, y, w, h);
+        }
+      }
+    }
+
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - "
+          @"%zu個のテキストボックス候補を検出、最大面積: %d",
+          textBoxCandidates.size(), maxArea);
+
+    // 追加チェック: 最大矩形が画像全体に近い場合はログ出力
+    if (largestBox.width > 0 && largestBox.height > 0) {
+      if (largestBox.width >= gray.cols * 0.95 &&
+          largestBox.height >= gray.rows * 0.95) {
+        NSLog(@"OpenCVWrapper: detectLargestTextBox - 警告: "
+              @"検出された最大矩形が画像全体に近い (w=%d,h=%d, img=%dx%d)",
+              largestBox.width, largestBox.height, gray.cols, gray.rows);
+      }
+    }
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: detectLargestTextBox でエラー: %s", e.what());
+  }
+
+  return largestBox;
+}
+
+// 改行を除去するヘルパーメソッド
++ (NSString *)removeNewlinesFromText:(NSString *)text {
+  if (!text || [text length] == 0) {
+    return @"";
+  }
+
+  // 改行文字を空白に置換
+  NSString *result = [text stringByReplacingOccurrencesOfString:@"\n"
+                                                     withString:@" "];
+  result = [result stringByReplacingOccurrencesOfString:@"\r" withString:@" "];
+
+  // 複数の空白を1つの空白に統合
+  NSError *error = nil;
+  NSRegularExpression *regex = [NSRegularExpression
+      regularExpressionWithPattern:@"\\s+"
+                           options:NSRegularExpressionCaseInsensitive
+                             error:&error];
+  if (!error) {
+    result =
+        [regex stringByReplacingMatchesInString:result
+                                        options:0
+                                          range:NSMakeRange(0, [result length])
+                                   withTemplate:@" "];
+  }
+
+  // 前後の空白を削除
+  return [result
+      stringByTrimmingCharactersInSet:[NSCharacterSet
+                                          whitespaceAndNewlineCharacterSet]];
 }
 
 @end

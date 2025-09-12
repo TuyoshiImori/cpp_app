@@ -11,12 +11,15 @@
 // - croppedImages: 切り取った設問画像の配列（UIImage）
 // - types: 設問の StoredType を表す文字列配列（"single" | "multiple" | "text" | "info"）
 // - optionTexts: 各設問の選択肢文字列を NSArray<NSString *> の配列で渡す
- + (NSDictionary *)parseCroppedImages:(UIImage *)image
-								 withCroppedImages:(NSArray<UIImage *> *)croppedImages
-									 withStoredTypes:(NSArray<NSString *> *)types
-									 withOptionTexts:(NSArray<NSArray<NSString *> *> *)optionTexts;
++ (NSDictionary *)parseCroppedImages:(UIImage *)image
+				   withCroppedImages:(NSArray<UIImage *> *)croppedImages
+					 withStoredTypes:(NSArray<NSString *> *)types
+					 withOptionTexts:(NSArray<NSArray<NSString *> *> *)optionTexts;
 
 // チェックボックス検出用のヘルパーメソッド
 + (NSString *)detectSingleAnswerFromImage:(UIImage *)image withOptions:(NSArray<NSString *> *)options;
+
+// テキスト回答検出用のヘルパーメソッド
++ (NSString *)detectTextAnswerFromImage:(UIImage *)image;
 
 @end

@@ -121,9 +121,24 @@ public struct CameraView: View {
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
                                 .font(.caption)
-                              Text("回答: 自由記述")
-                                .foregroundColor(.blue)
-                                .font(.subheadline)
+
+                              if answerIndex == "-1" {
+                                // 未検出
+                                Text("回答: 未検出")
+                                  .foregroundColor(.orange)
+                                  .font(.subheadline)
+                              } else if !answerIndex.isEmpty {
+                                // 検出されたテキストを表示
+                                Text("回答: \(answerIndex)")
+                                  .foregroundColor(.blue)
+                                  .font(.subheadline)
+                                  .bold()
+                              } else {
+                                // 空文字などの予期しない値
+                                Text("回答: 検出エラー")
+                                  .foregroundColor(.red)
+                                  .font(.subheadline)
+                              }
                             case .info(let question, _):
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
