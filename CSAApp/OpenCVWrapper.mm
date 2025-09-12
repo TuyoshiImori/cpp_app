@@ -653,8 +653,44 @@ using namespace cv;
     }
   }
 
-  // チェックされた選択肢の中に「その他」があるかチェック
+  // まず、選択肢に「その他」が含まれるインデックスを探す（存在するなら括弧内の文字列を検出しておく）
   NSString *otherText = nil;
+  int otherOptionIndex = -1;
+  for (int i = 0; i < [options count]; i++) {
+    NSString *option = options[i];
+    if ([option containsString:@"その他"] ||
+        [option containsString:@"そのた"] || [option containsString:@"other"] ||
+        [option containsString:@"Other"]) {
+      otherOptionIndex = i;
+      NSLog(@"OpenCVWrapper: detectMultipleAnswer - 「その他」選択肢を発見: "
+            @"index=%d, option=%@",
+            i, option);
+      break;
+    }
+  }
+
+  // 「その他」が選択肢にあれば、まず括弧内の文字列を検出する（single
+  // と同じ方法を使用）
+  if (otherOptionIndex >= 0 && otherOptionIndex < checkboxes.size()) {
+    NSString *freeTextAtIndex =
+        [self detectOtherFreeTextAtIndex:gray
+                              checkboxes:checkboxes
+                                   index:otherOptionIndex];
+    if (freeTextAtIndex && ![freeTextAtIndex isEqualToString:@""]) {
+      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+            @"括弧内の自由回答を検出（その他候補）: %@",
+            freeTextAtIndex);
+      // チェックが一つもない場合は単独で返す（single と同様の振る舞い）
+      if ([checkedOptions count] == 0) {
+        return freeTextAtIndex;
+      }
+      // それ以外は後で結果に含めるため保持しておく
+      otherText = freeTextAtIndex;
+    }
+  }
+
+  // 次に、チェックされた選択肢の中に「その他」があり、かつ括弧内の文字列が空の場合は
+  // チェックされたその他の近辺の自由回答領域を検出しておく（既存の検出方法を再利用）
   for (NSString *checkedOption in checkedOptions) {
     BOOL isOtherOption = ([checkedOption containsString:@"その他"] ||
                           [checkedOption containsString:@"そのた"] ||
@@ -665,63 +701,29 @@ using namespace cv;
       NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
             @"チェックされた選択肢に「その他」が含まれています: %@",
             checkedOption);
-      NSString *freeText = [self detectOtherFreeText:gray
-                                          checkboxes:checkboxes];
-      if (freeText && ![freeText isEqualToString:@""]) {
-        otherText = freeText;
-        NSLog(
-            @"OpenCVWrapper: detectMultipleAnswer - その他の自由回答を検出: %@",
-            otherText);
+      // 既に括弧内テキストが見つかっていればそれを使う
+      if (!otherText || [otherText isEqualToString:@""]) {
+        NSString *freeText = [self detectOtherFreeText:gray
+                                            checkboxes:checkboxes];
+        if (freeText && ![freeText isEqualToString:@""]) {
+          otherText = freeText;
+          NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
+                @"チェックされたその他から自由回答を検出: %@",
+                otherText);
+        }
       }
       break;
     }
   }
 
-  // チェックが見つからない場合は「その他」の可能性をチェック
+  // チェックが見つからない場合は、その他の括弧内テキストが既に検出されていればそれを返す
   if ([checkedOptions count] == 0) {
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-          @"チェックが見つからないため、その他を確認");
-
-    // 選択肢に「その他」が含まれているかチェック
-    BOOL hasOtherOption = false;
-    int otherOptionIndex = -1;
-
-    for (int i = 0; i < [options count]; i++) {
-      NSString *option = options[i];
-      if ([option containsString:@"その他"] ||
-          [option containsString:@"そのた"] ||
-          [option containsString:@"other"] ||
-          [option containsString:@"Other"]) {
-        hasOtherOption = true;
-        otherOptionIndex = i;
-        NSLog(@"OpenCVWrapper: detectMultipleAnswer - 「その他」選択肢を発見: "
-              @"index=%d, option=%@",
-              i, option);
-        break;
-      }
-    }
-
-    if (hasOtherOption && otherOptionIndex >= 0 &&
-        otherOptionIndex < checkboxes.size()) {
-      // 「その他」の選択肢があり、対応するチェックボックスが存在するため、自由回答を検出
+    if (otherText && ![otherText isEqualToString:@""]) {
       NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-            @"「その他」の自由回答を検出試行中（チェックなし）");
-
-      NSString *freeText = [self detectOtherFreeTextAtIndex:gray
-                                                 checkboxes:checkboxes
-                                                      index:otherOptionIndex];
-
-      if (freeText && ![freeText isEqualToString:@""]) {
-        NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-              @"チェックなしでその他の自由回答を検出: %@",
-              freeText);
-        return freeText;
-      } else {
-        NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-              @"「その他」の自由回答が見つからない");
-      }
+            @"チェックなしだがその他の括弧内テキストを返す: %@",
+            otherText);
+      return otherText;
     }
-
     NSLog(@"OpenCVWrapper: detectMultipleAnswer - チェックが見つかりません");
     return @"-1";
   }
@@ -746,6 +748,12 @@ using namespace cv;
   }
 
   // 複数の選択肢を「,」で区切って返す
+  // もし括弧内の自由回答が検出されていて results に含まれていなければ追加する
+  if (otherText && ![otherText isEqualToString:@""] &&
+      ![results containsObject:otherText]) {
+    [results addObject:otherText];
+  }
+
   NSString *finalResult = [results componentsJoinedByString:@","];
   NSLog(@"OpenCVWrapper: detectMultipleAnswer - 最終結果: %@", finalResult);
   return finalResult;
@@ -1039,43 +1047,59 @@ using namespace cv;
     return @"";
   }
 
-  // 日本語の括弧（）と英語の括弧()の両方に対応
+  // 「（」の位置を探す（日本語の括弧と英語の括弧の両方に対応）
+  NSRange openParenRange = [text rangeOfString:@"（"];
+  if (openParenRange.location == NSNotFound) {
+    openParenRange = [text rangeOfString:@"("];
+  }
+
+  if (openParenRange.location == NSNotFound) {
+    // 括弧が見つからない場合は空文字を返す
+    NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
+          @"開き括弧が見つかりません: '%@'",
+          text);
+    return @"";
+  }
+
+  // 「（」以降の文字列を取得
+  NSUInteger startIndex = openParenRange.location + openParenRange.length;
+  if (startIndex >= [text length]) {
+    NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
+          @"括弧の後に文字がありません: '%@'",
+          text);
+    return @"";
+  }
+
+  NSString *afterOpenParen = [text substringFromIndex:startIndex];
+
+  // 「）」を除去する
   NSError *error = nil;
   NSRegularExpression *regex = [NSRegularExpression
-      regularExpressionWithPattern:@"[（(]([^）)]*)[）)]"
+      regularExpressionWithPattern:@"[）)]"
                            options:NSRegularExpressionCaseInsensitive
                              error:&error];
   if (error) {
     NSLog(@"OpenCVWrapper: extractTextFromParentheses - 正規表現エラー: %@",
           error.localizedDescription);
-    return @"";
+    return afterOpenParen;
   }
 
-  NSArray<NSTextCheckingResult *> *matches =
-      [regex matchesInString:text
-                     options:0
-                       range:NSMakeRange(0, [text length])];
+  NSString *result = [regex
+      stringByReplacingMatchesInString:afterOpenParen
+                               options:0
+                                 range:NSMakeRange(0, [afterOpenParen length])
+                          withTemplate:@""];
 
-  if (matches.count > 0) {
-    // 最初の括弧内の文字列を取得
-    NSTextCheckingResult *match = matches[0];
-    if (match.numberOfRanges >= 2) {
-      NSRange captureRange =
-          [match rangeAtIndex:1]; // キャプチャグループ1（括弧内の文字）
-      NSString *extractedText = [text substringWithRange:captureRange];
+  // 前後の空白を削除
+  NSString *trimmedResult = [result
+      stringByTrimmingCharactersInSet:[NSCharacterSet
+                                          whitespaceAndNewlineCharacterSet]];
 
-      // 前後の空白を削除
-      return
-          [extractedText stringByTrimmingCharactersInSet:
-                             [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    }
-  }
-
-  // 括弧が見つからない場合は空文字を返す（「その他」の文字のみの場合など）
   NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
-        @"括弧内の文字が見つかりません: '%@'",
-        text);
-  return @"";
+        @"元テキスト: '%@' -> 抽出結果: '%@'",
+        text, trimmedResult);
+
+  return trimmedResult;
 }
 
 // Vision APIを使用した文字認識
