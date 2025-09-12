@@ -73,21 +73,24 @@ public struct CameraView: View {
                           if let item = item, imgIdx < item.questionTypes.count {
                             let questionType = item.questionTypes[imgIdx]
                             switch questionType {
-                            case .single(let question, let options):
+                            case .single(let question, _):
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
                                 .font(.caption)
 
-                              if let index = Int(answerIndex), index >= 0 && index < options.count {
-                                Text("回答: \(options[index])")
-                                  .foregroundColor(.green)
-                                  .font(.subheadline)
-                                  .bold()
-                              } else if answerIndex == "-1" {
+                              if answerIndex == "-1" {
+                                // 未選択
                                 Text("回答: 未選択")
                                   .foregroundColor(.orange)
                                   .font(.subheadline)
+                              } else if !answerIndex.isEmpty {
+                                // 選択肢の文章または自由回答のテキスト
+                                Text("回答: \(answerIndex)")
+                                  .foregroundColor(.green)
+                                  .font(.subheadline)
+                                  .bold()
                               } else {
+                                // 空文字などの予期しない値
                                 Text("回答: 検出エラー")
                                   .foregroundColor(.red)
                                   .font(.subheadline)

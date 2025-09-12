@@ -1,5 +1,6 @@
 #import "OpenCVWrapper.h"
 #import <UIKit/UIKit.h>
+#import <Vision/Vision.h>
 
 // Apple の NO マクロを一時的に無効化してからOpenCVをインクルード
 #ifdef NO
@@ -507,13 +508,93 @@ using namespace cv;
   }
 
   // チェック状態を確認
+  int checkedIndex = -1;
   for (size_t i = 0; i < checkboxes.size() && i < [options count]; i++) {
     if ([self isCheckboxChecked:gray rect:checkboxes[i]]) {
       NSLog(@"OpenCVWrapper: detectSingleAnswer - チェック検出: index=%zu, "
             @"option=%@",
             i, options[i]);
-      return [NSString stringWithFormat:@"%zu", i];
+      checkedIndex = (int)i;
+      break; // 単数回答なので最初のチェックで終了
     }
+  }
+
+  // チェックが見つからない場合は「その他」の可能性をチェック
+  if (checkedIndex == -1) {
+    NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+          @"通常のチェックが見つからないため、その他を確認");
+
+    // 選択肢に「その他」が含まれているかチェック
+    BOOL hasOtherOption = false;
+    int otherOptionIndex = -1;
+
+    for (int i = 0; i < [options count]; i++) {
+      NSString *option = options[i];
+      if ([option containsString:@"その他"] ||
+          [option containsString:@"そのた"] ||
+          [option containsString:@"other"] ||
+          [option containsString:@"Other"]) {
+        hasOtherOption = true;
+        otherOptionIndex = i;
+        NSLog(@"OpenCVWrapper: detectSingleAnswer - 「その他」選択肢を発見: "
+              @"index=%d, option=%@",
+              i, option);
+        break;
+      }
+    }
+
+    if (hasOtherOption && otherOptionIndex >= 0 &&
+        otherOptionIndex < checkboxes.size()) {
+      // 「その他」の選択肢があり、対応するチェックボックスが存在するため、自由回答を検出
+      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+            @"「その他」の自由回答を検出試行中（チェックなし）");
+
+      // 最後の選択肢（その他）のチェックボックス位置で自由記述を探す
+      NSString *otherText = [self detectOtherFreeTextAtIndex:gray
+                                                  checkboxes:checkboxes
+                                                       index:otherOptionIndex];
+
+      if (otherText && ![otherText isEqualToString:@""]) {
+        NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+              @"チェックなしでその他の自由回答を検出: %@",
+              otherText);
+        return otherText;
+      } else {
+        NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+              @"「その他」の自由回答が見つからない");
+      }
+    } else {
+      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+            @"選択肢に「その他」がないか、対応するチェックボックスが見つからな"
+            @"い");
+    }
+  } else {
+    // チェックされた選択肢が「その他」かどうかを確認
+    NSString *selectedOption = options[checkedIndex];
+    BOOL isOtherOption = ([selectedOption containsString:@"その他"] ||
+                          [selectedOption containsString:@"そのた"] ||
+                          [selectedOption containsString:@"other"] ||
+                          [selectedOption containsString:@"Other"]);
+
+    if (isOtherOption) {
+      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+            @"選択された選択肢「%@」は「その他」のため、自由回答を検出",
+            selectedOption);
+      NSString *otherText = [self detectOtherFreeText:gray
+                                           checkboxes:checkboxes];
+      if (otherText && ![otherText isEqualToString:@""]) {
+        NSLog(@"OpenCVWrapper: detectSingleAnswer - その他の自由回答を検出: %@",
+              otherText);
+        return otherText;
+      }
+    } else {
+      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
+            @"選択された選択肢「%@」は通常の選択肢",
+            selectedOption);
+    }
+
+    // 通常の選択肢の文章を返す（インデックスではなく）
+    return selectedOption;
   }
 
   NSLog(@"OpenCVWrapper: detectSingleAnswer - チェックが見つかりません");
@@ -634,6 +715,285 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: isCheckboxChecked でエラー: %s", e.what());
     return false;
   }
+}
+
+// その他の自由回答テキストを検出
++ (NSString *)detectOtherFreeText:(cv::Mat)gray
+                       checkboxes:(std::vector<cv::Rect>)checkboxes {
+  @try {
+    if (checkboxes.empty()) {
+      NSLog(@"OpenCVWrapper: detectOtherFreeText - "
+            @"チェックボックスが見つかりません");
+      return @"";
+    }
+
+    // 最後のチェックボックス（その他）を取得
+    cv::Rect lastCheckbox = checkboxes.back();
+    NSLog(@"OpenCVWrapper: detectOtherFreeText - 最後のチェックボックス位置: "
+          @"x=%d, y=%d, w=%d, h=%d",
+          lastCheckbox.x, lastCheckbox.y, lastCheckbox.width,
+          lastCheckbox.height);
+
+    // その他のチェックボックスから3つ分右の座標を計算
+    // チェックボックス幅の3倍分右にオフセット
+    int textStartX = lastCheckbox.x + (lastCheckbox.width * 3);
+    int textY = lastCheckbox.y - 5; // 上に少し
+    int textHeight =
+        lastCheckbox.height + 10; // チェックボックスの高さに少し余裕を加える
+    int textWidth = gray.cols - textStartX - 10; // 右端まで（余裕を持って）
+
+    // 範囲チェック
+    if (textStartX >= gray.cols || textY < 0 ||
+        textY + textHeight >= gray.rows || textWidth <= 0) {
+      NSLog(
+          @"OpenCVWrapper: detectOtherFreeText - テキスト領域が画像範囲外です");
+      return @"";
+    }
+
+    // テキスト領域を切り取り
+    cv::Rect textRect(textStartX, textY, textWidth, textHeight);
+    cv::Mat textROI = gray(textRect);
+
+    NSLog(@"OpenCVWrapper: detectOtherFreeText - テキスト領域: x=%d, y=%d, "
+          @"w=%d, h=%d",
+          textRect.x, textRect.y, textRect.width, textRect.height);
+
+    // ROIをUIImageに変換してVisionで文字認識
+    UIImage *textImage = MatToUIImage(textROI);
+
+    // Vision APIを使用して文字認識
+    NSString *recognizedText = [self recognizeTextFromImage:textImage];
+
+    if (recognizedText) {
+      // 括弧を除去する処理
+      NSString *cleanedText = [self removeParenthesesFromText:recognizedText];
+      NSLog(@"OpenCVWrapper: detectOtherFreeText - 認識されたテキスト: '%@' -> "
+            @"クリーンアップ後: '%@'",
+            recognizedText, cleanedText);
+      return cleanedText;
+    }
+
+    return @"";
+
+  } @catch (NSException *exception) {
+    NSLog(@"OpenCVWrapper: detectOtherFreeText でエラー: %@", exception.reason);
+    return @"";
+  }
+}
+
+// 指定したインデックスのチェックボックスでその他の自由回答テキストを検出
++ (NSString *)detectOtherFreeTextAtIndex:(cv::Mat)gray
+                              checkboxes:(std::vector<cv::Rect>)checkboxes
+                                   index:(int)index {
+  @try {
+    if (checkboxes.empty() || index < 0 || index >= checkboxes.size()) {
+      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
+            @"無効なインデックスまたは空のチェックボックス配列: index=%d, "
+            @"size=%zu",
+            index, checkboxes.size());
+      return @"";
+    }
+
+    // 指定したインデックスのチェックボックスを取得
+    cv::Rect targetCheckbox = checkboxes[index];
+    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
+          @"ターゲットチェックボックス位置: "
+          @"x=%d, y=%d, w=%d, h=%d (index=%d)",
+          targetCheckbox.x, targetCheckbox.y, targetCheckbox.width,
+          targetCheckbox.height, index);
+
+    // その他のチェックボックスから3つ分右の座標を計算
+    // チェックボックス幅の3倍分右にオフセット
+    int textStartX = targetCheckbox.x + (targetCheckbox.width * 3);
+    int textY = targetCheckbox.y - 5; // 上に少し
+    int textHeight =
+        targetCheckbox.height + 10; // チェックボックスの高さに少し余裕を加える
+    int textWidth = gray.cols - textStartX - 10; // 右端まで（余裕を持って）
+
+    // 範囲チェック
+    if (textStartX >= gray.cols || textY < 0 ||
+        textY + textHeight >= gray.rows || textWidth <= 0) {
+      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
+            @"テキスト領域が画像範囲外です");
+      return @"";
+    }
+
+    // テキスト領域を切り取り
+    cv::Rect textRect(textStartX, textY, textWidth, textHeight);
+    cv::Mat textROI = gray(textRect);
+
+    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=%d, "
+          @"y=%d, "
+          @"w=%d, h=%d",
+          textRect.x, textRect.y, textRect.width, textRect.height);
+
+    // ROIをUIImageに変換してVisionで文字認識
+    UIImage *textImage = MatToUIImage(textROI);
+
+    // Vision APIを使用して文字認識
+    NSString *recognizedText = [self recognizeTextFromImage:textImage];
+
+    if (recognizedText) {
+      // 括弧内の文字列のみを抽出する処理
+      NSString *extractedText =
+          [self extractTextFromParentheses:recognizedText];
+      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - 認識されたテキスト: "
+            @"'%@' -> "
+            @"括弧内抽出後: '%@'",
+            recognizedText, extractedText);
+      return extractedText;
+    }
+
+    return @"";
+
+  } @catch (NSException *exception) {
+    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex でエラー: %@",
+          exception.reason);
+    return @"";
+  }
+}
+
+// 括弧を除去するヘルパーメソッド
++ (NSString *)removeParenthesesFromText:(NSString *)text {
+  if (!text || [text length] == 0) {
+    return @"";
+  }
+
+  // 括弧とその中身を除去する正規表現
+  NSError *error = nil;
+  NSRegularExpression *regex = [NSRegularExpression
+      regularExpressionWithPattern:@"[（）()\\[\\]]"
+                           options:NSRegularExpressionCaseInsensitive
+                             error:&error];
+  if (error) {
+    NSLog(@"OpenCVWrapper: removeParenthesesFromText - 正規表現エラー: %@",
+          error.localizedDescription);
+    return text;
+  }
+
+  NSString *result =
+      [regex stringByReplacingMatchesInString:text
+                                      options:0
+                                        range:NSMakeRange(0, [text length])
+                                 withTemplate:@""];
+
+  // 前後の空白を削除
+  return [result
+      stringByTrimmingCharactersInSet:[NSCharacterSet
+                                          whitespaceAndNewlineCharacterSet]];
+}
+
+// 括弧内の文字列のみを抽出するヘルパーメソッド
++ (NSString *)extractTextFromParentheses:(NSString *)text {
+  if (!text || [text length] == 0) {
+    return @"";
+  }
+
+  // 日本語の括弧（）と英語の括弧()の両方に対応
+  NSError *error = nil;
+  NSRegularExpression *regex = [NSRegularExpression
+      regularExpressionWithPattern:@"[（(]([^）)]*)[）)]"
+                           options:NSRegularExpressionCaseInsensitive
+                             error:&error];
+  if (error) {
+    NSLog(@"OpenCVWrapper: extractTextFromParentheses - 正規表現エラー: %@",
+          error.localizedDescription);
+    return @"";
+  }
+
+  NSArray<NSTextCheckingResult *> *matches =
+      [regex matchesInString:text
+                     options:0
+                       range:NSMakeRange(0, [text length])];
+
+  if (matches.count > 0) {
+    // 最初の括弧内の文字列を取得
+    NSTextCheckingResult *match = matches[0];
+    if (match.numberOfRanges >= 2) {
+      NSRange captureRange =
+          [match rangeAtIndex:1]; // キャプチャグループ1（括弧内の文字）
+      NSString *extractedText = [text substringWithRange:captureRange];
+
+      // 前後の空白を削除
+      return
+          [extractedText stringByTrimmingCharactersInSet:
+                             [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+  }
+
+  // 括弧が見つからない場合は空文字を返す（「その他」の文字のみの場合など）
+  NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
+        @"括弧内の文字が見つかりません: '%@'",
+        text);
+  return @"";
+}
+
+// Vision APIを使用した文字認識
++ (NSString *)recognizeTextFromImage:(UIImage *)image {
+  if (!image) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImage - 画像がnilです");
+    return @"";
+  }
+
+  __block NSString *recognizedText = @"";
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+  // Vision API用のリクエストを作成
+  VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc]
+      initWithCompletionHandler:^(VNRequest *request, NSError *error) {
+        if (error) {
+          NSLog(@"OpenCVWrapper: recognizeTextFromImage - Visionエラー: %@",
+                error.localizedDescription);
+          dispatch_semaphore_signal(semaphore);
+          return;
+        }
+
+        // 認識結果を処理
+        NSMutableArray *textParts = [NSMutableArray array];
+        for (VNRecognizedTextObservation *observation in request.results) {
+          VNRecognizedText *candidate =
+              [observation topCandidates:1].firstObject;
+          if (candidate && candidate.string.length > 0) {
+            [textParts addObject:candidate.string];
+          }
+        }
+
+        recognizedText = [textParts componentsJoinedByString:@" "];
+        NSLog(@"OpenCVWrapper: recognizeTextFromImage - 認識結果: '%@'",
+              recognizedText);
+        dispatch_semaphore_signal(semaphore);
+      }];
+
+  // 認識レベルを設定（より高精度に）
+  request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
+
+  // 日本語を認識対象に含める
+  if (@available(iOS 13.0, *)) {
+    request.recognitionLanguages = @[ @"ja", @"en" ];
+  }
+
+  // リクエストを実行
+  VNImageRequestHandler *handler =
+      [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
+
+  NSError *error = nil;
+  BOOL success = [handler performRequests:@[ request ] error:&error];
+
+  if (!success || error) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImage - リクエスト実行エラー: %@",
+          error ? error.localizedDescription : @"不明なエラー");
+    dispatch_semaphore_signal(semaphore);
+  }
+
+  // 結果を待機（タイムアウト5秒）
+  dispatch_time_t timeout =
+      dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+  if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImage - タイムアウトしました");
+    return @"";
+  }
+
+  return recognizedText;
 }
 
 @end
