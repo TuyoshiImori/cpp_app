@@ -27,7 +27,7 @@ using namespace cv;
     };
   }
 
-  // UIImage -> cv::Mat
+  // UIImage を cv::Mat に変換
   cv::Mat mat;
   UIImageToMat(image, mat);
 
@@ -382,6 +382,8 @@ using namespace cv;
 }
 
 // 切り取った設問画像ごとにStoredTypeとoptionTextsを受け取り、種類ごとに処理を振り分ける
+// 使用StoredType: single, multiple, text, info (各要素を
+// parseCroppedImagesが振り分け)
 + (NSDictionary *)parseCroppedImages:(UIImage *)image
                    withCroppedImages:(NSArray<UIImage *> *)croppedImages
                      withStoredTypes:(NSArray<NSString *> *)types
@@ -463,7 +465,11 @@ using namespace cv;
       [parsedAnswers addObject:result];
     } else if ([storedType isEqualToString:@"info"]) {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as INFO", i);
-      [parsedAnswers addObject:@"0"]; // 情報フィールドは選択肢なし
+
+      // info設問専用の処理を実行
+      UIImage *croppedImage = croppedImages[i];
+      NSString *result = [self detectInfoAnswerFromImage:croppedImage];
+      [parsedAnswers addObject:result];
     } else {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as UNKNOWN", i);
       [parsedAnswers addObject:@"0"];
@@ -477,6 +483,7 @@ using namespace cv;
 }
 
 // チェックボックス検出のヘルパーメソッド
+// 使用StoredType: single
 + (NSString *)detectSingleAnswerFromImage:(UIImage *)image
                               withOptions:(NSArray<NSString *> *)options {
   if (image == nil || [options count] == 0) {
@@ -484,7 +491,7 @@ using namespace cv;
     return @"-1";
   }
 
-  // UIImage -> cv::Mat
+  // UIImage を cv::Mat に変換
   cv::Mat mat;
   UIImageToMat(image, mat);
 
@@ -607,6 +614,7 @@ using namespace cv;
 }
 
 // 複数回答チェックボックス検出のヘルパーメソッド
+// 使用StoredType: multiple
 + (NSString *)detectMultipleAnswerFromImage:(UIImage *)image
                                 withOptions:(NSArray<NSString *> *)options {
   if (image == nil || [options count] == 0) {
@@ -614,7 +622,7 @@ using namespace cv;
     return @"-1";
   }
 
-  // UIImage -> cv::Mat
+  // UIImage を cv::Mat に変換
   cv::Mat mat;
   UIImageToMat(image, mat);
 
@@ -761,6 +769,7 @@ using namespace cv;
 }
 
 // チェックボックス矩形検出
+// 使用StoredType: single, multiple
 + (std::vector<cv::Rect>)detectCheckboxes:(cv::Mat)gray {
   std::vector<cv::Rect> checkboxes;
 
@@ -847,6 +856,7 @@ using namespace cv;
 }
 
 // チェックボックスがチェックされているかを判定
+// 使用StoredType: single, multiple
 + (BOOL)isCheckboxChecked:(cv::Mat)gray rect:(cv::Rect)rect {
   try {
     // チェックボックス領域を抽出
@@ -877,6 +887,7 @@ using namespace cv;
 }
 
 // その他の自由回答テキストを検出
+// 使用StoredType: single, multiple
 + (NSString *)detectOtherFreeText:(cv::Mat)gray
                        checkboxes:(std::vector<cv::Rect>)checkboxes {
   @try {
@@ -941,6 +952,7 @@ using namespace cv;
 }
 
 // 指定したインデックスのチェックボックスでその他の自由回答テキストを検出
+// 使用StoredType: single, multiple
 + (NSString *)detectOtherFreeTextAtIndex:(cv::Mat)gray
                               checkboxes:(std::vector<cv::Rect>)checkboxes
                                    index:(int)index {
@@ -1172,13 +1184,14 @@ using namespace cv;
 }
 
 // テキスト回答検出のメソッド
+// 使用StoredType: text
 + (NSString *)detectTextAnswerFromImage:(UIImage *)image {
   if (image == nil) {
     NSLog(@"OpenCVWrapper: detectTextAnswer - 無効な入力");
     return @"";
   }
 
-  // UIImage -> cv::Mat
+  // UIImage を cv::Mat に変換
   cv::Mat mat;
   UIImageToMat(image, mat);
 
@@ -1232,25 +1245,19 @@ using namespace cv;
 }
 
 // 最大のテキストボックスを検出するメソッド
-+ (cv::Rect)detectLargestTextBox:(cv::Mat)gray {
-  cv::Rect largestBox;
+// 使用StoredType: text
+// 表の外側枠線を検出するヘルパーメソッド
++ (cv::Rect)detectTableOuterBounds:(cv::Mat)gray {
+  cv::Rect outerBounds;
 
   try {
-    // Step 1: 二値化
+    // まずは既存のモルフォロジーに基づく検出を試みる
     cv::Mat binary;
-    cv::threshold(gray, binary, 180, 255, cv::THRESH_OTSU);
+    cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-    // ログ: 二値化結果の非ゼロピクセル数
-    int binaryNonZero = cv::countNonZero(binary);
-    NSLog(
-        @"OpenCVWrapper: detectLargestTextBox - binary nonZero=%d, image=%dx%d",
-        binaryNonZero, binary.cols, binary.rows);
-
-    // Step 2: 水平線と垂直線の検出（チェックボックス検出と同様の手法）
     int lWidth = 2;
-    int lineMinWidth = 15; // チェックボックス検出と同じ線幅に合わせる
+    int lineMinWidth = std::max(15, (int)(gray.cols * 0.02));
 
-    // カーネル定義
     cv::Mat kernel1h =
         cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lWidth, 1));
     cv::Mat kernel1v =
@@ -1260,62 +1267,233 @@ using namespace cv;
     cv::Mat kernel6v =
         cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lineMinWidth));
 
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - kernels: lWidth=%d, "
-          @"lineMinWidth=%d, kernel1h=(%d,%d), kernel6h=(%d,%d)",
-          lWidth, lineMinWidth, kernel1h.size().width, kernel1h.size().height,
-          kernel6h.size().width, kernel6h.size().height);
-
-    // 水平線検出
     cv::Mat binaryInv;
     cv::bitwise_not(binary, binaryInv);
-    int binaryInvNonZero = cv::countNonZero(binaryInv);
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - binaryInv nonZero=%d",
-          binaryInvNonZero);
 
     cv::Mat imgBinH;
     cv::morphologyEx(binaryInv, imgBinH, cv::MORPH_CLOSE, kernel1h);
     cv::morphologyEx(imgBinH, imgBinH, cv::MORPH_OPEN, kernel6h);
-    int imgBinHNonZero = cv::countNonZero(imgBinH);
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinH nonZero=%d",
-          imgBinHNonZero);
 
-    // 垂直線検出
     cv::Mat imgBinV;
     cv::morphologyEx(binaryInv, imgBinV, cv::MORPH_CLOSE, kernel1v);
     cv::morphologyEx(imgBinV, imgBinV, cv::MORPH_OPEN, kernel6v);
-    int imgBinVNonZero = cv::countNonZero(imgBinV);
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinV nonZero=%d",
-          imgBinVNonZero);
 
-    // 水平線と垂直線を結合
     cv::Mat imgBinFinal;
     cv::bitwise_or(imgBinH, imgBinV, imgBinFinal);
-    int imgBinFinalNonZero = cv::countNonZero(imgBinFinal);
-    double percentCoverage = 0.0;
-    if (gray.cols > 0 && gray.rows > 0) {
-      percentCoverage =
-          (double)imgBinFinalNonZero / (double)(gray.cols * gray.rows) * 100.0;
-    }
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - imgBinFinal nonZero=%d "
-          @"(%.2f%% of image)",
-          imgBinFinalNonZero, percentCoverage);
 
-    // 結果を修正
-    imgBinFinal.setTo(255, imgBinFinal > 127);
-    imgBinFinal.setTo(0, imgBinFinal <= 127);
-
-    // Step 3: 連結成分で矩形検出
+    // 連結成分で矩形候補を検出
     cv::Mat labels, stats, centroids;
     cv::bitwise_not(imgBinFinal, imgBinFinal);
     int numLabels =
         cv::connectedComponentsWithStats(imgBinFinal, labels, stats, centroids);
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - connectedComponents "
-          @"numLabels=%d",
-          numLabels);
 
-    // 矩形をサイズでフィルタリング（テキストボックスに適したサイズ）
-    std::vector<cv::Rect> textBoxCandidates;
     int maxArea = 0;
+    for (int i = 1; i < numLabels; i++) {
+      int x = stats.at<int>(i, cv::CC_STAT_LEFT);
+      int y = stats.at<int>(i, cv::CC_STAT_TOP);
+      int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
+      int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
+      int area = stats.at<int>(i, cv::CC_STAT_AREA);
+
+      bool isValidTableSize = (w > gray.cols * 0.25 && h > gray.rows * 0.25 &&
+                               w < gray.cols * 0.98 && h < gray.rows * 0.98);
+      bool isRectangular = ((double)w / (double)h > 0.6); // 幅/高さの比率緩和
+
+      if (isValidTableSize && isRectangular && area > maxArea) {
+        maxArea = area;
+        outerBounds = cv::Rect(x, y, w, h);
+      }
+    }
+
+    if (outerBounds.width > 0 && outerBounds.height > 0) {
+      NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
+            @"morphology法で外枠を検出: x=%d, y=%d, w=%d, h=%d (area=%d)",
+            outerBounds.x, outerBounds.y, outerBounds.width, outerBounds.height,
+            maxArea);
+      return outerBounds;
+    }
+
+    // morphology法で見つからなければ、Canny + findContours によるフォールバック
+    NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
+          @"morphology法で外枠検出失敗、Cannyフォールバックを試行");
+
+    cv::Mat edges;
+    // コントラストが低い場合のために軽く平滑化
+    cv::Mat smooth;
+    cv::GaussianBlur(gray, smooth, cv::Size(3, 3), 0);
+    cv::Canny(smooth, edges, 50, 150);
+
+    // 膨張して線をつなげる
+    cv::Mat dil;
+    cv::dilate(edges, dil,
+               cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(dil, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    NSLog(@"OpenCVWrapper: detectTableOuterBounds - findContours で %zu "
+          @"個の輪郭を検出",
+          contours.size());
+
+    maxArea = 0;
+    for (size_t i = 0; i < contours.size(); i++) {
+      std::vector<cv::Point> approx;
+      double peri = cv::arcLength(contours[i], true);
+      cv::approxPolyDP(contours[i], approx, 0.02 * peri, true);
+
+      cv::Rect r = cv::boundingRect(approx);
+      int area = r.width * r.height;
+
+      bool isLikelyTable =
+          (r.width > gray.cols * 0.25 && r.height > gray.rows * 0.25 &&
+           area > maxArea && r.width < gray.cols * 0.99 &&
+           r.height < gray.rows * 0.99);
+
+      if (isLikelyTable) {
+        maxArea = area;
+        outerBounds = r;
+      }
+    }
+
+    if (outerBounds.width > 0 && outerBounds.height > 0) {
+      NSLog(@"OpenCVWrapper: detectTableOuterBounds - Canny法で外枠を検出: "
+            @"x=%d, y=%d, w=%d, h=%d (area=%d)",
+            outerBounds.x, outerBounds.y, outerBounds.width, outerBounds.height,
+            maxArea);
+      return outerBounds;
+    }
+
+    NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
+          @"外枠が見つかりませんでした（両手法とも失敗）");
+
+    // デバッグ用に中間画像を保存（閾値化・morphology結果・エッジ）
+    try {
+      NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+      [fmt setDateFormat:@"yyyyMMdd_HHmmss_SSS"];
+      NSString *t = [fmt stringFromDate:[NSDate date]];
+
+      // imgBinFinal が利用可能なら保存
+      if (imgBinFinal.data && !imgBinFinal.empty()) {
+        @try {
+          UIImage *u = MatToUIImage(imgBinFinal);
+          if (u) {
+            NSString *p = [@"/tmp/CSA_debug_imgBinFinal_"
+                stringByAppendingFormat:@"%@.png", t];
+            NSData *d = UIImagePNGRepresentation(u);
+            if (d)
+              [d writeToFile:p atomically:YES];
+            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved imgBinFinal "
+                  @"to %@",
+                  p);
+          }
+        } @catch (NSException *ex) {
+          NSLog(@"OpenCVWrapper: detectTableOuterBounds - imgBinFinal save "
+                @"exception: %@",
+                ex);
+        }
+      }
+
+      // edges が利用可能なら保存
+      if (edges.data && !edges.empty()) {
+        @try {
+          UIImage *ue = MatToUIImage(edges);
+          if (ue) {
+            NSString *pe =
+                [@"/tmp/CSA_debug_edges_" stringByAppendingFormat:@"%@.png", t];
+            NSData *de = UIImagePNGRepresentation(ue);
+            if (de)
+              [de writeToFile:pe atomically:YES];
+            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved edges to %@",
+                  pe);
+          }
+        } @catch (NSException *ex) {
+          NSLog(@"OpenCVWrapper: detectTableOuterBounds - edges save "
+                @"exception: %@",
+                ex);
+        }
+      }
+
+      // dil（膨張画像）も保存しておく
+      if (dil.data && !dil.empty()) {
+        @try {
+          UIImage *ud = MatToUIImage(dil);
+          if (ud) {
+            NSString *pd =
+                [@"/tmp/CSA_debug_dil_" stringByAppendingFormat:@"%@.png", t];
+            NSData *dd = UIImagePNGRepresentation(ud);
+            if (dd)
+              [dd writeToFile:pd atomically:YES];
+            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved dil to %@",
+                  pd);
+          }
+        } @catch (NSException *ex) {
+          NSLog(
+              @"OpenCVWrapper: detectTableOuterBounds - dil save exception: %@",
+              ex);
+        }
+      }
+
+    } catch (const cv::Exception &e) {
+      NSLog(@"OpenCVWrapper: detectTableOuterBounds - debug save でエラー: %s",
+            e.what());
+    }
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: detectTableOuterBounds でエラー: %s", e.what());
+  }
+
+  return outerBounds;
+}
+
+// 最大のテキストボックスを検出するメソッド
+// 使用StoredType: text
++ (cv::Rect)detectLargestTextBox:(cv::Mat)gray {
+  cv::Rect largestBox;
+
+  try {
+    // 二値化
+    cv::Mat img;
+    cv::threshold(gray, img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    // 水平線と垂直線の強調（テキスト領域を矩形で囲むため）
+    int lWidth = 2;
+    int lineMinWidth = std::max(15, (int)(gray.cols * 0.02));
+
+    cv::Mat kernel1h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lWidth, 1));
+    cv::Mat kernel1v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lWidth));
+    cv::Mat kernel6h =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(lineMinWidth, 1));
+    cv::Mat kernel6v =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, lineMinWidth));
+
+    cv::Mat imgInv;
+    cv::bitwise_not(img, imgInv);
+
+    cv::Mat imgH;
+    cv::morphologyEx(imgInv, imgH, cv::MORPH_CLOSE, kernel1h);
+    cv::morphologyEx(imgH, imgH, cv::MORPH_OPEN, kernel6h);
+
+    cv::Mat imgV;
+    cv::morphologyEx(imgInv, imgV, cv::MORPH_CLOSE, kernel1v);
+    cv::morphologyEx(imgV, imgV, cv::MORPH_OPEN, kernel6v);
+
+    cv::Mat imgBinFinal;
+    cv::bitwise_or(imgH, imgV, imgBinFinal);
+
+    // 結果を2値化して安定化
+    imgBinFinal.setTo(255, imgBinFinal > 127);
+    imgBinFinal.setTo(0, imgBinFinal <= 127);
+
+    // 連結成分解析で矩形候補を取得
+    cv::Mat labels, stats, centroids;
+    cv::bitwise_not(imgBinFinal, imgBinFinal);
+    int numLabels =
+        cv::connectedComponentsWithStats(imgBinFinal, labels, stats, centroids);
+
+    int maxArea = 0;
+    std::vector<cv::Rect> textBoxCandidates;
 
     for (int i = 1; i < numLabels; i++) {
       int x = stats.at<int>(i, cv::CC_STAT_LEFT);
@@ -1324,10 +1502,9 @@ using namespace cv;
       int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
       int area = stats.at<int>(i, cv::CC_STAT_AREA);
 
-      // テキストボックスのサイズ判定
       bool isValidSize =
           (w > 50 && h > 20 && w < gray.cols * 0.9 && h < gray.rows * 0.9);
-      bool isRectangular = (w > h * 1.5); // 幅が高さの1.5倍以上
+      bool isRectangular = (w > h * 1.5);
       bool hasReasonableArea =
           (area > 1000 && area < gray.cols * gray.rows * 0.8);
       bool notImageBorder =
@@ -1341,8 +1518,6 @@ using namespace cv;
 
       if (isValidSize && isRectangular && hasReasonableArea && notImageBorder) {
         textBoxCandidates.push_back(cv::Rect(x, y, w, h));
-
-        // 最大面積を記録
         if (area > maxArea) {
           maxArea = area;
           largestBox = cv::Rect(x, y, w, h);
@@ -1350,16 +1525,15 @@ using namespace cv;
       }
     }
 
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - "
-          @"%zu個のテキストボックス候補を検出、最大面積: %d",
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - %zu candidates, maxArea=%d",
           textBoxCandidates.size(), maxArea);
 
-    // 追加チェック: 最大矩形が画像全体に近い場合はログ出力
+    // 画像全体に近い矩形の場合は警告
     if (largestBox.width > 0 && largestBox.height > 0) {
       if (largestBox.width >= gray.cols * 0.95 &&
           largestBox.height >= gray.rows * 0.95) {
-        NSLog(@"OpenCVWrapper: detectLargestTextBox - 警告: "
-              @"検出された最大矩形が画像全体に近い (w=%d,h=%d, img=%dx%d)",
+        NSLog(@"OpenCVWrapper: detectLargestTextBox - Warning: largest box "
+              @"close to whole image (w=%d,h=%d, img=%dx%d)",
               largestBox.width, largestBox.height, gray.cols, gray.rows);
       }
     }
@@ -1372,6 +1546,7 @@ using namespace cv;
 }
 
 // 改行を除去するヘルパーメソッド
+// 使用StoredType: text, info
 + (NSString *)removeNewlinesFromText:(NSString *)text {
   if (!text || [text length] == 0) {
     return @"";
@@ -1400,6 +1575,364 @@ using namespace cv;
   return [result
       stringByTrimmingCharactersInSet:[NSCharacterSet
                                           whitespaceAndNewlineCharacterSet]];
+}
+
+// Info設問専用の表構造解析と文字認識メソッド
+// 使用StoredType: info
++ (NSString *)detectInfoAnswerFromImage:(UIImage *)image {
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 無効な入力");
+    return @"";
+  }
+
+  // UIImage を cv::Mat に変換
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 空の画像");
+    return @"";
+  }
+
+  // グレースケール変換
+  cv::Mat gray;
+  if (mat.channels() == 4) {
+    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
+  } else if (mat.channels() == 3) {
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = mat.clone();
+  }
+
+  NSLog(@"OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: %dx%d", gray.cols,
+        gray.rows);
+
+  // Step 1: 表の外側枠線を検出
+  cv::Rect tableOuterBounds = [self detectTableOuterBounds:gray];
+
+  if (tableOuterBounds.width <= 0 || tableOuterBounds.height <= 0) {
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 表の外側枠線が見つかりません");
+    return @"";
+  }
+
+  NSLog(
+      @"OpenCVWrapper: detectInfoAnswer - 表の外側枠線: x=%d, y=%d, w=%d, h=%d",
+      tableOuterBounds.x, tableOuterBounds.y, tableOuterBounds.width,
+      tableOuterBounds.height);
+
+  // Step 2: 表内領域を抽出
+  cv::Mat tableROI = gray(tableOuterBounds);
+
+  // Step 3: 列分割用の垂直線を検出（左列と右列を分離）
+  int dividerX = [self detectColumnDivider:tableROI];
+
+  if (dividerX <= 0) {
+    NSLog(
+        @"OpenCVWrapper: detectInfoAnswer - 列分割用の垂直線が見つかりません");
+    return @"";
+  }
+
+  NSLog(@"OpenCVWrapper: detectInfoAnswer - 列分割位置: x=%d", dividerX);
+
+  // Step 4: 右列（記述欄）を抽出
+  int rightColumnX = dividerX + 5; // 垂直線から少し右にオフセット
+  int rightColumnWidth = tableROI.cols - rightColumnX - 5; // 右端から少し内側
+
+  if (rightColumnWidth <= 0) {
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 右列の幅が無効です");
+    return @"";
+  }
+
+  cv::Rect rightColumnRect(rightColumnX, 0, rightColumnWidth, tableROI.rows);
+  cv::Mat rightColumnROI = tableROI(rightColumnRect);
+
+  NSLog(@"OpenCVWrapper: detectInfoAnswer - 右列領域: x=%d, y=%d, w=%d, h=%d",
+        rightColumnRect.x, rightColumnRect.y, rightColumnRect.width,
+        rightColumnRect.height);
+
+  // Step 5: 右列内の水平線を検出して行を分割
+  std::vector<int> horizontalLines =
+      [self detectHorizontalLinesInColumn:rightColumnROI];
+
+  if (horizontalLines.size() < 2) {
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 十分な水平線が見つかりません");
+    return @"";
+  }
+
+  NSLog(@"OpenCVWrapper: detectInfoAnswer - 検出された水平線数: %zu",
+        horizontalLines.size());
+
+  // Step 6: 各行から文字を抽出
+  NSMutableArray<NSString *> *rowTexts = [NSMutableArray array];
+
+  for (size_t i = 0; i < horizontalLines.size() - 1; i++) {
+    int topY = horizontalLines[i] + 2;        // 水平線から少し下
+    int bottomY = horizontalLines[i + 1] - 2; // 次の水平線まで少し上
+    int rowHeight = bottomY - topY;
+
+    if (rowHeight <= 10) { // 高さが小さすぎる場合はスキップ
+      NSLog(
+          @"OpenCVWrapper: detectInfoAnswer - 行%zu: 高さが小さすぎます (h=%d)",
+          i, rowHeight);
+      continue;
+    }
+
+    cv::Rect rowRect(0, topY, rightColumnROI.cols, rowHeight);
+    cv::Mat rowROI = rightColumnROI(rowRect);
+
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: y=%d, h=%d", i, topY,
+          rowHeight);
+
+    // 行のROIをUIImageに変換してVisionで文字認識
+    UIImage *rowImage = MatToUIImage(rowROI);
+    NSString *recognizedText = [self recognizeTextFromImage:rowImage];
+
+    if (recognizedText && [recognizedText length] > 0) {
+      NSString *cleanedText = [self removeNewlinesFromText:recognizedText];
+      [rowTexts addObject:cleanedText];
+      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu認識テキスト: '%@'", i,
+            cleanedText);
+    } else {
+      [rowTexts addObject:@""];
+      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: "
+            @"テキストが認識されませんでした",
+            i);
+    }
+  }
+
+  // 結果を結合して返す（各行を改行で区切り）
+  NSString *result = [rowTexts componentsJoinedByString:@"\n"];
+  NSLog(@"OpenCVWrapper: detectInfoAnswer - 最終結果: '%@'", result);
+
+  return result;
+}
+
+// 列分割用の垂直線を検出するヘルパーメソッド
+// 使用StoredType: info
++ (int)detectColumnDivider:(cv::Mat)tableROI {
+  int dividerX = -1;
+
+  try {
+    // 改善点:
+    // - 投影値は画素強度の総和に相当するため、255で割って白ピクセル数に変換する
+    // - 複数のスケール(minLineHeight) を試して縦線が見つかるか確認する
+    // - 投影閾値は絶対値ではなく割合に基づく柔軟な閾値を使う
+    // - 最後のフォールバックとして Sobel と HoughLinesP を試行する
+
+    cv::Mat binary;
+    // adaptiveThreshold をまず試す（線が薄い/不均一な場合に有効）
+    cv::adaptiveThreshold(tableROI, binary, 255, cv::ADAPTIVE_THRESH_MEAN_C,
+                          cv::THRESH_BINARY, 15, 5);
+
+    // もし adaptive が失敗して真っ白/真っ黒になった場合は Otsu にフォールバック
+    double nonZero = cv::countNonZero(binary);
+    if (nonZero == 0 || nonZero == binary.rows * binary.cols) {
+      cv::threshold(tableROI, binary, 0, 255, cv::THRESH_OTSU);
+    }
+
+    cv::Mat binaryInv;
+    cv::bitwise_not(binary, binaryInv);
+
+    int imgCols = tableROI.cols;
+    int imgRows = tableROI.rows;
+
+    // 試すスケール(表の高さに対する縦線の最小長さ比)
+    std::vector<double> scales = {0.6, 0.4, 0.25, 0.15};
+    int bestCount = 0;
+    int bestX = -1;
+
+    for (double scale : scales) {
+      int minLineHeight = std::max(3, (int)std::round(imgRows * scale));
+      cv::Mat kernel =
+          cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, minLineHeight));
+
+      cv::Mat verticalLines;
+      cv::morphologyEx(binaryInv, verticalLines, cv::MORPH_OPEN, kernel);
+
+      // 投影（列ごとの白ピクセル数）を得る
+      cv::Mat projection;
+      cv::reduce(verticalLines, projection, 0, cv::REDUCE_SUM, CV_32S);
+
+      int startX = imgCols * 0.05;
+      int endX = imgCols * 0.95;
+      int maxCount = 0;
+      int maxX = -1;
+
+      for (int x = startX; x < endX; x++) {
+        int sumVal = projection.at<int>(0, x);
+        // 255で割ることで "白ピクセル数" に変換
+        int whitePixels = sumVal / 255;
+        if (whitePixels > maxCount) {
+          maxCount = whitePixels;
+          maxX = x;
+        }
+      }
+
+      double ratio = (double)maxCount / (double)imgRows; // 0.0 - 1.0
+      NSLog(@"OpenCVWrapper: detectColumnDivider(scale=%.2f) - maxWhite=%d, "
+            @"ratio=%.3f, x=%d",
+            scale, maxCount, ratio, maxX);
+
+      // 柔軟閾値: 列の高さの15%程度の連続白ピクセルがあれば採用
+      if (maxCount > bestCount && ratio >= 0.08) {
+        bestCount = maxCount;
+        bestX = maxX;
+      }
+
+      // 早期打ち切り: 明確な縦線が見つかったら終了
+      if (ratio >= 0.25) {
+        dividerX = maxX;
+        break;
+      }
+    }
+
+    if (dividerX == -1 && bestX >= 0) {
+      dividerX = bestX;
+    }
+
+    // Sobel を使ったフォールバック（縦方向の勾配を利用）
+    if (dividerX == -1) {
+      cv::Mat sobelX;
+      cv::Sobel(tableROI, sobelX, CV_16S, 1, 0, 3);
+      cv::Mat absSobel;
+      cv::convertScaleAbs(sobelX, absSobel);
+      cv::Mat thr;
+      cv::threshold(absSobel, thr, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+      cv::Mat proj;
+      cv::reduce(thr, proj, 0, cv::REDUCE_SUM, CV_32S);
+      int maxCount = 0;
+      int maxX = -1;
+      for (int x = imgCols * 0.05; x < imgCols * 0.95; x++) {
+        int cnt = proj.at<int>(0, x) / 255;
+        if (cnt > maxCount) {
+          maxCount = cnt;
+          maxX = x;
+        }
+      }
+      double ratio = (double)maxCount / (double)imgRows;
+      NSLog(@"OpenCVWrapper: detectColumnDivider(sobel) - maxWhite=%d, "
+            @"ratio=%.3f, x=%d",
+            maxCount, ratio, maxX);
+      if (maxX >= 0 && ratio >= 0.06) {
+        dividerX = maxX;
+      }
+    }
+
+    // HoughLinesP をフォールバックとして使用（エッジから直線を検出）
+    if (dividerX == -1) {
+      cv::Mat edges;
+      cv::Canny(tableROI, edges, 50, 150);
+      std::vector<cv::Vec4i> linesP;
+      // minLineLength を表の高さの 40% 程度に設定
+      int minLineLen = std::max(10, (int)std::round(imgRows * 0.4));
+      cv::HoughLinesP(edges, linesP, 1, CV_PI / 180, 50, minLineLen, 10);
+
+      std::vector<int> xCandidates;
+      for (auto &l : linesP) {
+        int x1 = l[0], y1 = l[1], x2 = l[2], y2 = l[3];
+        double angle = atan2((double)(y2 - y1), (double)(x2 - x1));
+        double deg = fabs(angle * 180.0 / CV_PI);
+        // 垂直に近い線（90度に近い）を採用
+        if (deg > 80 && deg < 100) {
+          int xc = (x1 + x2) / 2;
+          if (xc > imgCols * 0.05 && xc < imgCols * 0.95)
+            xCandidates.push_back(xc);
+        }
+      }
+
+      if (!xCandidates.empty()) {
+        // 中央値を取る
+        std::sort(xCandidates.begin(), xCandidates.end());
+        int mid = xCandidates[xCandidates.size() / 2];
+        dividerX = mid;
+        NSLog(@"OpenCVWrapper: detectColumnDivider(hough) - candidates=%zu, "
+              @"selected=%d",
+              xCandidates.size(), dividerX);
+      } else {
+        NSLog(@"OpenCVWrapper: detectColumnDivider - Hough "
+              @"でも垂直線が見つかりませんでした");
+      }
+    }
+
+    if (dividerX > 0) {
+      NSLog(@"OpenCVWrapper: detectColumnDivider - 最終検出位置: x=%d",
+            dividerX);
+    } else {
+      NSLog(@"OpenCVWrapper: detectColumnDivider - 検出に失敗しました "
+            @"(dividerX=%d)",
+            dividerX);
+    }
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: detectColumnDivider でエラー: %s", e.what());
+  }
+
+  return dividerX;
+}
+
+// 右列内の水平線を検出するヘルパーメソッド
+// 使用StoredType: info
++ (std::vector<int>)detectHorizontalLinesInColumn:(cv::Mat)columnROI {
+  std::vector<int> lines;
+
+  try {
+    // 二値化
+    cv::Mat binary;
+    cv::threshold(columnROI, binary, 180, 255, cv::THRESH_OTSU);
+
+    // 水平線検出のためのカーネル
+    int minLineWidth = columnROI.cols * 0.3; // 列の幅の30%以上
+    cv::Mat kernel =
+        cv::getStructuringElement(cv::MORPH_RECT, cv::Size(minLineWidth, 1));
+
+    cv::Mat binaryInv;
+    cv::bitwise_not(binary, binaryInv);
+
+    cv::Mat horizontalLines;
+    cv::morphologyEx(binaryInv, horizontalLines, cv::MORPH_OPEN, kernel);
+
+    // 水平線の投影を計算
+    cv::Mat projection;
+    cv::reduce(horizontalLines, projection, 1, cv::REDUCE_SUM, CV_32S);
+
+    // 投影値が閾値以上の位置を検出
+    int threshold = columnROI.cols * 0.2; // 列幅の20%以上
+
+    for (int y = 0; y < projection.rows; y++) {
+      int val = projection.at<int>(y, 0);
+      if (val > threshold) {
+        lines.push_back(y);
+      }
+    }
+
+    // 近接する線をマージ（10ピクセル以内）
+    std::vector<int> mergedLines;
+    if (!lines.empty()) {
+      mergedLines.push_back(lines[0]);
+
+      for (size_t i = 1; i < lines.size(); i++) {
+        if (lines[i] - mergedLines.back() > 10) {
+          mergedLines.push_back(lines[i]);
+        }
+      }
+    }
+
+    NSLog(@"OpenCVWrapper: detectHorizontalLinesInColumn - 検出された水平線数: "
+          @"%zu -> %zu (マージ後)",
+          lines.size(), mergedLines.size());
+
+    for (size_t i = 0; i < mergedLines.size(); i++) {
+      NSLog(@"  水平線%zu: y=%d", i, mergedLines[i]);
+    }
+
+    return mergedLines;
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: detectHorizontalLinesInColumn でエラー: %s",
+          e.what());
+  }
+
+  return lines;
 }
 
 @end

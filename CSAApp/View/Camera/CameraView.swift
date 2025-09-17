@@ -60,9 +60,9 @@ public struct CameraView: View {
                         .padding(.horizontal, 10)
 
                       // 検出結果を表示
-                      if setIdx < viewModel.parsedAnswers.count
-                        && imgIdx < viewModel.parsedAnswers.count
-                      {
+                      // viewModel.parsedAnswers は画像ごとの配列（同じ長さの想定）なので
+                      // インデックスチェックを厳格に行ってから利用する
+                      if imgIdx < viewModel.parsedAnswers.count {
                         let answerIndex = viewModel.parsedAnswers[imgIdx]
                         VStack(alignment: .leading, spacing: 4) {
                           Text("検出結果:")
@@ -143,9 +143,22 @@ public struct CameraView: View {
                               Text("設問: \(question)")
                                 .foregroundColor(.white.opacity(0.8))
                                 .font(.caption)
-                              Text("回答: 個人情報")
-                                .foregroundColor(.purple)
-                                .font(.subheadline)
+                              // info の場合もネイティブが返す parsedAnswers を表示する。
+                              // 既にネイティブ側で PII はマスク済みのはず。
+                              if answerIndex == "-1" {
+                                Text("回答: 未検出")
+                                  .foregroundColor(.orange)
+                                  .font(.subheadline)
+                              } else if !answerIndex.isEmpty {
+                                Text("回答: \(answerIndex)")
+                                  .foregroundColor(.purple)
+                                  .font(.subheadline)
+                                  .bold()
+                              } else {
+                                Text("回答: 検出エラー")
+                                  .foregroundColor(.red)
+                                  .font(.subheadline)
+                              }
                             }
                           } else {
                             Text("設問情報なし")
