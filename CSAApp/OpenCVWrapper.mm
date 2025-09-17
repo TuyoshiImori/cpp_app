@@ -15,6 +15,68 @@
 using namespace cv;
 
 @implementation OpenCVWrapper
+// 共通ユーティリティ（クラスメソッド）: UIImage(cv::Mat)の前処理 ->
+// グレースケール化 引数: srcMat(in) -> grayscale を返す
++ (cv::Mat)toGrayFromMat:(cv::Mat)srcMat {
+  cv::Mat gray;
+  if (srcMat.channels() == 4) {
+    cv::cvtColor(srcMat, gray, cv::COLOR_RGBA2GRAY);
+  } else if (srcMat.channels() == 3) {
+    cv::cvtColor(srcMat, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = srcMat.clone();
+  }
+  return gray;
+}
+
+// 共通ユーティリティ（クラスメソッド）: Gaussian Blur を簡潔に呼ぶラッパ
++ (cv::Mat)gaussianBlurMat:(cv::Mat)src ksize:(int)ksigma sigma:(double)sigma {
+  cv::Mat out;
+  int k = ksigma;
+  if (k % 2 == 0)
+    k = std::max(1, k - 1);
+  cv::GaussianBlur(src, out, cv::Size(k, k), sigma);
+  return out;
+}
+
+// 共通ユーティリティ（クラスメソッド）: adaptiveThreshold を試し、失敗なら Otsu
+// にフォールバック
++ (cv::Mat)adaptiveOrOtsuThreshold:(cv::Mat)gray
+                         blockSize:(int)blockSize
+                                 C:(int)C {
+  cv::Mat binary;
+  int b = blockSize;
+  if (b % 2 == 0)
+    b = std::max(3, b - 1);
+  cv::adaptiveThreshold(gray, binary, 255, cv::ADAPTIVE_THRESH_MEAN_C,
+                        cv::THRESH_BINARY, b, C);
+  double nonZero = cv::countNonZero(binary);
+  if (nonZero == 0 || nonZero == binary.rows * binary.cols) {
+    cv::threshold(gray, binary, 0, 255, cv::THRESH_OTSU);
+  }
+  return binary;
+}
+
+// 共通ユーティリティ（クラスメソッド）: 行/列方向の投影和を返す
++ (cv::Mat)projectionSum:(cv::Mat)binary axis:(int)axis {
+  cv::Mat proj;
+  cv::reduce(binary, proj, axis, cv::REDUCE_SUM, CV_32S);
+  return proj;
+}
+
+// 共通ユーティリティ（クラスメソッド）: 近接する線位置 (int 配列) をマージする
++ (std::vector<int>)mergeCloseLines:(const std::vector<int> &)lines
+                                gap:(int)gap {
+  std::vector<int> merged;
+  if (lines.empty())
+    return merged;
+  merged.push_back(lines[0]);
+  for (size_t i = 1; i < lines.size(); i++) {
+    if (lines[i] - merged.back() > gap)
+      merged.push_back(lines[i]);
+  }
+  return merged;
+}
 
 + (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image {
   // 入力画像のnilチェック
@@ -500,15 +562,8 @@ using namespace cv;
     return @"-1";
   }
 
-  // グレースケール変換
-  cv::Mat gray;
-  if (mat.channels() == 4) {
-    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
-  } else if (mat.channels() == 3) {
-    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
-  } else {
-    gray = mat.clone();
-  }
+  // グレースケール変換（共通ユーティリティを使用）
+  cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
@@ -631,15 +686,8 @@ using namespace cv;
     return @"-1";
   }
 
-  // グレースケール変換
-  cv::Mat gray;
-  if (mat.channels() == 4) {
-    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
-  } else if (mat.channels() == 3) {
-    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
-  } else {
-    gray = mat.clone();
-  }
+  // グレースケール変換（共通ユーティリティを使用）
+  cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
@@ -776,9 +824,8 @@ using namespace cv;
   try {
     // https://stackoverflow.com/questions/63084676/checkbox-detection-opencv
     // 上の方法を参考に実装
-    // Step 1: 二値化
-    cv::Mat binary;
-    cv::threshold(gray, binary, 180, 255, cv::THRESH_OTSU);
+    // Step 1: 二値化（共通ラッパを使用。固定180閾値より柔軟）
+    cv::Mat binary = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
 
     // Step 2: 水平線と垂直線の検出
     int lWidth = 2;
@@ -862,9 +909,8 @@ using namespace cv;
     // チェックボックス領域を抽出
     cv::Mat roi = gray(rect);
 
-    // 二値化
-    cv::Mat binary;
-    cv::threshold(roi, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    // 二値化（共通ラッパを使用）
+    cv::Mat binary = [self adaptiveOrOtsuThreshold:roi blockSize:15 C:5];
 
     // 黒いピクセルの割合を計算
     int totalPixels = roi.rows * roi.cols;
@@ -1200,15 +1246,8 @@ using namespace cv;
     return @"";
   }
 
-  // グレースケール変換
-  cv::Mat gray;
-  if (mat.channels() == 4) {
-    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
-  } else if (mat.channels() == 3) {
-    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
-  } else {
-    gray = mat.clone();
-  }
+  // グレースケール変換（共通ユーティリティを使用）
+  cv::Mat gray = [self toGrayFromMat:mat];
 
   // テキストボックス検出処理
   cv::Rect textBox = [self detectLargestTextBox:gray];
@@ -1252,8 +1291,8 @@ using namespace cv;
 
   try {
     // まずは既存のモルフォロジーに基づく検出を試みる
-    cv::Mat binary;
-    cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    // 二値化（共通ラッパを使用して adaptive->Otsu の挙動を統一）
+    cv::Mat binary = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
 
     int lWidth = 2;
     int lineMinWidth = std::max(15, (int)(gray.cols * 0.02));
@@ -1451,9 +1490,8 @@ using namespace cv;
   cv::Rect largestBox;
 
   try {
-    // 二値化
-    cv::Mat img;
-    cv::threshold(gray, img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    // 二値化（共通ラッパを使用）
+    cv::Mat img = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
 
     // 水平線と垂直線の強調（テキスト領域を矩形で囲むため）
     int lWidth = 2;
@@ -1594,15 +1632,8 @@ using namespace cv;
     return @"";
   }
 
-  // グレースケール変換
-  cv::Mat gray;
-  if (mat.channels() == 4) {
-    cv::cvtColor(mat, gray, cv::COLOR_RGBA2GRAY);
-  } else if (mat.channels() == 3) {
-    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
-  } else {
-    gray = mat.clone();
-  }
+  // グレースケール変換（共通ユーティリティを使用）
+  cv::Mat gray = [self toGrayFromMat:mat];
 
   NSLog(@"OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: %dx%d", gray.cols,
         gray.rows);
@@ -1719,16 +1750,8 @@ using namespace cv;
     // - 投影閾値は絶対値ではなく割合に基づく柔軟な閾値を使う
     // - 最後のフォールバックとして Sobel と HoughLinesP を試行する
 
-    cv::Mat binary;
-    // adaptiveThreshold をまず試す（線が薄い/不均一な場合に有効）
-    cv::adaptiveThreshold(tableROI, binary, 255, cv::ADAPTIVE_THRESH_MEAN_C,
-                          cv::THRESH_BINARY, 15, 5);
-
-    // もし adaptive が失敗して真っ白/真っ黒になった場合は Otsu にフォールバック
-    double nonZero = cv::countNonZero(binary);
-    if (nonZero == 0 || nonZero == binary.rows * binary.cols) {
-      cv::threshold(tableROI, binary, 0, 255, cv::THRESH_OTSU);
-    }
+    // 二値化は共通ラッパを使用して adaptive -> Otsu の流れを統一
+    cv::Mat binary = [self adaptiveOrOtsuThreshold:tableROI blockSize:15 C:5];
 
     cv::Mat binaryInv;
     cv::bitwise_not(binary, binaryInv);
@@ -1749,9 +1772,8 @@ using namespace cv;
       cv::Mat verticalLines;
       cv::morphologyEx(binaryInv, verticalLines, cv::MORPH_OPEN, kernel);
 
-      // 投影（列ごとの白ピクセル数）を得る
-      cv::Mat projection;
-      cv::reduce(verticalLines, projection, 0, cv::REDUCE_SUM, CV_32S);
+      // 投影（列ごとの白ピクセル数）を得る（共通ユーティリティ）
+      cv::Mat projection = [self projectionSum:verticalLines axis:0];
 
       int startX = imgCols * 0.05;
       int endX = imgCols * 0.95;
@@ -1798,8 +1820,7 @@ using namespace cv;
       cv::convertScaleAbs(sobelX, absSobel);
       cv::Mat thr;
       cv::threshold(absSobel, thr, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-      cv::Mat proj;
-      cv::reduce(thr, proj, 0, cv::REDUCE_SUM, CV_32S);
+      cv::Mat proj = [self projectionSum:thr axis:0];
       int maxCount = 0;
       int maxX = -1;
       for (int x = imgCols * 0.05; x < imgCols * 0.95; x++) {
@@ -1876,9 +1897,8 @@ using namespace cv;
   std::vector<int> lines;
 
   try {
-    // 二値化
-    cv::Mat binary;
-    cv::threshold(columnROI, binary, 180, 255, cv::THRESH_OTSU);
+    // 二値化（共通ラッパを使用）
+    cv::Mat binary = [self adaptiveOrOtsuThreshold:columnROI blockSize:15 C:5];
 
     // 水平線検出のためのカーネル
     int minLineWidth = columnROI.cols * 0.3; // 列の幅の30%以上
@@ -1891,31 +1911,19 @@ using namespace cv;
     cv::Mat horizontalLines;
     cv::morphologyEx(binaryInv, horizontalLines, cv::MORPH_OPEN, kernel);
 
-    // 水平線の投影を計算
-    cv::Mat projection;
-    cv::reduce(horizontalLines, projection, 1, cv::REDUCE_SUM, CV_32S);
+    // 水平線の投影を計算（共通ユーティリティ）
+    cv::Mat projection = [self projectionSum:horizontalLines axis:1];
 
     // 投影値が閾値以上の位置を検出
-    int threshold = columnROI.cols * 0.2; // 列幅の20%以上
-
+    int threshold = columnROI.cols * 0.2; // 列幅の20%以上 を維持
     for (int y = 0; y < projection.rows; y++) {
       int val = projection.at<int>(y, 0);
-      if (val > threshold) {
+      if (val > threshold)
         lines.push_back(y);
-      }
     }
 
-    // 近接する線をマージ（10ピクセル以内）
-    std::vector<int> mergedLines;
-    if (!lines.empty()) {
-      mergedLines.push_back(lines[0]);
-
-      for (size_t i = 1; i < lines.size(); i++) {
-        if (lines[i] - mergedLines.back() > 10) {
-          mergedLines.push_back(lines[i]);
-        }
-      }
-    }
+    // 近接する線をマージ（mergeCloseLines ヘルパを使用、10ピクセル）
+    std::vector<int> mergedLines = [self mergeCloseLines:lines gap:10];
 
     NSLog(@"OpenCVWrapper: detectHorizontalLinesInColumn - 検出された水平線数: "
           @"%zu -> %zu (マージ後)",
