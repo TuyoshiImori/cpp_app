@@ -1272,8 +1272,9 @@ using namespace cv;
   NSString *recognizedText = [self recognizeTextFromImage:textImage];
 
   if (recognizedText) {
-    // 改行を除去して1行にする
-    NSString *cleanedText = [self removeNewlinesFromText:recognizedText];
+    // 改行とスペースを削除して1行にする（正規化）
+    NSString *cleanedText = [self normalizeOCRText:recognizedText
+                                      removeSpaces:YES];
     NSLog(@"OpenCVWrapper: detectTextAnswer - 認識されたテキスト: '%@' -> "
           @"クリーンアップ後: '%@'",
           recognizedText, cleanedText);
@@ -1615,6 +1616,57 @@ using namespace cv;
                                           whitespaceAndNewlineCharacterSet]];
 }
 
+// OCR の認識結果を正規化する共通メソッド
+// removeSpaces が YES の場合は全ての空白（スペース/タブ）と改行を削除する
+// NO
+// の場合は改行のみをスペースに置換して連続空白を1つにする（既存の挙動に近い）
++ (NSString *)normalizeOCRText:(NSString *)text
+                  removeSpaces:(BOOL)removeSpaces {
+  if (!text || [text length] == 0) {
+    return @"";
+  }
+
+  NSString *result = text;
+  if (removeSpaces) {
+    // 改行と復帰を削除
+    result = [result stringByReplacingOccurrencesOfString:@"\n" withString:@""];
+    result = [result stringByReplacingOccurrencesOfString:@"\r" withString:@""];
+    // タブも削除
+    result = [result stringByReplacingOccurrencesOfString:@"\t" withString:@""];
+    // 全角スペースと半角スペースを削除
+    result = [result stringByReplacingOccurrencesOfString:@" " withString:@""];
+    result = [result stringByReplacingOccurrencesOfString:@"\u3000"
+                                               withString:@""];
+
+    // 前後の空白をトリム（念のため）
+    result = [result
+        stringByTrimmingCharactersInSet:[NSCharacterSet
+                                            whitespaceAndNewlineCharacterSet]];
+    return result;
+  } else {
+    // 改行をスペースに置換し、連続空白を1つにする
+    result = [result stringByReplacingOccurrencesOfString:@"\n"
+                                               withString:@" "];
+    result = [result stringByReplacingOccurrencesOfString:@"\r"
+                                               withString:@" "];
+    NSError *error = nil;
+    NSRegularExpression *regex = [NSRegularExpression
+        regularExpressionWithPattern:@"\\s+"
+                             options:NSRegularExpressionCaseInsensitive
+                               error:&error];
+    if (!error) {
+      result = [regex
+          stringByReplacingMatchesInString:result
+                                   options:0
+                                     range:NSMakeRange(0, [result length])
+                              withTemplate:@" "];
+    }
+    return [result
+        stringByTrimmingCharactersInSet:[NSCharacterSet
+                                            whitespaceAndNewlineCharacterSet]];
+  }
+}
+
 // Info設問専用の表構造解析と文字認識メソッド
 // 使用StoredType: info
 + (NSString *)detectInfoAnswerFromImage:(UIImage *)image {
@@ -1719,7 +1771,9 @@ using namespace cv;
     NSString *recognizedText = [self recognizeTextFromImage:rowImage];
 
     if (recognizedText && [recognizedText length] > 0) {
-      NSString *cleanedText = [self removeNewlinesFromText:recognizedText];
+      // スペースと改行を除去して1行化
+      NSString *cleanedText = [self normalizeOCRText:recognizedText
+                                        removeSpaces:YES];
       [rowTexts addObject:cleanedText];
       NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu認識テキスト: '%@'", i,
             cleanedText);
