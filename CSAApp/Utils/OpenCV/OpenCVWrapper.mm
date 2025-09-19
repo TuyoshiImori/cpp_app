@@ -595,64 +595,85 @@ using namespace cv;
     }
   }
 
-  NSMutableArray<NSString *> *parsedAnswers = [NSMutableArray array];
-
-  for (size_t i = 0; i < n; ++i) {
-    NSString *storedType = (types && i < [types count]) ? types[i] : @"unknown";
-    NSArray<NSString *> *optionArray =
-        (optionTexts && i < [optionTexts count]) ? optionTexts[i] : @[];
-    NSInteger optCount = [optionArray count];
-
-    // 各要素ごとに storedType と対応する optionCount を明示的に出力
-    // optionTexts の内容を個別に出力して文字化けを回避
-    NSLog(@"OpenCVWrapper: index=%zu -> storedType=%@, optionCount=%ld", i,
-          storedType, (long)optCount);
-    for (NSUInteger j = 0; j < [optionArray count]; j++) {
-      NSString *option = optionArray[j];
-      NSLog(@"  option[%lu]: %@", (unsigned long)j, option);
-    }
-
-    // StoredType ごとの分岐：実際のOpenCV処理を実装
-    if ([storedType isEqualToString:@"single"]) {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as SINGLE with %ld options",
-            i, (long)optCount);
-
-      // チェックボックス検出処理を実行
-      UIImage *croppedImage = croppedImages[i];
-      NSString *result = [self detectSingleAnswerFromImage:croppedImage
-                                               withOptions:optionArray];
-      [parsedAnswers addObject:result];
-    } else if ([storedType isEqualToString:@"multiple"]) {
-      NSLog(
-          @"OpenCVWrapper: index=%zu -> handling as MULTIPLE with %ld options",
-          i, (long)optCount);
-
-      // 複数回答チェックボックス検出処理を実行
-      UIImage *croppedImage = croppedImages[i];
-      NSString *result = [self detectMultipleAnswerFromImage:croppedImage
-                                                 withOptions:optionArray];
-      [parsedAnswers addObject:result];
-    } else if ([storedType isEqualToString:@"text"]) {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as TEXT", i);
-
-      // テキスト検出処理を実行
-      UIImage *croppedImage = croppedImages[i];
-      NSString *result = [self detectTextAnswerFromImage:croppedImage];
-      [parsedAnswers addObject:result];
-    } else if ([storedType isEqualToString:@"info"]) {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as INFO", i);
-
-      // info設問専用の処理を実行
-      UIImage *croppedImage = croppedImages[i];
-      // optionArray に InfoField の rawValue (ex: "zip") が入っている想定
-      NSString *result = [self detectInfoAnswerFromImage:croppedImage
-                                         withOptionArray:optionArray];
-      [parsedAnswers addObject:result];
-    } else {
-      NSLog(@"OpenCVWrapper: index=%zu -> handling as UNKNOWN", i);
-      [parsedAnswers addObject:@"0"];
-    }
+  // 並列処理用に結果配列を事前に確保（スレッドセーフ）
+  NSMutableArray<NSString *> *parsedAnswers =
+      [NSMutableArray arrayWithCapacity:n];
+  for (size_t i = 0; i < n; i++) {
+    [parsedAnswers addObject:@""]; // プレースホルダーで初期化
   }
+
+  NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理開始 - %zu個の設問を処理",
+        n);
+
+  // 並列処理でループを実行（CPUコア数に応じて自動分散）
+  dispatch_apply(
+      n, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+      ^(size_t i) {
+        NSString *storedType =
+            (types && i < [types count]) ? types[i] : @"unknown";
+        NSArray<NSString *> *optionArray =
+            (optionTexts && i < [optionTexts count]) ? optionTexts[i] : @[];
+        NSInteger optCount = [optionArray count];
+
+        // 各要素ごとに storedType と対応する optionCount を明示的に出力
+        // optionTexts の内容を個別に出力して文字化けを回避
+        NSLog(@"OpenCVWrapper: [並列] index=%zu -> storedType=%@, "
+              @"optionCount=%ld",
+              i, storedType, (long)optCount);
+        for (NSUInteger j = 0; j < [optionArray count]; j++) {
+          NSString *option = optionArray[j];
+          NSLog(@"  [並列] option[%lu]: %@", (unsigned long)j, option);
+        }
+
+        NSString *result = @"0"; // デフォルト値
+
+        // StoredType ごとの分岐：実際のOpenCV処理を実装
+        if ([storedType isEqualToString:@"single"]) {
+          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as SINGLE with "
+                @"%ld options",
+                i, (long)optCount);
+
+          // チェックボックス検出処理を実行
+          UIImage *croppedImage = croppedImages[i];
+          result = [self detectSingleAnswerFromImage:croppedImage
+                                         withOptions:optionArray];
+        } else if ([storedType isEqualToString:@"multiple"]) {
+          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as MULTIPLE with "
+                @"%ld options",
+                i, (long)optCount);
+
+          // 複数回答チェックボックス検出処理を実行
+          UIImage *croppedImage = croppedImages[i];
+          result = [self detectMultipleAnswerFromImage:croppedImage
+                                           withOptions:optionArray];
+        } else if ([storedType isEqualToString:@"text"]) {
+          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as TEXT", i);
+
+          // テキスト検出処理を実行
+          UIImage *croppedImage = croppedImages[i];
+          result = [self detectTextAnswerFromImage:croppedImage];
+        } else if ([storedType isEqualToString:@"info"]) {
+          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as INFO", i);
+
+          // info設問専用の処理を実行
+          UIImage *croppedImage = croppedImages[i];
+          // optionArray に InfoField の rawValue (ex: "zip") が入っている想定
+          result = [self detectInfoAnswerFromImage:croppedImage
+                                   withOptionArray:optionArray];
+        } else {
+          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as UNKNOWN", i);
+          result = @"0";
+        }
+
+        // 結果を正しいインデックスに格納（スレッドセーフ）
+        @synchronized(parsedAnswers) {
+          parsedAnswers[i] = result;
+        }
+
+        NSLog(@"OpenCVWrapper: [並列] index=%zu 完了 -> result=%@", i, result);
+      });
+
+  NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理完了");
 
   return @{
     @"processedImage" : image ?: [NSNull null],
