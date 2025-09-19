@@ -24,8 +24,18 @@ using namespace cv;
 #endif
 
 @implementation OpenCVWrapper
-// 共通ユーティリティ（クラスメソッド）: UIImage(cv::Mat)の前処理 ->
-// グレースケール化 引数: srcMat(in) -> grayscale を返す
+// 共通ユーティリティ（クラスメソッド）: 画像リサイズ
++ (cv::Mat)resizeImage:(cv::Mat)src
+                scaleX:(double)scaleX
+                scaleY:(double)scaleY
+         interpolation:(int)interpolation {
+  cv::Mat resized;
+  cv::resize(src, resized, cv::Size(), scaleX, scaleY, interpolation);
+  return resized;
+}
+
+// 共通ユーティリティ（クラスメソッド）: グレースケール化 引数: srcMat(in) ->
+// grayscale を返す
 + (cv::Mat)toGrayFromMat:(cv::Mat)srcMat {
   cv::Mat gray;
   if (srcMat.channels() == 4) {
@@ -48,8 +58,8 @@ using namespace cv;
   return out;
 }
 
-// 共通ユーティリティ（クラスメソッド）: adaptiveThreshold を試し、失敗なら Otsu
-// にフォールバック
+// 共通ユーティリティ（クラスメソッド）: 二値化
+// adaptiveThreshold を試し、失敗なら Otsu にフォールバック
 + (cv::Mat)adaptiveOrOtsuThreshold:(cv::Mat)gray
                          blockSize:(int)blockSize
                                  C:(int)C {
@@ -64,6 +74,37 @@ using namespace cv;
     cv::threshold(gray, binary, 0, 255, cv::THRESH_OTSU);
   }
   return binary;
+}
+
+// 共通ユーティリティ（クラスメソッド）:
+// Gaussian適応的二値化（カスタムパラメータ対応）
++ (cv::Mat)adaptiveThresholdGaussian:(cv::Mat)gray
+                           blockSize:(int)blockSize
+                                   C:(int)C {
+  cv::Mat binary;
+  int b = blockSize;
+  if (b % 2 == 0)
+    b = std::max(3, b - 1);
+  cv::adaptiveThreshold(gray, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv::THRESH_BINARY, b, C);
+  return binary;
+}
+
+// 共通ユーティリティ（クラスメソッド）: 画像の白黒反転
++ (cv::Mat)invertImage:(cv::Mat)src {
+  cv::Mat inverted;
+  cv::bitwise_not(src, inverted);
+  return inverted;
+}
+
+// 共通ユーティリティ（クラスメソッド）:
+// モルフォロジーによるノイズ除去（オープン処理）
++ (cv::Mat)morphologyDenoiseOpen:(cv::Mat)src kernelSize:(int)kernelSize {
+  cv::Mat denoised;
+  cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                             cv::Size(kernelSize, kernelSize));
+  cv::morphologyEx(src, denoised, cv::MORPH_OPEN, kernel);
+  return denoised;
 }
 
 // 共通ユーティリティ（クラスメソッド）: 行/列方向の投影和を返す
@@ -87,6 +128,7 @@ using namespace cv;
   return merged;
 }
 
+// 主要機能（クラスメソッド）: テンプレートマッチングによる設問画像の切り取り
 + (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image {
   // 入力画像のnilチェック
   if (image == nil) {
@@ -119,7 +161,10 @@ using namespace cv;
   // 1. 画像を拡大（処理の精度向上のため）
   cv::Mat resizedMat;
   try {
-    cv::resize(mat, resizedMat, cv::Size(), 2.0, 2.0, cv::INTER_LINEAR);
+    resizedMat = [OpenCVWrapper resizeImage:mat
+                                     scaleX:2.0
+                                     scaleY:2.0
+                              interpolation:cv::INTER_LINEAR];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: resizeでエラー: %s", e.what());
     return @{
@@ -132,20 +177,7 @@ using namespace cv;
   // 2. グレースケール変換（拡大した画像から）
   cv::Mat grayMat;
   try {
-    if (resizedMat.channels() == 4) {
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_RGBA2GRAY);
-    } else if (resizedMat.channels() == 3) {
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_BGR2GRAY);
-    } else if (resizedMat.channels() == 1) {
-      grayMat = resizedMat.clone();
-    } else {
-      NSLog(@"OpenCVWrapper: 未対応のチャンネル数: %d", resizedMat.channels());
-      return @{
-        @"processedImage" : image,
-        @"circleCenters" : @[],
-        @"croppedImages" : @[]
-      };
-    }
+    grayMat = [OpenCVWrapper toGrayFromMat:resizedMat];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: グレースケール変換でエラー: %s", e.what());
     return @{
@@ -158,7 +190,7 @@ using namespace cv;
   // 3. ガウシアンブラーで平滑化
   cv::Mat blurMat;
   try {
-    cv::GaussianBlur(grayMat, blurMat, cv::Size(3, 3), 1.0);
+    blurMat = [OpenCVWrapper gaussianBlurMat:grayMat ksize:3 sigma:1.0];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: GaussianBlurでエラー: %s", e.what());
     return @{
@@ -172,10 +204,9 @@ using namespace cv;
   cv::Mat binaryMat;
   // 適応的二値化のパラメータを調整
   try {
-    cv::adaptiveThreshold(blurMat, binaryMat, 255,
-                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY,
-                          25, // ブロックサイズを19から25に変更
-                          5); // 定数を2から5に変更
+    binaryMat = [OpenCVWrapper adaptiveThresholdGaussian:blurMat
+                                               blockSize:25
+                                                       C:5];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
     return @{
@@ -188,7 +219,7 @@ using namespace cv;
   // 白黒反転前にさらに平滑化処理を追加
   cv::Mat extraBlurMat;
   try {
-    cv::GaussianBlur(binaryMat, extraBlurMat, cv::Size(5, 5), 2.0);
+    extraBlurMat = [OpenCVWrapper gaussianBlurMat:binaryMat ksize:5 sigma:2.0];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
     return @{
@@ -201,7 +232,7 @@ using namespace cv;
   // 5. 白黒反転
   cv::Mat invMat;
   try {
-    cv::bitwise_not(extraBlurMat, invMat);
+    invMat = [OpenCVWrapper invertImage:extraBlurMat];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return @{
@@ -214,8 +245,7 @@ using namespace cv;
   // 6. ノイズ除去（モルフォロジーオープン）
   cv::Mat noNoiseMat;
   try {
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(invMat, noNoiseMat, cv::MORPH_OPEN, kernel);
+    noNoiseMat = [OpenCVWrapper morphologyDenoiseOpen:invMat kernelSize:3];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
     return @{
@@ -228,7 +258,7 @@ using namespace cv;
   // 7. 再度反転
   cv::Mat finalMat;
   try {
-    cv::bitwise_not(noNoiseMat, finalMat);
+    finalMat = [OpenCVWrapper invertImage:noNoiseMat];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: bitwise_not(2)でエラー: %s", e.what());
     return @{
@@ -251,13 +281,7 @@ using namespace cv;
   // 元画像のグレースケール版を作成（円検出用）
   cv::Mat originalGrayMat;
   try {
-    if (mat.channels() == 4) {
-      cv::cvtColor(mat, originalGrayMat, cv::COLOR_RGBA2GRAY);
-    } else if (mat.channels() == 3) {
-      cv::cvtColor(mat, originalGrayMat, cv::COLOR_BGR2GRAY);
-    } else if (mat.channels() == 1) {
-      originalGrayMat = mat.clone();
-    }
+    originalGrayMat = [OpenCVWrapper toGrayFromMat:mat];
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: 元画像グレースケール変換でエラー: %s", e.what());
     return @{
@@ -269,7 +293,9 @@ using namespace cv;
 
   // 軽いガウシアンブラーでノイズ除去
   cv::Mat blurredOriginalMat;
-  cv::GaussianBlur(originalGrayMat, blurredOriginalMat, cv::Size(3, 3), 1.0);
+  blurredOriginalMat = [OpenCVWrapper gaussianBlurMat:originalGrayMat
+                                                ksize:3
+                                                sigma:1.0];
 
   // テンプレートマッチングによるマーカー検出 (q.png をテンプレートとして使用)
   std::vector<cv::Vec3f> circles; // (x, y, r) の配列として扱う
@@ -307,12 +333,7 @@ using namespace cv;
 
     // テンプレートもグレースケール化しておく
     cv::Mat tplGray;
-    if (tplMat.channels() == 4)
-      cv::cvtColor(tplMat, tplGray, cv::COLOR_RGBA2GRAY);
-    else if (tplMat.channels() == 3)
-      cv::cvtColor(tplMat, tplGray, cv::COLOR_BGR2GRAY);
-    else
-      tplGray = tplMat.clone();
+    tplGray = [OpenCVWrapper toGrayFromMat:tplMat];
 
     // matchTemplate を実行（TM_CCOEFF_NORMED）
     cv::Mat result;
@@ -573,7 +594,7 @@ using namespace cv;
     return @"-1";
   }
 
-  // グレースケール変換（共通ユーティリティを使用）
+  // グレースケール変換
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
@@ -697,7 +718,7 @@ using namespace cv;
     return @"-1";
   }
 
-  // グレースケール変換（共通ユーティリティを使用）
+  // グレースケール変換
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
@@ -920,7 +941,7 @@ using namespace cv;
     // チェックボックス領域を抽出
     cv::Mat roi = gray(rect);
 
-    // 二値化（共通ラッパを使用）
+    // 二値化
     cv::Mat binary = [self adaptiveOrOtsuThreshold:roi blockSize:15 C:5];
 
     // 黒いピクセルの割合を計算
@@ -1257,7 +1278,7 @@ using namespace cv;
     return @"";
   }
 
-  // グレースケール変換（共通ユーティリティを使用）
+  // グレースケール変換
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // テキストボックス検出処理
@@ -1502,7 +1523,7 @@ using namespace cv;
   cv::Rect largestBox;
 
   try {
-    // 二値化（共通ラッパを使用）
+    // 二値化
     cv::Mat img = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
 
     // 水平線と垂直線の強調（テキスト領域を矩形で囲むため）
@@ -1717,7 +1738,7 @@ using namespace cv;
     return @"";
   }
 
-  // グレースケール変換（共通ユーティリティを使用）
+  // グレースケール変換
   cv::Mat gray = [self toGrayFromMat:mat];
 
   NSLog(@"OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: %dx%d", gray.cols,
@@ -1907,7 +1928,7 @@ using namespace cv;
       cv::Mat verticalLines;
       cv::morphologyEx(binaryInv, verticalLines, cv::MORPH_OPEN, kernel);
 
-      // 投影（列ごとの白ピクセル数）を得る（共通ユーティリティ）
+      // 投影（列ごとの白ピクセル数）を得る
       cv::Mat projection = [self projectionSum:verticalLines axis:0];
 
       int startX = imgCols * 0.05;
@@ -2032,7 +2053,7 @@ using namespace cv;
   std::vector<int> lines;
 
   try {
-    // 二値化（共通ラッパを使用）
+    // 二値化
     cv::Mat binary = [self adaptiveOrOtsuThreshold:columnROI blockSize:15 C:5];
 
     // 水平線検出のためのカーネル
@@ -2046,7 +2067,7 @@ using namespace cv;
     cv::Mat horizontalLines;
     cv::morphologyEx(binaryInv, horizontalLines, cv::MORPH_OPEN, kernel);
 
-    // 水平線の投影を計算（共通ユーティリティ）
+    // 水平線の投影を計算
     cv::Mat projection = [self projectionSum:horizontalLines axis:1];
 
     // 投影値が閾値以上の位置を検出
