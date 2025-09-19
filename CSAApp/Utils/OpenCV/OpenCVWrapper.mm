@@ -87,6 +87,77 @@ using namespace cv;
   return merged;
 }
 
+// 統合画像処理メソッド: 全てのOpenCV処理で使用する共通前処理
+// 条件の緩い方（検出しやすい方）に統一したパラメータを使用
++ (NSDictionary *)processImageCommon:(cv::Mat)srcMat
+                               scale:(double)scale
+                         needsResize:(BOOL)needsResize {
+  if (srcMat.empty()) {
+    return @{
+      @"processedMat" : [NSValue valueWithPointer:nullptr],
+      @"grayMat" : [NSValue valueWithPointer:nullptr],
+      @"success" : @NO
+    };
+  }
+
+  cv::Mat processed = srcMat.clone();
+
+  try {
+    // 1. リサイズ（必要な場合のみ、スケール指定可能）
+    if (needsResize && scale > 0.1) {
+      cv::resize(processed, processed, cv::Size(), scale, scale,
+                 cv::INTER_LINEAR);
+    }
+
+    // 2. グレースケール変換（統合ヘルパー使用）
+    cv::Mat gray = [self toGrayFromMat:processed];
+
+    // 3. ガウシアンブラー（軽めのパラメータで統一）
+    cv::Mat blurred;
+    cv::GaussianBlur(gray, blurred, cv::Size(3, 3), 1.0);
+
+    // 4. 適応的二値化（検出しやすい緩い条件で統一）
+    cv::Mat binary;
+    cv::adaptiveThreshold(blurred, binary, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                          cv::THRESH_BINARY, 25, 5);
+
+    // 5. 追加のガウシアンブラー（二値化後の平滑化）
+    cv::Mat extraBlurred;
+    cv::GaussianBlur(binary, extraBlurred, cv::Size(5, 5), 2.0);
+
+    // 6. 白黒反転
+    cv::Mat inverted;
+    cv::bitwise_not(extraBlurred, inverted);
+
+    // 7. モルフォロジー処理（ノイズ除去）
+    cv::Mat cleaned;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(inverted, cleaned, cv::MORPH_OPEN, kernel);
+
+    // 8. 最終反転
+    cv::Mat final;
+    cv::bitwise_not(cleaned, final);
+
+    // 結果をNSDictionaryで返す（cv::MatをNSValueでラップ）
+    return @{
+      @"processedMat" : [NSValue valueWithPointer:new cv::Mat(final)],
+      @"grayMat" : [NSValue valueWithPointer:new cv::Mat(gray)],
+      @"binaryMat" : [NSValue valueWithPointer:new cv::Mat(binary)],
+      @"success" : @YES
+    };
+
+  } catch (const cv::Exception &e) {
+    NSLog(@"OpenCVWrapper: processImageCommon でエラー: %s", e.what());
+    return @{
+      @"processedMat" : [NSValue valueWithPointer:nullptr],
+      @"grayMat" : [NSValue valueWithPointer:nullptr],
+      @"success" : @NO
+    };
+  }
+}
+
+// メインの画像処理関数:
+// 円検出とテンプレートマッチングと切り取りを行い、処理済み画像、円の中心点、切り取った画像を返す
 + (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image {
   // 入力画像のnilチェック
   if (image == nil) {
@@ -115,13 +186,13 @@ using namespace cv;
   NSLog(@"OpenCVWrapper: 元画像 channels=%d, type=%d, size=%dx%d",
         mat.channels(), mat.type(), mat.cols, mat.rows);
 
-  // === 画像処理部分 ===
-  // 1. 画像を拡大（処理の精度向上のため）
-  cv::Mat resizedMat;
-  try {
-    cv::resize(mat, resizedMat, cv::Size(), 2.0, 2.0, cv::INTER_LINEAR);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: resizeでエラー: %s", e.what());
+  // === 画像処理部分（共通メソッド使用） ===
+  NSDictionary *commonResult = [self processImageCommon:mat
+                                                  scale:2.0
+                                            needsResize:YES];
+
+  if (![[commonResult objectForKey:@"success"] boolValue]) {
+    NSLog(@"OpenCVWrapper: 共通画像処理でエラー");
     return @{
       @"processedImage" : image,
       @"circleCenters" : @[],
@@ -129,113 +200,45 @@ using namespace cv;
     };
   }
 
-  // 2. グレースケール変換（拡大した画像から）
-  cv::Mat grayMat;
-  try {
-    if (resizedMat.channels() == 4) {
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_RGBA2GRAY);
-    } else if (resizedMat.channels() == 3) {
-      cv::cvtColor(resizedMat, grayMat, cv::COLOR_BGR2GRAY);
-    } else if (resizedMat.channels() == 1) {
-      grayMat = resizedMat.clone();
-    } else {
-      NSLog(@"OpenCVWrapper: 未対応のチャンネル数: %d", resizedMat.channels());
-      return @{
-        @"processedImage" : image,
-        @"circleCenters" : @[],
-        @"croppedImages" : @[]
-      };
-    }
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: グレースケール変換でエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
+  // 処理結果を取得
+  // 注意: processImageCommon が返すキー名は "processedMat" / "grayMat" /
+  // "binaryMat" なので それに合わせて取得する。さらに pointerValue が NULL
+  // の可能性があるため NULL チェックを行う。
+  NSValue *finalMatValue = [commonResult objectForKey:@"processedMat"];
+  NSValue *grayMatValue = [commonResult objectForKey:@"grayMat"];
+
+  cv::Mat *finalMatPtr = nullptr;
+  cv::Mat *grayMatPtr = nullptr;
+
+  if (finalMatValue && [finalMatValue pointerValue]) {
+    finalMatPtr = (cv::Mat *)[finalMatValue pointerValue];
+  }
+  if (grayMatValue && [grayMatValue pointerValue]) {
+    grayMatPtr = (cv::Mat *)[grayMatValue pointerValue];
   }
 
-  // 3. ガウシアンブラーで平滑化
-  cv::Mat blurMat;
-  try {
-    cv::GaussianBlur(grayMat, blurMat, cv::Size(3, 3), 1.0);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: GaussianBlurでエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // 4. 適応的二値化
-  cv::Mat binaryMat;
-  // 適応的二値化のパラメータを調整
-  try {
-    cv::adaptiveThreshold(blurMat, binaryMat, 255,
-                          cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY,
-                          25, // ブロックサイズを19から25に変更
-                          5); // 定数を2から5に変更
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // 白黒反転前にさらに平滑化処理を追加
-  cv::Mat extraBlurMat;
-  try {
-    cv::GaussianBlur(binaryMat, extraBlurMat, cv::Size(5, 5), 2.0);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // 5. 白黒反転
-  cv::Mat invMat;
-  try {
-    cv::bitwise_not(extraBlurMat, invMat);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // 6. ノイズ除去（モルフォロジーオープン）
-  cv::Mat noNoiseMat;
-  try {
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(invMat, noNoiseMat, cv::MORPH_OPEN, kernel);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // 7. 再度反転
+  // ポインタが無ければ元の画像から安全なフォールバックを作る
   cv::Mat finalMat;
-  try {
-    cv::bitwise_not(noNoiseMat, finalMat);
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: bitwise_not(2)でエラー: %s", e.what());
-    return @{
-      @"processedImage" : image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
+  cv::Mat resizedGrayMat;
+  if (finalMatPtr && !finalMatPtr->empty()) {
+    finalMat = *finalMatPtr;
+  } else {
+    // フォールバック: 元の入力マットをコピー
+    finalMat = mat.clone();
+  }
+  if (grayMatPtr && !grayMatPtr->empty()) {
+    resizedGrayMat = *grayMatPtr;
+  } else {
+    // フォールバック: 元画像のグレースケールを作る
+    resizedGrayMat = [self toGrayFromMat:mat];
+  }
+
+  // メモリ解放（new されたもののみ削除）
+  if (finalMatPtr) {
+    delete finalMatPtr;
+  }
+  if (grayMatPtr) {
+    delete grayMatPtr;
   }
 
   // 処理済み画像をUIImageに変換
@@ -249,23 +252,7 @@ using namespace cv;
 
   // === 円検出部分 ===
   // 元画像のグレースケール版を作成（円検出用）
-  cv::Mat originalGrayMat;
-  try {
-    if (mat.channels() == 4) {
-      cv::cvtColor(mat, originalGrayMat, cv::COLOR_RGBA2GRAY);
-    } else if (mat.channels() == 3) {
-      cv::cvtColor(mat, originalGrayMat, cv::COLOR_BGR2GRAY);
-    } else if (mat.channels() == 1) {
-      originalGrayMat = mat.clone();
-    }
-  } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: 元画像グレースケール変換でエラー: %s", e.what());
-    return @{
-      @"processedImage" : processedImage ?: image,
-      @"circleCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
+  cv::Mat originalGrayMat = [self toGrayFromMat:mat];
 
   // 軽いガウシアンブラーでノイズ除去
   cv::Mat blurredOriginalMat;
@@ -577,7 +564,7 @@ using namespace cv;
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
-  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
+  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:image];
 
   if (checkboxes.empty()) {
     NSLog(@"OpenCVWrapper: detectSingleAnswer - "
@@ -701,7 +688,7 @@ using namespace cv;
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // チェックボックス検出処理
-  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
+  std::vector<cv::Rect> checkboxes = [self detectCheckboxes:image];
 
   if (checkboxes.empty()) {
     NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
@@ -829,14 +816,44 @@ using namespace cv;
 
 // チェックボックス矩形検出
 // 使用StoredType: single, multiple
-+ (std::vector<cv::Rect>)detectCheckboxes:(cv::Mat)gray {
++ (std::vector<cv::Rect>)detectCheckboxes:(UIImage *)image {
   std::vector<cv::Rect> checkboxes;
 
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: detectCheckboxes - 入力画像がnilです");
+    return checkboxes;
+  }
+
   try {
+    // 元画像をMatに変換
+    cv::Mat mat;
+    UIImageToMat(image, mat);
+    if (mat.empty()) {
+      NSLog(@"OpenCVWrapper: detectCheckboxes - 画像変換失敗");
+      return checkboxes;
+    }
+
+    // 共通画像処理を適用（スケール1.0、リサイズなし）
+    NSDictionary *processedDict = [self processImageCommon:mat
+                                                     scale:1.0
+                                               needsResize:NO];
+    BOOL success = [processedDict[@"success"] boolValue];
+    if (!success) {
+      NSLog(@"OpenCVWrapper: detectCheckboxes - 共通画像処理失敗");
+      return checkboxes;
+    }
+
+    // 処理済み二値化画像を取得
+    cv::Mat *binaryMat =
+        static_cast<cv::Mat *>([processedDict[@"binaryMat"] pointerValue]);
+    if (binaryMat == nullptr || binaryMat->empty()) {
+      NSLog(@"OpenCVWrapper: detectCheckboxes - 二値化画像が無効");
+      return checkboxes;
+    }
+
     // https://stackoverflow.com/questions/63084676/checkbox-detection-opencv
     // 上の方法を参考に実装
-    // Step 1: 二値化（共通ラッパを使用。固定180閾値より柔軟）
-    cv::Mat binary = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
+    // Step 1: 二値化は共通メソッドで既に完了
 
     // Step 2: 水平線と垂直線の検出
     int lWidth = 2;
@@ -854,7 +871,7 @@ using namespace cv;
 
     // 水平線検出
     cv::Mat binaryInv;
-    cv::bitwise_not(binary, binaryInv);
+    cv::bitwise_not(*binaryMat, binaryInv);
 
     cv::Mat imgBinH;
     cv::morphologyEx(binaryInv, imgBinH, cv::MORPH_CLOSE, kernel1h);
@@ -905,6 +922,12 @@ using namespace cv;
 
     NSLog(@"OpenCVWrapper: detectCheckboxes - %zu個のチェックボックスを検出",
           checkboxes.size());
+
+    // メモリクリーンアップ
+    delete static_cast<cv::Mat *>(
+        [processedDict[@"processedMat"] pointerValue]);
+    delete static_cast<cv::Mat *>([processedDict[@"grayMat"] pointerValue]);
+    delete binaryMat;
 
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: detectCheckboxes でエラー: %s", e.what());
@@ -1261,7 +1284,7 @@ using namespace cv;
   cv::Mat gray = [self toGrayFromMat:mat];
 
   // テキストボックス検出処理
-  cv::Rect textBox = [self detectLargestTextBox:gray];
+  cv::Rect textBox = [self detectLargestTextBox:image];
 
   if (textBox.width <= 0 || textBox.height <= 0) {
     NSLog(
@@ -1498,12 +1521,47 @@ using namespace cv;
 
 // 最大のテキストボックスを検出するメソッド
 // 使用StoredType: text
-+ (cv::Rect)detectLargestTextBox:(cv::Mat)gray {
++ (cv::Rect)detectLargestTextBox:(UIImage *)image {
   cv::Rect largestBox;
 
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: detectLargestTextBox - 入力画像がnilです");
+    return largestBox;
+  }
+
   try {
-    // 二値化（共通ラッパを使用）
-    cv::Mat img = [self adaptiveOrOtsuThreshold:gray blockSize:15 C:5];
+    // 元画像をMatに変換
+    cv::Mat mat;
+    UIImageToMat(image, mat);
+    if (mat.empty()) {
+      NSLog(@"OpenCVWrapper: detectLargestTextBox - 画像変換失敗");
+      return largestBox;
+    }
+
+    // 共通画像処理を適用（スケール1.0、リサイズなし）
+    NSDictionary *processedDict = [self processImageCommon:mat
+                                                     scale:1.0
+                                               needsResize:NO];
+    BOOL success = [processedDict[@"success"] boolValue];
+    if (!success) {
+      NSLog(@"OpenCVWrapper: detectLargestTextBox - 共通画像処理失敗");
+      return largestBox;
+    }
+
+    // 処理済み二値化画像を取得
+    cv::Mat *binaryMat =
+        static_cast<cv::Mat *>([processedDict[@"binaryMat"] pointerValue]);
+    cv::Mat *grayMat =
+        static_cast<cv::Mat *>([processedDict[@"grayMat"] pointerValue]);
+    if (binaryMat == nullptr || binaryMat->empty() || grayMat == nullptr ||
+        grayMat->empty()) {
+      NSLog(@"OpenCVWrapper: detectLargestTextBox - 画像が無効");
+      return largestBox;
+    }
+
+    // 二値化は共通メソッドで既に完了
+    cv::Mat &gray = *grayMat;  // 参照用
+    cv::Mat &img = *binaryMat; // 二値化済み画像
 
     // 水平線と垂直線の強調（テキスト領域を矩形で囲むため）
     int lWidth = 2;
@@ -1587,6 +1645,12 @@ using namespace cv;
               largestBox.width, largestBox.height, gray.cols, gray.rows);
       }
     }
+
+    // メモリクリーンアップ
+    delete static_cast<cv::Mat *>(
+        [processedDict[@"processedMat"] pointerValue]);
+    delete grayMat;
+    delete binaryMat;
 
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: detectLargestTextBox でエラー: %s", e.what());
