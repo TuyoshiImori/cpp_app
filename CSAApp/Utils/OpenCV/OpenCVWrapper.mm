@@ -211,13 +211,13 @@ using namespace cv;
 }
 
 // 主要機能（クラスメソッド）: テンプレートマッチングによる設問画像の切り取り
-+ (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image {
++ (NSDictionary *)processImageWithTemplateMatchingAndCrop:(UIImage *)image {
   // 入力画像のnilチェック
   if (image == nil) {
     NSLog(@"OpenCVWrapper: 入力画像がnilです");
     return @{
       @"processedImage" : image ?: [NSNull null],
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -231,7 +231,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: 入力画像が空です");
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -251,7 +251,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: resizeでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -264,7 +264,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: グレースケール変換でエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -277,7 +277,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: GaussianBlurでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -293,7 +293,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -306,7 +306,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -319,7 +319,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -332,7 +332,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -345,7 +345,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: bitwise_not(2)でエラー: %s", e.what());
     return @{
       @"processedImage" : image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -359,8 +359,8 @@ using namespace cv;
     processedImage = image;
   }
 
-  // === 円検出部分 ===
-  // 元画像のグレースケール版を作成（円検出用）
+  // === テンプレートマッチング部分 ===
+  // 元画像のグレースケール版を作成（テンプレートマッチング用）
   cv::Mat originalGrayMat;
   try {
     originalGrayMat = [OpenCVWrapper toGrayFromMat:mat];
@@ -368,7 +368,7 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: 元画像グレースケール変換でエラー: %s", e.what());
     return @{
       @"processedImage" : processedImage ?: image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
@@ -380,7 +380,8 @@ using namespace cv;
                                                 sigma:1.0];
 
   // テンプレートマッチングによるマーカー検出 (q.png をテンプレートとして使用)
-  std::vector<cv::Vec3f> circles; // (x, y, r) の配列として扱う
+  std::vector<cv::Vec3f>
+      markers; // (x, y, r) の配列として扱う（rは互換性のため残す）
   try {
     // テンプレート画像をバンドルから読み込む
     UIImage *tplUIImage = [UIImage imageNamed:@"q"];
@@ -397,7 +398,7 @@ using namespace cv;
       NSLog(@"OpenCVWrapper: テンプレート画像 q.png を読み込めませんでした");
       return @{
         @"processedImage" : [NSNull null],
-        @"circleCenters" : @[],
+        @"templateCenters" : @[],
         @"croppedImages" : @[]
       };
     }
@@ -408,7 +409,7 @@ using namespace cv;
       NSLog(@"OpenCVWrapper: テンプレート画像が空です");
       return @{
         @"processedImage" : [NSNull null],
-        @"circleCenters" : @[],
+        @"templateCenters" : @[],
         @"croppedImages" : @[]
       };
     }
@@ -431,11 +432,11 @@ using namespace cv;
       if (maxVal < threshold)
         break;
 
-      // テンプレートの中心を円の中心とみなす
+      // テンプレートの中心をマーカー中心とみなす
       float centerX = static_cast<float>(maxLoc.x) + tplGray.cols / 2.0f;
       float centerY = static_cast<float>(maxLoc.y) + tplGray.rows / 2.0f;
       float radius = std::max(tplGray.cols, tplGray.rows) / 2.0f;
-      circles.push_back(cv::Vec3f(centerX, centerY, radius));
+      markers.push_back(cv::Vec3f(centerX, centerY, radius));
 
       // 検出領域を抑制して重複検出を防ぐ
       int x0 = std::max(0, maxLoc.x - tplGray.cols / 2);
@@ -450,50 +451,51 @@ using namespace cv;
     }
 
     NSLog(@"OpenCVWrapper: テンプレートマッチングで検出された個数: %zu",
-          circles.size());
+          markers.size());
   } catch (const cv::Exception &e) {
     NSLog(@"OpenCVWrapper: テンプレートマッチングでエラー: %s", e.what());
     return @{
       @"processedImage" : processedImage ?: image,
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
 
   // テンプレート検出結果がなければ終了
-  if (circles.empty()) {
+  if (markers.empty()) {
     NSLog(@"OpenCVWrapper: テンプレートマッチで何も検出されませんでした");
     return @{
       @"processedImage" : [NSNull null],
-      @"circleCenters" : @[],
+      @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
   }
 
   // 検出された中心点を NSArray に変換
-  NSMutableArray<NSValue *> *circleCenters = [NSMutableArray array];
-  for (const auto &circle : circles) {
-    CGPoint center = CGPointMake(circle[0], circle[1]);
-    [circleCenters addObject:[NSValue valueWithCGPoint:center]];
+  NSMutableArray<NSValue *> *templateCenters = [NSMutableArray array];
+  for (const auto &marker : markers) {
+    // cv::Vec3f の要素は float なので CGFloat にキャストする
+    CGPoint center = CGPointMake((CGFloat)marker[0], (CGFloat)marker[1]);
+    [templateCenters addObject:[NSValue valueWithCGPoint:center]];
   }
 
   // === 画像切り取り部分 ===
   NSMutableArray<UIImage *> *croppedImages = [NSMutableArray array];
 
-  if (!circles.empty()) {
-    // 円をy座標でソート（上から下へ）
+  if (!markers.empty()) {
+    // マーカーをy座標でソート（上から下へ）
     std::sort(
-        circles.begin(), circles.end(),
+        markers.begin(), markers.end(),
         [](const cv::Vec3f &a, const cv::Vec3f &b) { return a[1] < b[1]; });
 
     NSLog(@"OpenCVWrapper: 切り取り領域計算開始");
-    for (size_t i = 0; i < circles.size(); i++) {
-      const auto &circle = circles[i];
-      float centerX = circle[0];
-      float centerY = circle[1];
-      float radius = circle[2];
+    for (size_t i = 0; i < markers.size(); i++) {
+      const auto &marker = markers[i];
+      float centerX = marker[0];
+      float centerY = marker[1];
+      float radius = marker[2];
 
-      // 円の左上の座標を始点とする
+      // マーカーの左上の座標を始点とする
       int startX = static_cast<int>(centerX - radius);
       int startY = static_cast<int>(centerY - radius);
 
@@ -504,27 +506,27 @@ using namespace cv;
       // 横幅は画像の右端まで
       int width = mat.cols - startX;
 
-      // 縦幅を計算：次の円までの距離、または画像の下端まで
+      // 縦幅を計算：次のマーカーまでの距離、または画像の下端まで
       int height;
-      if (i + 1 < circles.size()) {
-        const auto &nextCircle = circles[i + 1];
-        int nextCircleTop = static_cast<int>(nextCircle[1] - nextCircle[2]);
-        height = nextCircleTop - startY;
+      if (i + 1 < markers.size()) {
+        const auto &nextMarker = markers[i + 1];
+        int nextMarkerTop = static_cast<int>(nextMarker[1] - nextMarker[2]);
+        height = nextMarkerTop - startY;
       } else {
         height = mat.rows - startY;
       }
 
       // 縦幅が0以下の場合はスキップ
       if (height <= 0) {
-        NSLog(@"OpenCVWrapper: 円%zu: 高さが不正 (%d)", i, height);
+        NSLog(@"OpenCVWrapper: マーカー%zu: 高さが不正 (%d)", i, height);
         continue;
       }
 
       // 画像の範囲内に調整
       height = std::min(height, mat.rows - startY);
 
-      NSLog(@"OpenCVWrapper: 円%zu: 切り取り領域 x=%d, y=%d, w=%d, h=%d", i,
-            startX, startY, width, height);
+      NSLog(@"OpenCVWrapper: マーカー%zu: 切り取り領域 x=%d, y=%d, w=%d, h=%d",
+            i, startX, startY, width, height);
 
       try {
         cv::Rect cropRect(startX, startY, width, height);
@@ -534,7 +536,7 @@ using namespace cv;
           [croppedImages addObject:croppedImage];
         }
       } catch (const cv::Exception &e) {
-        NSLog(@"OpenCVWrapper: 円%zu: 切り取りでエラー: %s", i, e.what());
+        NSLog(@"OpenCVWrapper: マーカー%zu: 切り取りでエラー: %s", i, e.what());
         continue;
       }
     }
@@ -550,7 +552,7 @@ using namespace cv;
 
   return @{
     @"processedImage" : processedImage ?: image,
-    @"circleCenters" : circleCenters,
+    @"templateCenters" : templateCenters,
     @"croppedImages" : croppedImages
   };
 }

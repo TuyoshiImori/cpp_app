@@ -4,7 +4,7 @@
 
 @interface OpenCVWrapper : NSObject
 // APIの命名は処理内容がわかりやすいようにする
-+ (NSDictionary *)processImageWithCircleDetectionAndCrop:(UIImage *)image;
++ (NSDictionary *)processImageWithTemplateMatchingAndCrop:(UIImage *)image;
 
 // Cropped images parsing API
 // - image: 元画像（処理済み/参照用）
