@@ -14,6 +14,15 @@
 
 using namespace cv;
 
+// OpenCV をインクルードするために一時的に NO を undef しているため、
+// ここで Objective-C の YES/NO マクロを再定義しておく
+#ifndef YES
+#define YES ((BOOL)1)
+#endif
+#ifndef NO
+#define NO ((BOOL)0)
+#endif
+
 @implementation OpenCVWrapper
 // 共通ユーティリティ（クラスメソッド）: UIImage(cv::Mat)の前処理 ->
 // グレースケール化 引数: srcMat(in) -> grayscale を返す
@@ -530,7 +539,9 @@ using namespace cv;
 
       // info設問専用の処理を実行
       UIImage *croppedImage = croppedImages[i];
-      NSString *result = [self detectInfoAnswerFromImage:croppedImage];
+      // optionArray に InfoField の rawValue (ex: "zip") が入っている想定
+      NSString *result = [self detectInfoAnswerFromImage:croppedImage
+                                         withOptionArray:optionArray];
       [parsedAnswers addObject:result];
     } else {
       NSLog(@"OpenCVWrapper: index=%zu -> handling as UNKNOWN", i);
@@ -1667,9 +1678,31 @@ using namespace cv;
   }
 }
 
-// Info設問専用の表構造解析と文字認識メソッド
+// 郵便記号 '〒' を削除するヘルパーメソッド
+// info の OCR 結果で郵便番号が含まれる場合に先頭や本文中の '〒' を取り除く
++ (NSString *)removePostalMarkFromText:(NSString *)text {
+  if (!text || [text length] == 0) {
+    return @"";
+  }
+
+  NSString *result = text;
+  // 日本語の郵便記号 '〒' を削除
+  result = [result stringByReplacingOccurrencesOfString:@"〒" withString:@""];
+  // 念のため Unicode 表現も削除
+  result = [result stringByReplacingOccurrencesOfString:@"\u3012"
+                                             withString:@""];
+
+  // 前後の空白を削除
+  result = [result
+      stringByTrimmingCharactersInSet:[NSCharacterSet
+                                          whitespaceAndNewlineCharacterSet]];
+
+  return result;
+}
+
+// Info設問専用の表構造解析と文字認識メソッド（内部用）
 // 使用StoredType: info
-+ (NSString *)detectInfoAnswerFromImage:(UIImage *)image {
++ (NSString *)detectInfoAnswerRawFromImage:(UIImage *)image {
   if (image == nil) {
     NSLog(@"OpenCVWrapper: detectInfoAnswer - 無効な入力");
     return @"";
@@ -1774,9 +1807,12 @@ using namespace cv;
       // スペースと改行を除去して1行化
       NSString *cleanedText = [self normalizeOCRText:recognizedText
                                         removeSpaces:YES];
-      [rowTexts addObject:cleanedText];
-      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu認識テキスト: '%@'", i,
-            cleanedText);
+      // 郵便記号 '〒' を削除して正規化
+      NSString *noPostal = [self removePostalMarkFromText:cleanedText];
+      [rowTexts addObject:noPostal];
+      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu認識テキスト: '%@' -> "
+            @"郵便記号除去後: '%@'",
+            i, cleanedText, noPostal);
     } else {
       [rowTexts addObject:@""];
       NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: "
@@ -1790,6 +1826,51 @@ using namespace cv;
   NSLog(@"OpenCVWrapper: detectInfoAnswer - 最終結果: '%@'", result);
 
   return result;
+}
+
+// optionTexts を考慮したラッパー
+// optionArray は行ごとの InfoField.rawValue の配列 (例: @[["name"],["zip"],
+// ...]) を想定
++ (NSString *)detectInfoAnswerFromImage:(UIImage *)image
+                        withOptionArray:(NSArray<NSString *> *)optionArray {
+  if (image == nil) {
+    return @"";
+  }
+
+  // 既存のテーブル/行分割 OCR
+  // 実装を呼び出して、行ごとのテキストを改行で受け取る
+  NSString *rawResult = [self detectInfoAnswerRawFromImage:image];
+  if (!rawResult || [rawResult length] == 0) {
+    return @"";
+  }
+
+  NSArray<NSString *> *lines = [rawResult componentsSeparatedByString:@"\n"];
+  NSMutableArray<NSString *> *outLines =
+      [NSMutableArray arrayWithCapacity:[lines count]];
+
+  for (NSUInteger i = 0; i < [lines count]; i++) {
+    NSString *line = lines[i];
+    NSString *trimmed = [line
+        stringByTrimmingCharactersInSet:[NSCharacterSet
+                                            whitespaceAndNewlineCharacterSet]];
+
+    // 対応する option が存在し、かつそれが "zip" の場合は郵便記号を除去する
+    NSString *opt = nil;
+    if (optionArray && i < [optionArray count]) {
+      opt = optionArray[i];
+    }
+
+    if (opt && [opt isKindOfClass:[NSString class]] &&
+        [opt isEqualToString:@"zip"]) {
+      NSString *noPostal = [self removePostalMarkFromText:trimmed];
+      [outLines addObject:noPostal ?: @""];
+    } else {
+      [outLines addObject:trimmed ?: @""];
+    }
+  }
+
+  NSString *final = [outLines componentsJoinedByString:@"\n"];
+  return final;
 }
 
 // 列分割用の垂直線を検出するヘルパーメソッド

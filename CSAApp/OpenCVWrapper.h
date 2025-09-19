@@ -22,4 +22,8 @@
 // テキスト回答検出用のヘルパーメソッド
 + (NSString *)detectTextAnswerFromImage:(UIImage *)image;
 
+// Info 設問を optionArray を考慮して解析するラッパー
++ (NSString *)detectInfoAnswerFromImage:(UIImage *)image
+					   withOptionArray:(NSArray<NSString *> *)optionArray;
+
 @end

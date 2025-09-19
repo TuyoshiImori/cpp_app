@@ -93,7 +93,9 @@ final class CameraViewModel: NSObject, ObservableObject {
       case .single(_, let options): return options
       case .multiple(_, let options): return options
       case .text(_): return []
-      case .info(_, _): return []
+      case .info(_, let infoFields):
+        // InfoField の順序をそのままネイティブ側に渡す（rawValue で識別）
+        return infoFields.map { $0.rawValue }
       }
     }
 
