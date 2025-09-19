@@ -107,6 +107,88 @@ using namespace cv;
   return denoised;
 }
 
+// 共通ユーティリティ（クラスメソッド）: ヒストグラム均等化による最適化
++ (cv::Mat)enhanceContrastCLAHE:(cv::Mat)gray clipLimit:(double)clipLimit {
+  cv::Mat enhanced;
+  cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+  clahe->setClipLimit(clipLimit);
+  clahe->apply(gray, enhanced);
+  return enhanced;
+}
+
+// 共通ユーティリティ（クラスメソッド）: シャープニングフィルタ
++ (cv::Mat)sharpenImage:(cv::Mat)src strength:(double)strength {
+  cv::Mat sharpened;
+  cv::Mat kernel = (cv::Mat_<float>(3, 3) << 0, -strength, 0, -strength,
+                    1 + 4 * strength, -strength, 0, -strength, 0);
+  cv::filter2D(src, sharpened, -1, kernel);
+  return sharpened;
+}
+
+// 共通ユーティリティ（クラスメソッド）: 文字最適化モルフォロジー処理
++ (cv::Mat)optimizeTextMorphology:(cv::Mat)binary
+                       dilateSize:(int)dilateSize
+                        erodeSize:(int)erodeSize {
+  cv::Mat optimized;
+
+  // わずかに膨張（文字の欠損を修復）
+  if (dilateSize > 0) {
+    cv::Mat dilateKernel = cv::getStructuringElement(
+        cv::MORPH_RECT, cv::Size(dilateSize, dilateSize));
+    cv::dilate(binary, optimized, dilateKernel);
+  } else {
+    optimized = binary.clone();
+  }
+
+  // 収縮で元のサイズに戻す（ノイズを除去）
+  if (erodeSize > 0) {
+    cv::Mat erodeKernel = cv::getStructuringElement(
+        cv::MORPH_RECT, cv::Size(erodeSize, erodeSize));
+    cv::erode(optimized, optimized, erodeKernel);
+  }
+
+  return optimized;
+}
+
+// 共通ユーティリティ（クラスメソッド）: OCR用高精度前処理パイプライン
++ (cv::Mat)preprocessForOCR:(cv::Mat)src enhanceContrast:(BOOL)enhanceContrast {
+  cv::Mat processed = src.clone();
+
+  // 1. グレースケール変換
+  if (processed.channels() > 1) {
+    processed = [OpenCVWrapper toGrayFromMat:processed];
+  }
+
+  // 2. 画像拡大（文字の詳細を保持）
+  processed = [OpenCVWrapper resizeImage:processed
+                                  scaleX:2.0
+                                  scaleY:2.0
+                           interpolation:cv::INTER_CUBIC];
+
+  // 3. コントラスト強化（オプション）
+  if (enhanceContrast) {
+    processed = [OpenCVWrapper enhanceContrastCLAHE:processed clipLimit:3.0];
+  }
+
+  // 4. ノイズ除去（軽め）
+  processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
+
+  // 5. シャープニング（文字のエッジを強調）
+  processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
+
+  // 6. 適応的二値化（より精密なパラメータ）
+  processed = [OpenCVWrapper adaptiveThresholdGaussian:processed
+                                             blockSize:15
+                                                     C:8];
+
+  // 7. 文字最適化モルフォロジー処理
+  processed = [OpenCVWrapper optimizeTextMorphology:processed
+                                         dilateSize:1
+                                          erodeSize:1];
+
+  return processed;
+}
+
 // 共通ユーティリティ（クラスメソッド）: 行/列方向の投影和を返す
 + (cv::Mat)projectionSum:(cv::Mat)binary axis:(int)axis {
   cv::Mat proj;
@@ -1002,12 +1084,16 @@ using namespace cv;
     cv::Rect textRect(textStartX, textY, textWidth, textHeight);
     cv::Mat textROI = gray(textRect);
 
+    // テキスト領域にOCR用高精度前処理を適用
+    cv::Mat processedTextROI = [OpenCVWrapper preprocessForOCR:textROI
+                                               enhanceContrast:YES];
+
     NSLog(@"OpenCVWrapper: detectOtherFreeText - テキスト領域: x=%d, y=%d, "
-          @"w=%d, h=%d",
+          @"w=%d, h=%d (OCR前処理適用済み)",
           textRect.x, textRect.y, textRect.width, textRect.height);
 
     // ROIをUIImageに変換してVisionで文字認識
-    UIImage *textImage = MatToUIImage(textROI);
+    UIImage *textImage = MatToUIImage(processedTextROI);
 
     // Vision APIを使用して文字認識
     NSString *recognizedText = [self recognizeTextFromImage:textImage];
@@ -1071,13 +1157,17 @@ using namespace cv;
     cv::Rect textRect(textStartX, textY, textWidth, textHeight);
     cv::Mat textROI = gray(textRect);
 
+    // テキスト領域にOCR用高精度前処理を適用
+    cv::Mat processedTextROI = [OpenCVWrapper preprocessForOCR:textROI
+                                               enhanceContrast:YES];
+
     NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=%d, "
           @"y=%d, "
-          @"w=%d, h=%d",
+          @"w=%d, h=%d (OCR前処理適用済み)",
           textRect.x, textRect.y, textRect.width, textRect.height);
 
     // ROIをUIImageに変換してVisionで文字認識
-    UIImage *textImage = MatToUIImage(textROI);
+    UIImage *textImage = MatToUIImage(processedTextROI);
 
     // Vision APIを使用して文字認識
     NSString *recognizedText = [self recognizeTextFromImage:textImage];
@@ -1278,10 +1368,12 @@ using namespace cv;
     return @"";
   }
 
-  // グレースケール変換
-  cv::Mat gray = [self toGrayFromMat:mat];
+  // OCR用高精度前処理を適用
+  cv::Mat processedMat = [OpenCVWrapper preprocessForOCR:mat
+                                         enhanceContrast:YES];
 
-  // テキストボックス検出処理
+  // テキストボックス検出処理（元の画像で検出してから適用）
+  cv::Mat gray = [self toGrayFromMat:mat];
   cv::Rect textBox = [self detectLargestTextBox:gray];
 
   if (textBox.width <= 0 || textBox.height <= 0) {
@@ -1290,12 +1382,25 @@ using namespace cv;
     return @"";
   }
 
-  // テキストボックス領域を抽出
-  cv::Mat textROI = gray(textBox);
+  // 前処理された画像から該当領域を抽出（座標をスケール調整）
+  double scaleX = (double)processedMat.cols / mat.cols;
+  double scaleY = (double)processedMat.rows / mat.rows;
 
-  NSLog(@"OpenCVWrapper: detectTextAnswer - テキストボックス領域: x=%d, y=%d, "
-        @"w=%d, h=%d",
-        textBox.x, textBox.y, textBox.width, textBox.height);
+  cv::Rect scaledTextBox;
+  scaledTextBox.x = (int)(textBox.x * scaleX);
+  scaledTextBox.y = (int)(textBox.y * scaleY);
+  scaledTextBox.width = (int)(textBox.width * scaleX);
+  scaledTextBox.height = (int)(textBox.height * scaleY);
+
+  // 境界チェック
+  scaledTextBox.x = std::max(0, scaledTextBox.x);
+  scaledTextBox.y = std::max(0, scaledTextBox.y);
+  scaledTextBox.width =
+      std::min(scaledTextBox.width, processedMat.cols - scaledTextBox.x);
+  scaledTextBox.height =
+      std::min(scaledTextBox.height, processedMat.rows - scaledTextBox.y);
+
+  cv::Mat textROI = processedMat(scaledTextBox);
 
   // ROIをUIImageに変換してVisionで文字認識
   UIImage *textImage = MatToUIImage(textROI);
@@ -1817,11 +1922,16 @@ using namespace cv;
     cv::Rect rowRect(0, topY, rightColumnROI.cols, rowHeight);
     cv::Mat rowROI = rightColumnROI(rowRect);
 
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: y=%d, h=%d", i, topY,
-          rowHeight);
+    // 行のROIに高精度OCR前処理を適用
+    cv::Mat processedRowROI = [OpenCVWrapper preprocessForOCR:rowROI
+                                              enhanceContrast:YES];
 
-    // 行のROIをUIImageに変換してVisionで文字認識
-    UIImage *rowImage = MatToUIImage(rowROI);
+    NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: y=%d, h=%d "
+          @"(OCR前処理適用済み)",
+          i, topY, rowHeight);
+
+    // 前処理済みの行のROIをUIImageに変換してVisionで文字認識
+    UIImage *rowImage = MatToUIImage(processedRowROI);
     NSString *recognizedText = [self recognizeTextFromImage:rowImage];
 
     if (recognizedText && [recognizedText length] > 0) {
