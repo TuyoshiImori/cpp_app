@@ -78,6 +78,7 @@ using namespace cv;
 
 // 共通ユーティリティ（クラスメソッド）:
 // Gaussian適応的二値化（カスタムパラメータ対応）
+// (adaptive Gaussian threshold wrapper)
 + (cv::Mat)adaptiveThresholdGaussian:(cv::Mat)gray
                            blockSize:(int)blockSize
                                    C:(int)C {
@@ -95,6 +96,192 @@ using namespace cv;
   cv::Mat inverted;
   cv::bitwise_not(src, inverted);
   return inverted;
+}
+
+// 共通ユーティリティ（クラスメソッド）: 統一画像前処理（フル版）
+// UIImage → cv::Mat変換 + 空画像チェック + グレースケール変換 + 元のmat取得
++ (cv::Mat)prepareImageForProcessing:(UIImage *)image
+                           errorCode:(NSString **)errorCode
+                          methodName:(NSString *)methodName
+                         originalMat:(cv::Mat *)originalMat {
+  // エラーコードを初期化
+  if (errorCode) {
+    *errorCode = nil;
+  }
+
+  // 入力チェック
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: %@ - 無効な入力", methodName);
+    if (errorCode) {
+      *errorCode = @"invalid_input";
+    }
+    return cv::Mat();
+  }
+
+  // UIImage を cv::Mat に変換
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  // 空の画像チェック
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: %@ - 空の画像", methodName);
+    if (errorCode) {
+      *errorCode = @"empty_image";
+    }
+    return cv::Mat();
+  }
+
+  // 元のmatを出力パラメータに設定
+  if (originalMat) {
+    *originalMat = mat;
+  }
+
+  // グレースケール変換
+  cv::Mat gray = [self toGrayFromMat:mat];
+
+  NSLog(@"OpenCVWrapper: %@ - 画像前処理完了 (%dx%d)", methodName, gray.cols,
+        gray.rows);
+
+  return gray;
+}
+
+// 共通ユーティリティ（クラスメソッド）: OCR用高精度画像前処理（基本版）
+// UIImage → cv::Mat変換 + 空画像チェック + OCR最適化処理一式
++ (cv::Mat)prepareImageForOCRProcessing:(UIImage *)image
+                              errorCode:(NSString **)errorCode
+                             methodName:(NSString *)methodName {
+  return [OpenCVWrapper prepareImageForOCRProcessing:image
+                                           errorCode:errorCode
+                                          methodName:methodName
+                                         originalMat:nil];
+}
+
+// 共通ユーティリティ（クラスメソッド）: OCR用高精度画像前処理（cv::Mat版）
+// cv::Mat（ROI）→ OCR最適化処理一式
+// 名前を明確化: cv::Mat 入力向けのオーバーロードは混同を避けるため
+// prepareImageForOCRProcessingFromMat: に変更
++ (cv::Mat)prepareImageForOCRProcessingFromMat:(cv::Mat)mat {
+  // 空の画像チェック
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: prepareImageForOCRProcessing(Mat) - 空の画像");
+    return cv::Mat();
+  }
+
+  // OCR用高精度前処理を適用
+  cv::Mat processed = mat.clone();
+
+  // 1. グレースケール変換
+  if (processed.channels() > 1) {
+    processed = [OpenCVWrapper toGrayFromMat:processed];
+  }
+
+  // 2. 画像拡大（文字の詳細を保持）
+  processed = [OpenCVWrapper resizeImage:processed
+                                  scaleX:2.0
+                                  scaleY:2.0
+                           interpolation:cv::INTER_CUBIC];
+
+  // 3. コントラスト強化
+  processed = [OpenCVWrapper enhanceContrastCLAHE:processed clipLimit:3.0];
+
+  // 4. ノイズ除去（軽め）
+  processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
+
+  // 5. シャープニング（文字のエッジを強調）
+  processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
+
+  // 6. 適応的二値化（OCR最適化パラメータ）
+  processed = [OpenCVWrapper adaptiveThresholdGaussian:processed
+                                             blockSize:15
+                                                     C:8];
+
+  // 7. 文字最適化モルフォロジー処理
+  processed = [OpenCVWrapper optimizeTextMorphology:processed
+                                         dilateSize:1
+                                          erodeSize:1];
+
+  NSLog(@"OpenCVWrapper: prepareImageForOCRProcessingFromMat - "
+        @"OCR用高精度前処理完了 (%dx%d)",
+        processed.cols, processed.rows);
+
+  return processed;
+}
+
+// 共通ユーティリティ（クラスメソッド）: OCR用高精度画像前処理（フル版）
+// UIImage → cv::Mat変換 + 空画像チェック + OCR最適化処理一式 + 元のmat取得
++ (cv::Mat)prepareImageForOCRProcessing:(UIImage *)image
+                              errorCode:(NSString **)errorCode
+                             methodName:(NSString *)methodName
+                            originalMat:(cv::Mat *)originalMat {
+  // エラーコードを初期化
+  if (errorCode) {
+    *errorCode = nil;
+  }
+
+  // 入力チェック
+  if (image == nil) {
+    NSLog(@"OpenCVWrapper: %@ - 無効な入力", methodName);
+    if (errorCode) {
+      *errorCode = @"invalid_input";
+    }
+    return cv::Mat();
+  }
+
+  // UIImage を cv::Mat に変換
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  // 空の画像チェック
+  if (mat.empty()) {
+    NSLog(@"OpenCVWrapper: %@ - 空の画像", methodName);
+    if (errorCode) {
+      *errorCode = @"empty_image";
+    }
+    return cv::Mat();
+  }
+
+  // 元のmatを出力パラメータに設定
+  if (originalMat) {
+    *originalMat = mat;
+  }
+
+  // OCR用高精度前処理を適用
+  cv::Mat processed = mat.clone();
+
+  // 1. グレースケール変換
+  if (processed.channels() > 1) {
+    processed = [OpenCVWrapper toGrayFromMat:processed];
+  }
+
+  // 2. 画像拡大（文字の詳細を保持）
+  processed = [OpenCVWrapper resizeImage:processed
+                                  scaleX:2.0
+                                  scaleY:2.0
+                           interpolation:cv::INTER_CUBIC];
+
+  // 3. コントラスト強化
+  processed = [OpenCVWrapper enhanceContrastCLAHE:processed clipLimit:3.0];
+
+  // 4. ノイズ除去（軽め）
+  processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
+
+  // 5. シャープニング（文字のエッジを強調）
+  processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
+
+  // 6. 適応的二値化（OCR最適化パラメータ）
+  processed = [OpenCVWrapper adaptiveThresholdGaussian:processed
+                                             blockSize:15
+                                                     C:8];
+
+  // 7. 文字最適化モルフォロジー処理
+  processed = [OpenCVWrapper optimizeTextMorphology:processed
+                                         dilateSize:1
+                                          erodeSize:1];
+
+  NSLog(@"OpenCVWrapper: %@ - OCR用高精度前処理完了 (%dx%d)", methodName,
+        processed.cols, processed.rows);
+
+  return processed;
 }
 
 // 共通ユーティリティ（クラスメソッド）:
@@ -150,45 +337,6 @@ using namespace cv;
   return optimized;
 }
 
-// 共通ユーティリティ（クラスメソッド）: OCR用高精度前処理パイプライン
-+ (cv::Mat)preprocessForOCR:(cv::Mat)src enhanceContrast:(BOOL)enhanceContrast {
-  cv::Mat processed = src.clone();
-
-  // 1. グレースケール変換
-  if (processed.channels() > 1) {
-    processed = [OpenCVWrapper toGrayFromMat:processed];
-  }
-
-  // 2. 画像拡大（文字の詳細を保持）
-  processed = [OpenCVWrapper resizeImage:processed
-                                  scaleX:2.0
-                                  scaleY:2.0
-                           interpolation:cv::INTER_CUBIC];
-
-  // 3. コントラスト強化（オプション）
-  if (enhanceContrast) {
-    processed = [OpenCVWrapper enhanceContrastCLAHE:processed clipLimit:3.0];
-  }
-
-  // 4. ノイズ除去（軽め）
-  processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
-
-  // 5. シャープニング（文字のエッジを強調）
-  processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
-
-  // 6. 適応的二値化（より精密なパラメータ）
-  processed = [OpenCVWrapper adaptiveThresholdGaussian:processed
-                                             blockSize:15
-                                                     C:8];
-
-  // 7. 文字最適化モルフォロジー処理
-  processed = [OpenCVWrapper optimizeTextMorphology:processed
-                                         dilateSize:1
-                                          erodeSize:1];
-
-  return processed;
-}
-
 // 共通ユーティリティ（クラスメソッド）: 行/列方向の投影和を返す
 + (cv::Mat)projectionSum:(cv::Mat)binary axis:(int)axis {
   cv::Mat proj;
@@ -212,25 +360,18 @@ using namespace cv;
 
 // 主要機能（クラスメソッド）: テンプレートマッチングによる設問画像の切り取り
 + (NSDictionary *)processImageWithTemplateMatchingAndCrop:(UIImage *)image {
-  // 入力画像のnilチェック
-  if (image == nil) {
-    NSLog(@"OpenCVWrapper: 入力画像がnilです");
+  // 統一前処理を適用（元のmatも取得）
+  NSString *errorCode = nil;
+  cv::Mat mat;
+  cv::Mat initialGray =
+      [self prepareImageForProcessing:image
+                            errorCode:&errorCode
+                           methodName:@"processImageWithTemplateMatchingAndCrop"
+                          originalMat:&mat];
+
+  if (errorCode) {
     return @{
       @"processedImage" : image ?: [NSNull null],
-      @"templateCenters" : @[],
-      @"croppedImages" : @[]
-    };
-  }
-
-  // UIImage を cv::Mat に変換
-  cv::Mat mat;
-  UIImageToMat(image, mat);
-
-  // 入力画像が空の場合
-  if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: 入力画像が空です");
-    return @{
-      @"processedImage" : image,
       @"templateCenters" : @[],
       @"croppedImages" : @[]
     };
@@ -269,7 +410,7 @@ using namespace cv;
     };
   }
 
-  // 3. ガウシアンブラーで平滑化
+  // 3. ガウシアンブラーで平滑化（テンプレートマッチング用に調整）
   cv::Mat blurMat;
   try {
     blurMat = [OpenCVWrapper gaussianBlurMat:grayMat ksize:3 sigma:1.0];
@@ -282,7 +423,7 @@ using namespace cv;
     };
   }
 
-  // 4. 適応的二値化
+  // 4. 適応的二値化（テンプレートマッチング用パラメータ）
   cv::Mat binaryMat;
   // 適応的二値化のパラメータを調整
   try {
@@ -685,22 +826,24 @@ using namespace cv;
 // 使用StoredType: single
 + (NSString *)detectSingleAnswerFromImage:(UIImage *)image
                               withOptions:(NSArray<NSString *> *)options {
-  if (image == nil || [options count] == 0) {
-    NSLog(@"OpenCVWrapper: detectSingleAnswer - 無効な入力");
+  if ([options count] == 0) {
+    NSLog(@"OpenCVWrapper: detectSingleAnswer - オプションが空");
     return @"-1";
   }
 
-  // UIImage を cv::Mat に変換
-  cv::Mat mat;
-  UIImageToMat(image, mat);
+  // 統一前処理を適用
+  NSString *errorCode = nil;
+  cv::Mat gray = [self prepareImageForProcessing:image
+                                       errorCode:&errorCode
+                                      methodName:@"detectSingleAnswer"
+                                     originalMat:NULL];
 
-  if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: detectSingleAnswer - 空の画像");
+  if (!errorCode && gray.empty()) {
     return @"-1";
   }
-
-  // グレースケール変換
-  cv::Mat gray = [self toGrayFromMat:mat];
+  if (errorCode) {
+    return @"-1";
+  }
 
   // チェックボックス検出処理
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
@@ -809,22 +952,24 @@ using namespace cv;
 // 使用StoredType: multiple
 + (NSString *)detectMultipleAnswerFromImage:(UIImage *)image
                                 withOptions:(NSArray<NSString *> *)options {
-  if (image == nil || [options count] == 0) {
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - 無効な入力");
+  if ([options count] == 0) {
+    NSLog(@"OpenCVWrapper: detectMultipleAnswer - オプションが空");
     return @"-1";
   }
 
-  // UIImage を cv::Mat に変換
-  cv::Mat mat;
-  UIImageToMat(image, mat);
+  // 統一前処理を適用
+  NSString *errorCode = nil;
+  cv::Mat gray = [self prepareImageForProcessing:image
+                                       errorCode:&errorCode
+                                      methodName:@"detectMultipleAnswer"
+                                     originalMat:NULL];
 
-  if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - 空の画像");
+  if (!errorCode && gray.empty()) {
     return @"-1";
   }
-
-  // グレースケール変換
-  cv::Mat gray = [self toGrayFromMat:mat];
+  if (errorCode) {
+    return @"-1";
+  }
 
   // チェックボックス検出処理
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
@@ -1107,10 +1252,9 @@ using namespace cv;
     cv::Rect textRect(textStartX, textY, textWidth, textHeight);
     cv::Mat textROI = gray(textRect);
 
-    // テキスト領域にOCR用高精度前処理を適用
-    cv::Mat processedTextROI = [OpenCVWrapper preprocessForOCR:textROI
-                                               enhanceContrast:YES];
-
+    // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
+    cv::Mat processedTextROI =
+        [OpenCVWrapper prepareImageForOCRProcessingFromMat:textROI];
     NSLog(@"OpenCVWrapper: detectOtherFreeText - テキスト領域: x=%d, y=%d, "
           @"w=%d, h=%d (OCR前処理適用済み)",
           textRect.x, textRect.y, textRect.width, textRect.height);
@@ -1180,10 +1324,9 @@ using namespace cv;
     cv::Rect textRect(textStartX, textY, textWidth, textHeight);
     cv::Mat textROI = gray(textRect);
 
-    // テキスト領域にOCR用高精度前処理を適用
-    cv::Mat processedTextROI = [OpenCVWrapper preprocessForOCR:textROI
-                                               enhanceContrast:YES];
-
+    // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
+    cv::Mat processedTextROI =
+        [OpenCVWrapper prepareImageForOCRProcessingFromMat:textROI];
     NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=%d, "
           @"y=%d, "
           @"w=%d, h=%d (OCR前処理適用済み)",
@@ -1377,26 +1520,33 @@ using namespace cv;
 // テキスト回答検出のメソッド
 // 使用StoredType: text
 + (NSString *)detectTextAnswerFromImage:(UIImage *)image {
-  if (image == nil) {
-    NSLog(@"OpenCVWrapper: detectTextAnswer - 無効な入力");
+  // 統一前処理を適用（matも取得する必要があるため、少し異なる処理）
+  NSString *errorCode = nil;
+  cv::Mat gray = [self prepareImageForProcessing:image
+                                       errorCode:&errorCode
+                                      methodName:@"detectTextAnswer"
+                                     originalMat:NULL];
+
+  if (errorCode) {
     return @"";
   }
 
-  // UIImage を cv::Mat に変換
+  // 元のmatも必要なので再取得（座標計算とOCR前処理用）
   cv::Mat mat;
   UIImageToMat(image, mat);
 
-  if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: detectTextAnswer - 空の画像");
+  // 統一されたOCR前処理をUIImageから直接適用
+  cv::Mat processedMat =
+      [OpenCVWrapper prepareImageForOCRProcessing:image
+                                        errorCode:&errorCode
+                                       methodName:@"detectTextAnswer"
+                                      originalMat:NULL];
+
+  if (errorCode) {
     return @"";
   }
 
-  // OCR用高精度前処理を適用
-  cv::Mat processedMat = [OpenCVWrapper preprocessForOCR:mat
-                                         enhanceContrast:YES];
-
-  // テキストボックス検出処理（元の画像で検出してから適用）
-  cv::Mat gray = [self toGrayFromMat:mat];
+  // テキストボックス検出処理（グレースケール画像で検出）
   cv::Rect textBox = [self detectLargestTextBox:gray];
 
   if (textBox.width <= 0 || textBox.height <= 0) {
@@ -1852,22 +2002,16 @@ using namespace cv;
 // Info設問専用の表構造解析と文字認識メソッド（内部用）
 // 使用StoredType: info
 + (NSString *)detectInfoAnswerRawFromImage:(UIImage *)image {
-  if (image == nil) {
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 無効な入力");
+  // 統一前処理を適用
+  NSString *errorCode = nil;
+  cv::Mat gray = [self prepareImageForProcessing:image
+                                       errorCode:&errorCode
+                                      methodName:@"detectInfoAnswer"
+                                     originalMat:NULL];
+
+  if (errorCode) {
     return @"";
   }
-
-  // UIImage を cv::Mat に変換
-  cv::Mat mat;
-  UIImageToMat(image, mat);
-
-  if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 空の画像");
-    return @"";
-  }
-
-  // グレースケール変換
-  cv::Mat gray = [self toGrayFromMat:mat];
 
   NSLog(@"OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: %dx%d", gray.cols,
         gray.rows);
@@ -1945,10 +2089,9 @@ using namespace cv;
     cv::Rect rowRect(0, topY, rightColumnROI.cols, rowHeight);
     cv::Mat rowROI = rightColumnROI(rowRect);
 
-    // 行のROIに高精度OCR前処理を適用
-    cv::Mat processedRowROI = [OpenCVWrapper preprocessForOCR:rowROI
-                                              enhanceContrast:YES];
-
+    // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
+    cv::Mat processedRowROI =
+        [OpenCVWrapper prepareImageForOCRProcessingFromMat:rowROI];
     NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: y=%d, h=%d "
           @"(OCR前処理適用済み)",
           i, topY, rowHeight);
