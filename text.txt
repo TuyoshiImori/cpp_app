@@ -1,185 +1,704 @@
-(Fig) signalled err=-12710 at <>:601
-(Fig) signalled err=-12710 at <>:601
-(Fig) signalled err=-12710 at <>:601
-<<<< FigXPCUtilities >>>> signalled err=-17281 at <>:299
-<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:569) - (err=-17281)
-OpenCVWrapper: 元画像 channels=1, type=0, size=804x1138
-OpenCVWrapper: テンプレートマッチングで検出された個数: 6
-OpenCVWrapper: 切り取り領域計算開始
-OpenCVWrapper: 円0: 切り取り領域 x=43, y=183, w=761, h=91
-OpenCVWrapper: 円1: 切り取り領域 x=43, y=274, w=761, h=99
-OpenCVWrapper: 円2: 切り取り領域 x=43, y=373, w=761, h=73
-OpenCVWrapper: 円3: 切り取り領域 x=43, y=446, w=761, h=150
-OpenCVWrapper: 円4: 切り取り領域 x=43, y=596, w=761, h=163
-OpenCVWrapper: 円5: 切り取り領域 x=43, y=759, w=761, h=379
-OpenCVWrapper: 処理完了 - 切り取った画像数: 6
-Swift側 optionTexts:
-  index[0]: ["10代未満", "10代", "20代", "30代", "40代", "50代", "60代", "70代", "80代以上", "その他"]
-  index[1]: ["ポスター", "出演者から", "SNS(X,Instagram,Facebook)", "その他"]
-  index[2]: ["大変良かった", "良かった", "普通", "良くなかった", "悪かった"]
-  index[3]: []
-  index[4]: []
-  index[5]: []
-OpenCVWrapper.parseCroppedImages: images=6, types=6, optionTexts=6
-OpenCVWrapper.parseCroppedImages: provided types=(
-    single,
-    multiple,
-    single,
-    text,
-    text,
-    info
+爆速Swift FoundaionModels入門！ローカルでLLMが動くよ。 WWDC2025（動画解説ver.）
+機械学習
+Swift
+Swift6
+LLM
+WWDC2025
+最終更新日 2025年06月13日
+投稿日 2025年06月13日
+0.はじめに
+モバイルアプリエンジニアに興味をもち、Swiftの学習を進めている大学院生です！
+間違っている点や質問がございましたらビシバシお願いします！！
+
+なぜこの記事を書こうと思ったか
+爆速でSwiftの新技術をキャッチアップして開発中のアプリに取り入れたい！！と思ったからです。
+LLMがローカルで軽量に動くとなると実装にも幅が広がると思います。見るより動かす！で手を動かしてFoundation Modelsの感覚を掴みたい人の助けになれば幸いです。
+
+引用
+引用画像、サンプルコードの一部はWWDC2025の動画から説明に必要な最小限の範囲で引用しています。
+参考リンク: Foundation Modelフレームワークの紹介
+
+ざっくり解説
+FoundationModelsを使ってLLMをローカルで動かせるようになったよ！
+しかもOS由来で動くので軽量だよ！！
+出力をそのまま構造体として扱えるよ！！デコードいりません！！
+ストリーム配信が出力に合わせて特殊になってるよ！！
+Toolを使えばモデルが空気を読んで色々な処理を実行してくれるよ！！
+Adapter経由でユースケースに沿った高精度モデルを使えるように用意しているよ！！
+モデルのsessionは状態を持ってるからうまく制御してね！！
+公式のコードとは別で、セットアップ~基本のきの部分のUI、モデル実装を加えてるので手を動かしてみたい方はぜひ参考にしてください！！(実装ver.も投稿する予定です。)
+
+動画の導入部分
+このモデルは、コンテンツ生成、テキスト要約、ユーザー入力の分析など多岐にわたる処理に最適化されており、すべて オンデバイスで動作します。
+
+保護されたプライバシー
+オフラインでも動く
+容量が大きくならない！！
+この動画で説明していること:
+
+モデルの詳細
+
+Guided Generation：Swiftで構造化された出力を得る方法
+
+ストリーミング API：遅延を心地よさに変える技術
+
+Tool Calling：モデルがアプリ内のコードを実行できる機能
+
+ステートフル・セッション：複数ターンの対話を実現
+
+Apple開発者エコシステムへの統合
+
+1. The Model
+使用例
+動画のサンプルコードではLLM用のセッションを開始した後にrespond(to: )でプロンプトを投げていました。
+
+import FoundationModels
+import Playgrounds
+
+#Playground {
+  let session = LanguageModelSession()
+  //日本旅行のタイトルを生成するプロンプト
+  let response = try await session.respond(to: "What's a good name for a trip to Japan? Reply only with a title")
+
+}
+するとPlaygroundでモデルの出力が確認できるようです。
+
+image.png
+
+実際に動かしてみよう(Set Up編)
+公式のXCode26 beta版をインストール
+ビルドversionを26.0に設定
+image.png
+実際に動かしてみよう(Coding編)
+実行動画
+スクショ1.gif
+
+今回はボタンを二つ用意ボタンを二つ用意
+追加したプロンプト:
+
+🔥 :「今日も最高の1日にするためのやる気の出るメラメラと燃え盛るような言葉を一つください。」
+☕️ : 「頑張った人をねぎらうとってもふんわりとした優しい一言を一つください。」
+
+最初はもう少し端的なプロンプトを入力していましたが、労いなのか励ましなのかわからない という事象が発生しました。
+やはり動画で言っていた通り、プロンプトを何度も検証するは大事な工程であるなと感じました。また生成される日本語も若干英語を翻訳したような表現を感じます。こちらもプロンプト次第では改善できそう。
+
+MotivationModel.swiftでは、LanguageModelsession生成→プロンプト入力を実装しています。実行に時間のかかる非同期関数なのでasync awaitが必要です。
+ascync/awaitはじめとした非同期処理について以前書いた記事があるので参考いただけると幸いです↓
+Swift Concurrencyについて理解したことを料理人を登場させて理解する。
+
+MotivationModel.swift
+import FoundationModels
+import SwiftUI
+
+@Observable
+class MotivationModel: ObservableObject {
+    @MainActor var message: String = "ここにメッセージが表示されます"
+    private var session: LanguageModelSession?
+
+
+    init() {
+        Task {
+            try? await setup()
+        }
+    }
+
+    private func setup() async throws {
+        session = LanguageModelSession()
+    }
+
+    @MainActor
+    func generate(for type: MessageType) async throws -> String{
+            message = "生成中..."
+            guard let session else { return "sessionを取得できませんでした。"}
+
+            let prompt = switch type {
+            case .motivation:
+                "今日も最高の1日にするためのやる気の出るメラメラと燃え盛るような言葉を一つください。"
+            case .gratitude:
+                "頑張った人をねぎらうとってもふんわりとした優しい一言を一つください。"
+            }
+        let response = try await session.respond(to: prompt)
+        return response.content
+        }
+    }
+
+enum MessageType {
+    case motivation, gratitude
+}
+Viewe側にはモデルとして'MotivationModel'を呼び出し、
+
+炎の時は.motivation、
+コーヒーの時は.gratitude
+のenumを入力するようにしています。
+
+MotivationView.swift
+import SwiftUI
+import FoundationModels
+
+struct MotivationView: View {
+    @StateObject private var model = MotivationModel()
+    var body: some View {
+        VStack(spacing: 40) {
+            Text(model.message)
+                .font(.title2)
+                .padding()
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 40) {
+                Button {
+                    Task {
+                        let msg = try? await model.generate(for: .motivation)
+                        await MainActor.run { model.message = msg ?? "失敗しました" }
+                    }
+                } label: {
+                    VStack {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 40))
+                        Text("🔥")
+                    }
+                }
+
+                Button {
+                    Task {
+                        let msg = try? await model.generate(for: .gratitude)
+                        await MainActor.run { model.message = msg ?? "失敗しました" }
+                    }
+                } label: {
+                    VStack {
+                        Image(systemName: "cup.and.saucer.fill")
+                            .font(.system(size: 40))
+                        Text("☕")
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+}
+やはり軽量なモデルとはいえ少し生成までに時間がかかります。この待ち時間をいい体験にする工夫も動画で触れられていたので後ほど👀
+
+モデルの仕様
+パラメータ数：30億（3B）
+量子化：各パラメータ2ビットに圧縮
+OS搭載モデルの中で最大規模
+デバイススケールモデルとして最適化
+しかし、あくまでもオンデバイスモデル。デバイス規模のモデルであることを念頭に置くようにと注意していました。
+
+「世界知識や高度な推論を行うためのモデル（サーバー側LLM）」ではなく、要約・抽出・分類といった用途に特化したモデルです。
+
+モデルの分割
+1.2章で触れた通り、オンデバイスモデルには限界があります。タスクを小さなタスクに分割してモデルを適用させることがtipsのようです。これはモデルを操作するうちに、長所と短所に対する直感が養われていくと言及していました。
+特定の一般的なユースケース（例：コンテンツのタグ付け機能など）モデルの能力が最大化するよう専用アダプタも用意しています。
+
+継続的なモデルの改良
+今後もモデルを継続的に改良し続けていく方針のようです。動画の後半でモデルのフィードバックをappleに送ることで、モデル改良に繋げるよ。と言っていました。
+
+2. Guided Generation
+これはFoundationModelsフレームワークの心臓部分。とても重要。
+通常、言語モデルは構造化されていない自然言語を出力として生成します。つまり日常で使っているような文章で出力されることがデフォルトの状態です。もしくは余計なことまで出力するかもしれません。
+
+プロンプトをそのまま流し込んだ時
+let prompt="""
+  有名な観光名所を訪れるアプリのために、推奨される検索語句のリストを生成してください。
+"""
+print(response.content)
+「もちろん、力になれて嬉しい！「海 綺麗 場所」とか「自然 公園」とかどう？」
+しかしこれだと、**View側に流し込みずらい。**ダラダラと文章をそのままViewに表示するのはUI/UX的にもあまり良くありません。
+
+そこで考えるのが、
+JSONやCSVで生成してもらおう
+というアイデア。
+
+プロンプトに無理やり構造化させる
+let prompt = """
+  有名な観光名所を訪れるアプリのために、推奨される検索語句のリストを生成してください。
+  レスポンスは、'searchTerms' という配列プロパティを持つ JSON オブジェクトとしてフォーマットしてください。
+"""
+しかしモデルがまだ想定する出力をしてくれない。プロンプトを書き足そう。
+
+プロンプトに無理やり書き足す
+let prompt = """
+  有名な観光名所を訪れるアプリのために、推奨される検索語句のリストを生成してください。
+  レスポンスは、'searchTerms' という配列プロパティを持つ JSON オブジェクトとしてフォーマットしてください。
+  前置きや説明は含めないでください。JSON だけで答えてください。JSON をバッククォート（``）で囲まないでください。
+  レスポンス例:
+  {"searchTerms": ["魅力的な風景", "古代の歴史", "..."]}
+"""
+**これじゃキリがない！！**確率的に言語を生成するAIに何をすべきで何をすべきでないかの制約をより正確にするために、Guided Generationを使いましょう！
+これがGuided generationの存在意義。
+
+FoundationModelsをimportすると、以下の二つのマクロが使えるようになります！
+
+@Generable
+モデルに生成させたいSwiftの型 (structなど)を記述できます
+
+@Guide
+自然言語による説明を与えたり、生成される値をプログラムで制御したりできます。
+
+Generable構造体の定義
+@Generable // SearchSuggestionsの形の出力をモデルが生成可能になる。
+struct SearchSuggestions {
+  // どんな意味のデータなのか, いくつ出力してほしいか。をモデルに伝えることができる。
+  @Guide(description: "提案された検索語句のリスト", .count(4))
+  var searchTerms: [String]
+}
+こうして定義したstructを用いて、
+
+Generableマクロ使った例
+let prompt="""
+  有名な観光名所を訪れるアプリのために、推奨される検索語句のリストを生成してください。
+"""
+let response = try await session.respond(
+  to: prompt,
+  generating: SearchSuggestions.self
 )
-OpenCVWrapper.parseCroppedImages: provided optionTexts (count=6):
-  optionTexts[0] (count=10):
-    [0]: 10代未満
-    [1]: 10代
-    [2]: 20代
-    [3]: 30代
-    [4]: 40代
-    [5]: 50代
-    [6]: 60代
-    [7]: 70代
-    [8]: 80代以上
-    [9]: その他
-  optionTexts[1] (count=4):
-    [0]: ポスター
-    [1]: 出演者から
-    [2]: SNS(X,Instagram,Facebook)
-    [3]: その他
-  optionTexts[2] (count=5):
-    [0]: 大変良かった
-    [1]: 良かった
-    [2]: 普通
-    [3]: 良くなかった
-    [4]: 悪かった
-  optionTexts[3] (count=0):
-  optionTexts[4] (count=0):
-  optionTexts[5] (count=0):
-OpenCVWrapper: index=0 -> storedType=single, optionCount=10
-  option[0]: 10代未満
-  option[1]: 10代
-  option[2]: 20代
-  option[3]: 30代
-  option[4]: 40代
-  option[5]: 50代
-  option[6]: 60代
-  option[7]: 70代
-  option[8]: 80代以上
-  option[9]: その他
-OpenCVWrapper: index=0 -> handling as SINGLE with 10 options
-OpenCVWrapper: detectCheckboxes - 10個のチェックボックスを検出
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: detectSingleAnswer - 通常のチェックが見つからないため、その他を確認
-OpenCVWrapper: detectSingleAnswer - 「その他」選択肢を発見: index=9, option=その他
-OpenCVWrapper: detectSingleAnswer - 「その他」の自由回答を検出試行中（チェックなし）
-OpenCVWrapper: detectOtherFreeTextAtIndex - ターゲットチェックボックス位置: x=26, y=65, w=14, h=14 (index=9)
-OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=68, y=60, w=683, h=24
-OpenCVWrapper: recognizeTextFromImage - 認識結果: '0他（ 10D歳 ）'
-OpenCVWrapper: extractTextFromParentheses - 元テキスト: '0他（ 10D歳 ）' -> 抽出結果: '10D歳'
-OpenCVWrapper: detectOtherFreeTextAtIndex - 認識されたテキスト: '0他（ 10D歳 ）' -> 括弧内抽出後: '10D歳'
-OpenCVWrapper: detectSingleAnswer - チェックなしでその他の自由回答を検出: 10D歳
-OpenCVWrapper: index=1 -> storedType=multiple, optionCount=4
-  option[0]: ポスター
-  option[1]: 出演者から
-  option[2]: SNS(X,Instagram,Facebook)
-  option[3]: その他
-OpenCVWrapper: index=1 -> handling as MULTIPLE with 4 options
-OpenCVWrapper: detectCheckboxes - 4個のチェックボックスを検出
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 18.37%, チェック済み: YES
-OpenCVWrapper: detectMultipleAnswer - チェック検出: index=0, option=ポスター
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 19.39%, チェック済み: YES
-OpenCVWrapper: detectMultipleAnswer - チェック検出: index=2, option=SNS(X,Instagram,Facebook)
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: detectMultipleAnswer - 「その他」選択肢を発見: index=3, option=その他
-OpenCVWrapper: detectOtherFreeTextAtIndex - ターゲットチェックボックス位置: x=26, y=62, w=14, h=14 (index=3)
-OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=68, y=57, w=683, h=24
-OpenCVWrapper: recognizeTextFromImage - 認識結果: 'D他（あいうえお ）'
-OpenCVWrapper: extractTextFromParentheses - 元テキスト: 'D他（あいうえお ）' -> 抽出結果: 'あいうえお'
-OpenCVWrapper: detectOtherFreeTextAtIndex - 認識されたテキスト: 'D他（あいうえお ）' -> 括弧内抽出後: 'あいうえお'
-OpenCVWrapper: detectMultipleAnswer - 括弧内の自由回答を検出（その他候補）: あいうえお
-OpenCVWrapper: detectMultipleAnswer - 最終結果: ポスター,SNS(X,Instagram,Facebook),あいうえお
-OpenCVWrapper: index=2 -> storedType=single, optionCount=5
-  option[0]: 大変良かった
-  option[1]: 良かった
-  option[2]: 普通
-  option[3]: 良くなかった
-  option[4]: 悪かった
-OpenCVWrapper: index=2 -> handling as SINGLE with 5 options
-OpenCVWrapper: detectCheckboxes - 5個のチェックボックスを検出
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 0.00%, チェック済み: NO
-OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: 17.35%, チェック済み: YES
-OpenCVWrapper: detectSingleAnswer - チェック検出: index=4, option=悪かった
-OpenCVWrapper: detectSingleAnswer - 選択された選択肢「悪かった」は通常の選択肢
-OpenCVWrapper: index=3 -> storedType=text, optionCount=0
-OpenCVWrapper: index=3 -> handling as TEXT
-OpenCVWrapper: detectLargestTextBox - label=1 rect=(x=0,y=0,w=761,h=150) area=47318 sizeOK=0 rectOK=1 areaOK=1 borderOK=0
-OpenCVWrapper: detectLargestTextBox - label=2 rect=(x=26,y=39,w=671,h=95) area=63480 sizeOK=1 rectOK=1 areaOK=1 borderOK=1
-OpenCVWrapper: detectLargestTextBox - 1 candidates, maxArea=63480
-OpenCVWrapper: detectTextAnswer - テキストボックス領域: x=26, y=39, w=671, h=95
-OpenCVWrapper: recognizeTextFromImage - 認識結果: 'よかった 楽しかった'
-OpenCVWrapper: detectTextAnswer - 認識されたテキスト: 'よかった 楽しかった' -> クリーンアップ後: 'よかった 楽しかった'
-OpenCVWrapper: index=4 -> storedType=text, optionCount=0
-OpenCVWrapper: index=4 -> handling as TEXT
-OpenCVWrapper: detectLargestTextBox - label=1 rect=(x=0,y=0,w=761,h=163) area=57211 sizeOK=0 rectOK=1 areaOK=1 borderOK=0
-OpenCVWrapper: detectLargestTextBox - label=2 rect=(x=26,y=55,w=671,h=95) area=63710 sizeOK=1 rectOK=1 areaOK=1 borderOK=1
-OpenCVWrapper: detectLargestTextBox - 1 candidates, maxArea=63710
-OpenCVWrapper: detectTextAnswer - テキストボックス領域: x=26, y=55, w=671, h=95
-OpenCVWrapper: recognizeTextFromImage - 認識結果: 'とくになし'
-OpenCVWrapper: detectTextAnswer - 認識されたテキスト: 'とくになし' -> クリーンアップ後: 'とくになし'
-OpenCVWrapper: index=5 -> storedType=info, optionCount=0
-OpenCVWrapper: index=5 -> handling as INFO
-OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: 761x379
-OpenCVWrapper: detectTableOuterBounds - morphology法で外枠検出失敗、Cannyフォールバックを試行
-OpenCVWrapper: detectTableOuterBounds - findContours で 34 個の輪郭を検出
-OpenCVWrapper: detectTableOuterBounds - Canny法で外枠を検出: x=22, y=50, w=679, h=252 (area=171108)
-OpenCVWrapper: detectInfoAnswer - 表の外側枠線: x=22, y=50, w=679, h=252
-OpenCVWrapper: detectColumnDivider(scale=0.60) - maxWhite=248, ratio=0.984, x=113
-OpenCVWrapper: detectColumnDivider - 最終検出位置: x=113
-OpenCVWrapper: detectInfoAnswer - 列分割位置: x=113
-OpenCVWrapper: detectInfoAnswer - 右列領域: x=118, y=0, w=556, h=252
-OpenCVWrapper: detectHorizontalLinesInColumn - 検出された水平線数: 14 -> 7 (マージ後)
-  水平線0: y=2
-  水平線1: y=41
-  水平線2: y=81
-  水平線3: y=121
-  水平線4: y=161
-  水平線5: y=201
-  水平線6: y=248
-OpenCVWrapper: detectInfoAnswer - 検出された水平線数: 7
-OpenCVWrapper: detectInfoAnswer - 行0: y=4, h=35
-OpenCVWrapper: recognizeTextFromImage - 認識結果: 'いいもり'
-OpenCVWrapper: detectInfoAnswer - 行0認識テキスト: 'いいもり'
-OpenCVWrapper: detectInfoAnswer - 行1: y=43, h=36
-OpenCVWrapper: recognizeTextFromImage - 認識結果: '飯科'
-OpenCVWrapper: detectInfoAnswer - 行1認識テキスト: '飯科'
-OpenCVWrapper: detectInfoAnswer - 行2: y=83, h=36
-OpenCVWrapper: recognizeTextFromImage - 認識結果: 'ab c@gmail.com'
-OpenCVWrapper: detectInfoAnswer - 行2認識テキスト: 'ab c@gmail.com'
-OpenCVWrapper: detectInfoAnswer - 行3: y=123, h=36
-OpenCVWrapper: recognizeTextFromImage - 認識結果: '050-1234-5678'
-OpenCVWrapper: detectInfoAnswer - 行3認識テキスト: '050-1234-5678'
-OpenCVWrapper: detectInfoAnswer - 行4: y=163, h=36
-OpenCVWrapper: recognizeTextFromImage - 認識結果: '〒 123-4567'
-OpenCVWrapper: detectInfoAnswer - 行4認識テキスト: '〒 123-4567'
-OpenCVWrapper: detectInfoAnswer - 行5: y=203, h=43
-OpenCVWrapper: recognizeTextFromImage - 認識結果: '千葉県'
-OpenCVWrapper: detectInfoAnswer - 行5認識テキスト: '千葉県'
-OpenCVWrapper: detectInfoAnswer - 最終結果: 'いいもり
-飯科
-ab c@gmail.com
-050-1234-5678
-〒 123-4567
-千葉県'
+print(response.content)
+出力結果
+SearchSuggestions(searchTerms:["温泉", "お寺", "公園", "海"])
+これ、、、便利すぎる、、、いちいちJSONからデコードせずにそのまま構造体として出力がもらえるなんて、、、
+
+@Generableが構造化可能なデータ型
+基本的な型(プリミティブ):
+
+String
+Int
+Float
+Double
+Bool
+複合型:
+
+配列 例: [String]
+構造体 例: Person
+構造体の配列 例: [Person]
+基本的な方に加えて、再帰的、入れ子構造の生成も可能であり、ネストされた構造体も扱えることができます。
+
+Guided generationの副効果
+動画ではGuide generationを用いることで嬉しくなる他の効果についても触れています。
+
+プロンプトがシンプルになり、ほしい動作(何を生成したいか)に集中することができる。
+モデルの出力精度の向上
+高速化、最適化可能
+実行時に動的にスキーマを作成することも可能。詳細についてはdeep dive videoを参照。
+
+3. ストリーミング
+こちらも2章で説明した@Generableマクロがベースになります。
+モデルはテキストを「トークン」という短い文字列単位で生成します。
+image.png
+
+一般的なストリーミングでは差分として順次配信していきます。
+
+FoundationModelフレームワークはこのやり方はしない
+
+差分配信のデメリット:
+差分が生成された時に蓄積 →最終的な出力に組み立て: これは通常開発者側が管理する。
+しかし、出力が構造化されている場合(@Generableな場合)
+→**差分から構造に必要な文字列を解析して取り出す必要がある。**これは結構厄介ですね。
+データが複雑になるほど厄介になる。
+
+差分配信は@Generableな出力との相性が悪い
+これが差分配信を採用しなかった理由です。
+
+差分ではなくスナップショット配信
+FoundationModelsの大きなメリット→構造化(@Generable)された出力が可能これを活かすために、
+差分ではなく、スナップショットとしてストリーミングすることにしました。
+
+スナップショットとは？
+途中まで生成されたレスポンスのこと。
+スナップショット内のプロパティは全てオプショナル
+モデルの出力が進むにつれ、順次それらのプロパティを埋めていく
+
+公式の動画の色付けがかなりわかりやすかったので拝借します。
+image.png
+
+構造を崩さないまま順次出力を更新し続けるといった感じでしょうか。
+
+先ほどからたびたび出てきている、@Generableマクロですが、このマクロが
+**部分的に生成された型(PartiallyGenerated)**の定義も自動的に作成してくれています。
+
+PartiallyGenerated型
+スナップショットのために部分的に生成された型
+
+元の構造体と同じ形をしている
+全てのプロパティがオプショナル
+この型の存在が出力の途中経過を安全かつ柔軟に扱えるようにしています。
+
+@Generableによる差分構造体生成
+@Generable
+struct Itinerary: Generable {
+  //通常定義する構造体(プロンプトへのスキーマのような物)
+  var name: String
+  var days: [Day]
+
+  //@Generableが勝手に生成してくれる構造体。
+  nonisolated struct PartiallyGenerated: ConvertibleFromGeneratedContent {
+    var name String? //親と同じプロパティを持つが全てオプショナル
+    var days: [Day.PartiallyGenerated]? //Dayは構造体であるため、再帰的にPartiallyGeneratedの型を持つ。
+    //...
+  }
+}
+ストリーム配信の使い方
+streamResponse()を呼び出す。
+streamResponse()は非同期なシーケンスを返します。
+つまり部分的に最新の生成物を返してくれるってこと。
+
+モデル出力のストリーム配信
+
+// streamResponse()でストリーム配信
+let stream = session.streamResponse(
+  to: "富士山への3日間の旅程を作成してください。」",
+  generating: Itinerary.self
+)
+
+//非同期シーケンスを返す。
+for try await partial in stream {
+  print(partial)
+}
+出力結果
+tinerary.PartiallyGenerated(name: nil, days: nil)
+Itinerary.PartiallyGenerated(name: "Mt.", days: nil)
+Itinerary.PartiallyGenerated(name: "Mt. Fuji, days: nil)
+Itinerary.PartiallyGenerated(name: "Mt. Fuji", days: [])
+...
+これらはSwiftUIとの相性がとてもいい
+PartiallyGeneratedの状態を作成して、
+レスポンスストリームを順に処理し、各スナップショット保存していくだけ
+→AIの生成でどんどんUIが構築されていく様子が見れる。
+
+ベストプラクティス
+SwiftUI のアニメーションやトランジションで遅延をうまくごまかそう
+　→ 待機時間を感じさせず、逆に楽しい体験に変える工夫を。
+
+SwiftUI における View の識別（identity）に注意しよう
+　→ 特に配列を生成する場合、要素が正しく更新・差分描画されるように id を適切に指定する必要があります。
+
+構造体のプロパティは、宣言順に生成されることを意識しよう
+　→ 表示アニメーションの順序に影響するほか、
+　　要約（summary）などは最後に置いた方が高品質な出力を得やすいことがあります。
+
+4. ツールの呼び出し
+ざっくりいうと
+アプリ内で定義したコードをモデルが勝手に実行してくれる機能
+
+モデルが自分で「必要そうなツール」を選んで
+タイミングを見て
+そのツールを実行し
+結果を取り込んで、回答を仕上げてくれる
+というふうに、アシスタントのように賢く動いてくれます。
+モデルが使うツールには以下のような情報を追加できます。
+
+世界の知識
+最近の出来事
+個人的な情報
+旅行アプリではMapKitのデータをモデルに渡して、観光スポットや近くのレストランを調べさせることができます。
+これによって
+ハルシネーションを起こしにくくなる(でたらめを言いににくくなる)
+出典を示すことができる。
+モデルがアクションを実行する力を持てる。
+というメリットがあります。
+ツール呼び出しを行う流れ
+1.「トランスクリプト」に履歴が記録される
+まず、やりとりの**履歴（Transcript）**に「何がいつ起きたか」のすべてが記録されます。
+
+2. ツールがモデルに渡される
+あなたがセッション（会話のやりとり）にツールを提供していれば、
+
+そのツール情報は モデルに一緒に渡されます。これでモデルは「自分がどんな道具を使えるか」を理解できるようになります。
+
+3. プロンプトが送られる
+次に、ユーザーからのプロンプト（たとえば「○○に旅行したい」）が来ます。
+
+4. モデルが「ツール使ったほうが良い」と判断する
+ここがポイントです。
+モデルが「これはツールを使ったほうが良いな」と自律的に判断すると、1個または複数の**ツール呼び出し（tool call）**を生成します。
+
+たとえば：
+
+レストランを調べる
+ホテルを検索する
+というようなツール呼び出しが行われるかもしれません。
+
+5. フレームワークがツールを実行する
+この段階になると、FoundationModels フレームワークが自動で
+あなたが事前に書いたツールのコードを呼び出して実行してくれます。
+
+6. 出力がトランスクリプトに追加される
+その結果（レストラン一覧・ホテル情報など）は、自動的に履歴（Transcript）に追加されます。
+
+7. モデルが最終回答を仕上げる
+モデルは履歴全体（元のプロンプト・ツールの出力などすべて）を参照し、
+最終的な回答を組み立てて返してきます。
+
+image.png
+
+実装方法
+大きく分けて以下の4ステップ。
+
+ツール名の定義
+ツールの説明を追加
+ツールの引数を@Generableで定義
+実際の呼び出す処理を定義
+Toolの定義
+impot WeatherKit
+import CoreLocation
+import FoundationModels
+
+struct GetWeatherTool: Tool {
+  let name = "getWeather" //ツールの名前
+  let description = "ある都市の最新の天気情報を取得します"
+
+  @Generable
+  struct Arguments { //ツールの引数
+    @guide(description: "天気を取得したい都市名")
+    var city: String
+  }
+
+  func call(arguments: Arguments) async throws -> ToolOutput {
+    let places = try await CLGeocoder().geocodeAddressString(arguments.city)
+    let weather = try await WeatherService.shared.weather(for: places.first!.location!)
+    let temperature = weather.currentWeather.temperature.value
+
+    let content = GeneratedContent(properties: ["temperature": temperature])
+    let output = ToolOutput(content)
+
+    return output
+  }
+}
+Argumentsを@Generableにする理由は、Tool CallingがGuided Generationに基づいているからです。
+これでモデルが無効なツール名や間違った引数を出すことがなくなります。
+ツールの出力はToolOutput型で表現します。
+
+出力が構造化データ → GenerateContentから作成します。
+出力が自然言語の文章 → 単んある文字列から作成可能
+ざっくりツールの流れは
+必要なデータ（都市名）を渡す → コードで天気を取得 → モデルに戻す
+という流れです。
+
+作成したツールをモデルが使えるようにする
+セッションを初期化するときにツールをアタッチすることで使えます。
+
+let session = LanguageModelSession(
+    tools: [GetWeatherTool()], //さっき作ったツールをアタッチ
+    instructions: "ユーザーに天気予報の情報を提供してください。"
+)
+
+let response = try await session.respond(
+    to: "東京の気温は何度ですか？"
+)
+
+print(response.content)
+出力結果
+東京の気温は27度です。
+こんなにシンプルな構成で緻密な設定ができるのはとても便利ですね。
+
+ツールの動的な定義
+引数や挙動そのものを実行時に決めることができます。
+動的スキーマを使いましょう。
+詳細についてはdeep dive videoを参照とのこと。
+とても気になるので後日まとめたい。
+
+5. セッションの状態
+セッションを作成すると
+デフォルトではオンデバイスの汎用モデルが使用される。そこにプロンプトを送る形となる。
+そこに、
+**カスタムinstruction(指示)**を追加可能
+instructionはモデルに対して、
+
+どういう役割を持ってほしいか
+どのように応答すべきか
+といったガイドラインを与える物です。
+例:
+出力スタイル 敬語、カジュアル語など
+説明の長さや詳細度
+instructionsを追加してセッションを初期化
+// Supplying custom instructions
+
+let session = LanguageModelSession(
+    instructions: """
+        あなたはいつも韻を踏んで答えてくれる \
+        親切なアシスタントです。
+        """
+)
+ルールとして、
+instructions(指示)は静的にするべきです。
+信頼できないユーザー入力をinstructionsに埋め込まないこと
+
+instructions（指示）は、開発者が設定するもの
+prompts（プロンプト）は、ユーザーから入力されるもの
+という認識を持っておけば問題ありません。
+
+モデルの優先度は、
+prompts < instructions
+となるように訓練されています。これで、プロンプトインジェクション(ユーザーが意図的に命令を書き換える攻撃)からある程度守ることが可能になります。※完全なセキリュティ対策にはなっていないので注意！！
+
+マルチターンなやり取り
+連続俳句生成
+let session = try await LanguageModelSession()
+
+let firstHaiku = try await session.respond(to: "釣りに関する俳句を一つ作ってください")
+print(firstHaiku.content)
+// 静かな水面、
+// 朝霧に糸垂らす、
+// 希望の一投。
+
+let secondHaiku = try await session.respond(to: "今度はゴルフについての俳句をお願いします")
+print(secondHaiku.content)
+// 朝露光る、
+// キャディの声やさしく、
+// 忍耐の道。
+このように一つのセッション内でプロンプトを与え続ける時に、「もう一つ作って」とプロンプトを投げると、モデルは俳句を書くことを指していることを理解できます。
+
+**session.transcript**を書けば以前のやり取りを検査したりUI上に履歴を作ることができたりします。
+
+実行結果
+print(session.transcript)
+// (プロンプト) 釣りに関する俳句を一つ作ってください
+// (応答) 静かな水面、...
+// (プロンプト) 今度はゴルフについてお願いします
+// (応答) 朝露光る、...
+生成中はisRespondingがtrue
+モデルが回答を生成している間、isRespondingがtrueになります。この状態を監視することでボタンを無効化して回答中にプロンプトが投げられるのを防ぐことができます。
+
+俳句のビュー
+import SwiftUI
+import FoundationModels
+
+struct HaikuView: View {
+
+    @State
+    private var session = LanguageModelSession()
+
+    @State
+    private var haiku: String?
+
+    var body: some View {
+        if let haiku {
+            Text(haiku)
+        }
+
+        Button("生成する") {
+            Task {
+                haiku = try await session.respond(
+                    to: "まだ詠まれていないテーマで俳句を一つ作ってください。"
+                ).content
+            }
+        }
+        // モデルが応答中はボタンを無効化
+        .disabled(session.isResponding)
+    }
+}
+専用ユースケース
+デフォルトの汎用モデル以外にも、特定の用途向けにチューニングされたアダプタも提供しています。
+これらは初期化時に渡して使うことができます。
+使う方法は、model引数に、SystemLanguageModel(useCaes: .使いたいアダプタコンテント)で宣言します。
+
+モデルセッションにアダプタを渡す
+let session = LanguageModelSession(
+    model: SystemLanguageModel(useCase: .contentTagging)
+)
+サポートしているアダプタは以下の通りです。
+
+タグ生成
+エンティティ抽出
+トピック検出
+このアダプタはデフォルトでトピックタグを出力するように訓練されており、Guided Generationと連携しています。
+さらに、カスタムのinstructionsやGenerable出力型を定義することで、
+アクションや感情など、より複雑な情報も抽出できるようになります。
+
+アダプタの宣言
+@Generable
+struct Result {
+    let topics: [String]
+}
+let session = LanguageModelSession(model: SystemLanguageModel(useCase: .contentTagging))
+let response = try await session.respond(to: ..., generating: Result.self)
+さらに、タグ付けのモデルとinstructionを使うことで以下のようにタグ付け特化で出力も構造化させることができ、さらにinstructionで静的指示の設定のできた、より精度の高いモデルの実装も可能になります。
+
+タグ付けの応用
+@Generable
+struct Top3ActionEmotionResult {
+    @Guide(.maximumCount(3))
+    let actions: [String]
+    @Guide(.maximumCount(3))
+    let emotions: [String]
+}
+
+let session = LanguageModelSession(
+    model: SystemLanguageModel(useCase: .contentTagging),
+    instructions: "3つの主要な行動と感情をタグ付けして。"
+)
+let response = try await session.respond(to: ..., generating: Top3ActionEmotionResult.self)
+availableとunavailable
+モデルの状態は
+available: 利用可能
+unavailable: 利用不可能
+の二つを含みます。
+これらに応じてUIを調整することも可能です。
+
+利用ステータスで場合分け
+struct AvailabilityExample: View {
+    private let model = SystemLanguageModel.default
+
+    var body: some View {
+        switch model.availability {
+        case .available:
+            Text("モデルが利用できます。").foregroundStyle(.green)
+        case .unavailable(let reason):
+            Text("モデルが利用できません。").foregroundStyle(.red)
+            Text("Reason: \(reason)")
+        }
+    }
+}
+エラーハンドリング
+ガードレール違反
+サポートしていない言語
+モデルに渡せる入力サイズの超過
+などのエラーハンドリングができます。
+こちらも詳細はdeep dive video参照。
+#6. 開発者ツールについて
+
+Playgroundsを使おう
+PlaygroundはFoundationModelsを使った開発体験を向上させます。
+
+Playgroundsを使えばプロンプトを色々変更しながら何回もすぐに検証ができる。
+プロジェクト内のすべての型にアクセス可能
+自分で定義したGuided generationのスキーマをテストすることもできる。
+Instrumentation
+Instruments のようなツールを使って、
+モデルのパフォーマンスや振る舞いをリアルタイムにモニタリングできます。
+ボトルネックを見つけてプロンプトの調整などでチューニングも可能です。
+
+Feedback Assistant
+Feeaback Assistanを通じてフィードバックを送ることができます
+
+feedback用のデータ
+let feedback = LanguageModelFeedbackAttachment(
+  input: [
+    // ...
+  ],
+  output: [
+    // ...
+  ],
+  sentiment: .negative,
+  issues: [
+    LanguageModelFeedbackAttachment.Issue(
+      category: .incorrect,
+      explanation: "..."
+    )
+  ],
+  desiredOutputExamples: [
+    [
+      // ...
+    ]
+  ]
+)
+let data = try JSONEncoder().encode(feedback)
+Custom Adapters
+Custom Adaptersを作ることもできます。
+ただ、pple 側のアップデートがあれば、開発者が何もしなくてもモデルがより賢くなるといっているので期待して待っておくのもいいかもですね。かなりニッチなアダプタを作るのであれば話は別かもしれませんが...
+
+7 まとめと感想
+思ったよりなんでもできるフレームワークで感動しました。オフラインで動くところも使い勝手が良さそうですね。
+状況を判断して動くToolを呼び出せるのもオンデバイスのボトルネックである精度の低さに対応しやすくなっているのではないかと感じました。またアプリの開発の幅が広がりました。
+個人的に気になるのはTCAと組み合わせた時の非同期処理についてですステートを持ってる点では使いやすいのかな？と思います。
+他のフレームワークと組み合わせて面白アプリ作りたいですね！！
+最後までご覧いただきありがとうございました。
