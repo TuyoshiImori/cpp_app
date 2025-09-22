@@ -13,6 +13,7 @@ public struct CameraView: View {
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
   @State private var isCircleDetectionFailed: Bool = false
   @State private var isProcessingSample: Bool = false
+  @State private var isPulseActive: Bool = false
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -264,26 +265,65 @@ public struct CameraView: View {
       }
       .edgesIgnoringSafeArea(.bottom)
 
-      // 右下再開ボタン
+      // 右下 カメラのステータス表示
       VStack {
         Spacer()
         HStack {
           Spacer()
-          if !viewModel.isAutoCaptureEnabled {
-            Button(action: {
-              viewModel.resumeAutoCapture()
-            }) {
-              Text("再開")
+          // .possible / .scanning のときはラベル表示にする。
+          Group {
+            switch viewModel.scanState {
+            case .possible:
+              Text("スキャン可能")
                 .font(.headline)
                 .foregroundColor(.black)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(Color.white.opacity(0.9))
                 .cornerRadius(24)
+                .allowsHitTesting(false)  // タップを無効化
+
+            case .scanning:
+              HStack(spacing: 10) {
+                Text("スキャン中")
+                  .font(.headline)
+                  .foregroundColor(.black)
+                ProgressView()  // インジケーター
+                  .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                  .scaleEffect(0.8)
+                  .frame(width: 16, height: 16)
+              }
+              .padding(.horizontal, 20)
+              .padding(.vertical, 12)
+              .background(Color.white.opacity(0.9))
+              .cornerRadius(24)
+              .allowsHitTesting(false)  // タップを無効化
+
+            case .paused:
+              Button(action: {
+                viewModel.resumeAutoCapture()
+              }) {
+                Text("スキャン再開")
+                  .font(.headline)
+                  .foregroundColor(.black)
+                  .padding(.horizontal, 24)
+                  .padding(.vertical, 12)
+                  .background(Color.white.opacity(0.9))
+                  .cornerRadius(24)
+              }
+              // パルスアニメーション
+              .scaleEffect(isPulseActive ? 1.12 : 1.0)
+              .opacity(isPulseActive ? 1.0 : 0.90)
+              .shadow(
+                color: Color.black.opacity(isPulseActive ? 0.28 : 0.06),
+                radius: isPulseActive ? 12 : 3, x: 0, y: 3
+              )
+              .animation(
+                .easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: isPulseActive)
             }
-            .padding(.bottom, 24 + safeAreaInsets.bottom)
-            .padding(.trailing, 16 + safeAreaInsets.right)
           }
+          .padding(.bottom, 24 + safeAreaInsets.bottom)
+          .padding(.trailing, 16 + safeAreaInsets.right)
         }
       }
       .edgesIgnoringSafeArea(.bottom)
@@ -339,6 +379,27 @@ public struct CameraView: View {
           message: Text("適切なフォーマットのアンケートをスキャンしてください。"),
           dismissButton: .default(Text("OK"))
         )
+      }
+    }
+    // アニメーションの起動/停止を観測して、Paused 状態のときだけパルスさせる
+    .onAppear {
+      if viewModel.scanState == .paused {
+        // repeatForever のアニメーションでパルスを開始
+        withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+          isPulseActive = true
+        }
+      }
+    }
+    .onChange(of: viewModel.scanState) { newState in
+      if newState == .paused {
+        withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+          isPulseActive = true
+        }
+      } else {
+        // 状態が変わったらアニメーションフラグをオフにする
+        withAnimation(.easeInOut(duration: 0.18)) {
+          isPulseActive = false
+        }
       }
     }
     .fullScreenCover(isPresented: $isPreviewPresented) {

@@ -2,6 +2,16 @@ import AVFoundation
 import Combine
 import UIKit
 
+// カメラのスキャン状態を表す列挙型
+enum ScanState {
+  /// スキャン可能（自動キャプチャが有効で、取り込み可能な状態）
+  case possible
+  /// スキャン中（現在画像を解析中）
+  case scanning
+  /// スキャン完了・一時停止（再開可能）
+  case paused
+}
+
 final class CameraViewModel: NSObject, ObservableObject {
   @Published var initialQuestionTypes: [QuestionType] = []
   @Published var capturedImage: UIImage?
@@ -12,6 +22,8 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var isTorchOn: Bool = false
   @Published var isTargetBracesVisible: Bool = true
   @Published var isAutoCaptureEnabled: Bool = true
+  // スキャン状態を公開する（View 側はこれを監視してボタン表示を変更する）
+  @Published var scanState: ScanState = .possible
 
   let scanner = AVDocumentScanner()
 
@@ -41,12 +53,20 @@ final class CameraViewModel: NSObject, ObservableObject {
   func pauseAutoCapture() {
     isAutoCaptureEnabled = false
     scanner.isAutoCaptureEnabled = false
+    // 自動キャプチャを一時停止したら再開可能な状態にする
+    DispatchQueue.main.async {
+      self.scanState = .paused
+    }
   }
 
   func resumeAutoCapture() {
     isAutoCaptureEnabled = true
     scanner.isAutoCaptureEnabled = true
     scanner.start()
+    // 再開したらスキャン可能状態に戻す
+    DispatchQueue.main.async {
+      self.scanState = .possible
+    }
   }
 
   /// 取り込んだ画像を共通処理する。
@@ -57,20 +77,35 @@ final class CameraViewModel: NSObject, ObservableObject {
   func processCapturedImage(
     _ image: UIImage, completion: (() -> Void)? = nil
   ) {
+    // UI の即時反映のため、状態はメインスレッドで切り替え、重い解析はバックグラウンドで行う
     DispatchQueue.main.async {
+      self.scanState = .scanning
+    }
+
+    DispatchQueue.global(qos: .userInitiated).async {
       let (gray, texts, cropped) = image.recognizeTextWithVisionSync()
-      // 切り取った設問画像を先に保持してから capturedImage を公開する
-      // -> `.onReceive(viewModel.$capturedImage)` 側が `lastCroppedImages` を参照するため、
-      //    先に `lastCroppedImages` を設定してから `capturedImage` を publish する。
-      self.recognizedTexts = texts
-      self.lastCroppedImages = cropped
-      self.capturedImage = gray
-      // 自動キャプチャを一時停止
-      self.pauseAutoCapture()
-      let parsed = self.parseCroppedImagesWithStoredTypes(cropped)
-      self.parsedAnswers = parsed
-      // 完了コールバック
-      completion?()
+
+      // 解析結果をメインスレッドで反映させる
+      DispatchQueue.main.async {
+        // 切り取った設問画像を先に保持してから capturedImage を公開する
+        // -> `.onReceive(viewModel.$capturedImage)` 側が `lastCroppedImages` を参照するため、
+        //    先に `lastCroppedImages` を設定してから `capturedImage` を publish する。
+        self.recognizedTexts = texts
+        self.lastCroppedImages = cropped
+        self.capturedImage = gray
+
+        // 自動キャプチャを一時停止
+        self.pauseAutoCapture()
+
+        let parsed = self.parseCroppedImagesWithStoredTypes(cropped)
+        self.parsedAnswers = parsed
+
+        // 完了コールバック
+        completion?()
+
+        // 画像解析が終わったのでスキャン完了（paused）状態にする
+        self.scanState = .paused
+      }
     }
   }
 
