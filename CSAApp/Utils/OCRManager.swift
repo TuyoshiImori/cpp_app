@@ -7,24 +7,26 @@ import Vision
 @objc public class OCRManager: NSObject {
   /// 既存の互換 API を残す（古い呼び出しから壊さないため）
   @objc public static func recognizeText(_ image: UIImage) -> String {
-    return recognizeText(image, question: nil, storedType: nil, infoFields: nil)
+    let result = recognizeText(image, question: nil, storedType: nil, infoFields: nil)
+    return result["text"] as? String ?? ""
   }
 
   /// 拡張 API（将来的に question/ storedType/ infoFields を渡せるようにする）
-  /// ただし現在は LLM を使わず、Vision の生 OCR 結果を正規化して返す
+  /// 信頼度も含む結果を辞書形式で返すように変更
   @objc public static func recognizeText(
     _ image: UIImage,
     question: String?,
     storedType: String?,
     infoFields: [String]?
-  ) -> String {
-    // CGImage が取れない場合は空文字を返す
+  ) -> NSDictionary {
+    // CGImage が取れない場合は空の辞書を返す
     guard let cgImage = image.cgImage else {
       NSLog("OCRManager: recognizeText - UIImage.CGImage が nil です")
-      return ""
+      return ["text": "", "confidence": 0.0]
     }
 
     var recognizedText = ""
+    var confidenceScore: Float = 0.0
     let semaphore = DispatchSemaphore(value: 0)
 
     let request = VNRecognizeTextRequest { request, error in
@@ -39,10 +41,20 @@ import Vision
         return
       }
 
-      let parts = results.compactMap { obs -> String? in
-        return obs.topCandidates(1).first?.string
+      let partsWithConfidence = results.compactMap { obs -> (String, Float)? in
+        guard let candidate = obs.topCandidates(1).first else { return nil }
+        return (candidate.string, candidate.confidence)
       }
+
+      // テキストを結合し、信頼度の平均を計算
+      let parts = partsWithConfidence.map { $0.0 }
       recognizedText = parts.joined(separator: " ")
+
+      if !partsWithConfidence.isEmpty {
+        let totalConfidence = partsWithConfidence.map { $0.1 }.reduce(0, +)
+        confidenceScore = totalConfidence / Float(partsWithConfidence.count)
+      }
+
       semaphore.signal()
     }
 
@@ -67,6 +79,14 @@ import Vision
     let forOpenCV = recognizedText.replacingOccurrences(
       of: "\\s+", with: "", options: .regularExpression)
 
-    return forOpenCV
+    // 信頼度をパーセンテージに変換（0-1の値を0-100にする）
+    let confidencePercentage = confidenceScore * 100.0
+
+    NSLog("OCRManager: recognizeText - 認識結果: '%@', 信頼度: %.1f%%", forOpenCV, confidencePercentage)
+
+    return [
+      "text": forOpenCV,
+      "confidence": confidencePercentage,
+    ]
   }
 }

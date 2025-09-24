@@ -1277,13 +1277,19 @@ using namespace cv;
 #if __has_include("CSAApp-Swift.h")
       // Swift の OCRManager が利用可能ならまずそちらを試す
       @try {
-        // ROI を UIImage として渡す
-        NSString *swiftResult = [OCRManager recognizeText:textImage];
-        if (swiftResult && swiftResult.length > 0) {
+        // ROI を UIImage として渡し、信頼度を含む結果を取得
+        NSDictionary *swiftResult = [OCRManager recognizeText:textImage
+                                                     question:nil
+                                                   storedType:nil
+                                                   infoFields:nil];
+        NSString *text = swiftResult[@"text"];
+        NSNumber *confidence = swiftResult[@"confidence"];
+
+        if (text && text.length > 0) {
           NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
-                @"結果: '%@'",
-                swiftResult);
-          return swiftResult;
+                @"結果: '%@' (信頼度: %.1f%%)",
+                text, confidence.floatValue);
+          return text;
         }
       } @catch (NSException *ex) {
         // Swift 呼び出しで問題があればフォールバックして Vision を実行
@@ -1485,12 +1491,18 @@ using namespace cv;
 #if __has_include("CSAApp-Swift.h")
   // まず Swift 側の OCRManager を試みる（LLM 校正のパスに到達させるため）
   @try {
-    NSString *swiftResult = [OCRManager recognizeText:image];
-    if (swiftResult && swiftResult.length > 0) {
+    NSDictionary *swiftResult = [OCRManager recognizeText:image
+                                                 question:nil
+                                               storedType:nil
+                                               infoFields:nil];
+    NSString *text = swiftResult[@"text"];
+    NSNumber *confidence = swiftResult[@"confidence"];
+
+    if (text && text.length > 0) {
       NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager 結果: "
-            @"'%@'",
-            swiftResult);
-      return swiftResult;
+            @"'%@' (信頼度: %.1f%%)",
+            text, confidence.floatValue);
+      return text;
     } else {
       NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
             @"は空の結果を返しました");

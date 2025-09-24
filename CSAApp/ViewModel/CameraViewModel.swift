@@ -19,6 +19,7 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var parsedAnswers: [String] = []
   @Published var lastCroppedImages: [UIImage] = []
   @Published var recognizedTexts: [String] = []
+  @Published var confidenceScores: [Float] = []  // OCR信頼度スコア
   @Published var isTorchOn: Bool = false
   @Published var isTargetBracesVisible: Bool = true
   @Published var isAutoCaptureEnabled: Bool = true

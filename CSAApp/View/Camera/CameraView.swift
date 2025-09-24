@@ -37,160 +37,6 @@ public struct CameraView: View {
     }
   }
 
-  // プレビュー全画面表示
-  private func previewFullScreenView() -> some View {
-    ZStack(alignment: .topTrailing) {
-      Color.black.ignoresSafeArea()
-      if !croppedImageSets.isEmpty {
-        TabView(selection: $previewIndex) {
-          ForEach(Array(croppedImageSets.enumerated()), id: \.offset) { setIdx, imageSet in
-            GeometryReader { geo in
-              ScrollView(.vertical) {
-                VStack(spacing: 10) {
-                  ForEach(Array(imageSet.enumerated()), id: \.offset) { imgIdx, img in
-                    VStack {
-                      Text("設問 \(imgIdx + 1)")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                        .padding(.top, 10)
-
-                      Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: geo.size.width - 20)
-                        .padding(.horizontal, 10)
-
-                      // 検出結果を表示
-                      // viewModel.parsedAnswers は画像ごとの配列（同じ長さの想定）なので
-                      // インデックスチェックを厳格に行ってから利用する
-                      if imgIdx < viewModel.parsedAnswers.count {
-                        let answerIndex = viewModel.parsedAnswers[imgIdx]
-                        VStack(alignment: .leading, spacing: 4) {
-                          Text("検出結果:")
-                            .foregroundColor(.white)
-                            .font(.subheadline)
-                            .bold()
-
-                          if let item = item, imgIdx < item.questionTypes.count {
-                            let questionType = item.questionTypes[imgIdx]
-                            switch questionType {
-                            case .single(let question, _):
-                              Text("設問: \(question)")
-                                .foregroundColor(.white.opacity(0.8))
-                                .font(.caption)
-
-                              if answerIndex == "-1" {
-                                // 未選択
-                                Text("回答: 未選択")
-                                  .foregroundColor(.orange)
-                                  .font(.subheadline)
-                              } else if !answerIndex.isEmpty {
-                                // 選択肢の文章または自由回答のテキスト
-                                Text("回答: \(answerIndex)")
-                                  .foregroundColor(.green)
-                                  .font(.subheadline)
-                                  .bold()
-                              } else {
-                                // 空文字などの予期しない値
-                                Text("回答: 検出エラー")
-                                  .foregroundColor(.red)
-                                  .font(.subheadline)
-                              }
-                            case .multiple(let question, _):
-                              Text("設問: \(question)")
-                                .foregroundColor(.white.opacity(0.8))
-                                .font(.caption)
-
-                              if answerIndex == "-1" {
-                                // 未選択
-                                Text("回答: 未選択")
-                                  .foregroundColor(.orange)
-                                  .font(.subheadline)
-                              } else if !answerIndex.isEmpty {
-                                // ネイティブから受け取った文字列をそのまま表示する
-                                Text("回答: \(answerIndex)")
-                                  .foregroundColor(.purple)
-                                  .font(.subheadline)
-                                  .bold()
-                              } else {
-                                // 空文字などの予期しない値
-                                Text("回答: 検出エラー")
-                                  .foregroundColor(.red)
-                                  .font(.subheadline)
-                              }
-                            case .text(let question):
-                              Text("設問: \(question)")
-                                .foregroundColor(.white.opacity(0.8))
-                                .font(.caption)
-
-                              if answerIndex == "-1" {
-                                // 未検出
-                                Text("回答: 未検出")
-                                  .foregroundColor(.orange)
-                                  .font(.subheadline)
-                              } else if !answerIndex.isEmpty {
-                                // 検出されたテキストを表示
-                                Text("回答: \(answerIndex)")
-                                  .foregroundColor(.blue)
-                                  .font(.subheadline)
-                                  .bold()
-                              } else {
-                                // 空文字などの予期しない値
-                                Text("回答: 検出エラー")
-                                  .foregroundColor(.red)
-                                  .font(.subheadline)
-                              }
-                            case .info(let question, _):
-                              Text("設問: \(question)")
-                                .foregroundColor(.white.opacity(0.8))
-                                .font(.caption)
-                              // info の場合もネイティブが返す parsedAnswers を表示する。
-                              // 既にネイティブ側で PII はマスク済みのはず。
-                              if answerIndex == "-1" {
-                                Text("回答: 未検出")
-                                  .foregroundColor(.orange)
-                                  .font(.subheadline)
-                              } else if !answerIndex.isEmpty {
-                                Text("回答: \(answerIndex)")
-                                  .foregroundColor(.purple)
-                                  .font(.subheadline)
-                                  .bold()
-                              } else {
-                                Text("回答: 検出エラー")
-                                  .foregroundColor(.red)
-                                  .font(.subheadline)
-                              }
-                            }
-                          } else {
-                            Text("設問情報なし")
-                              .foregroundColor(.gray)
-                              .font(.subheadline)
-                          }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 10)
-                      }
-                    }
-                  }
-                }
-                .padding(.top, 50)
-              }
-            }
-            .tag(setIdx)
-          }
-        }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-        .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-      }
-      Button(action: { isPreviewPresented = false }) {
-        Image(systemName: "xmark.circle.fill")
-          .font(.system(size: 36))
-          .foregroundColor(.white)
-          .padding()
-      }
-    }
-  }
-
   public var body: some View {
     ZStack {
       CameraPreview(
@@ -403,7 +249,14 @@ public struct CameraView: View {
       }
     }
     .fullScreenCover(isPresented: $isPreviewPresented) {
-      previewFullScreenView()
+      PreviewFullScreenView(
+        isPreviewPresented: $isPreviewPresented,
+        previewIndex: $previewIndex,
+        croppedImageSets: croppedImageSets,
+        parsedAnswers: viewModel.parsedAnswers,
+        item: item,
+        confidenceScores: nil  // 将来的にviewModel.confidenceScoresを渡す予定
+      )
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
       // ViewModel が既に画像処理と切り取りを実行しているため、
