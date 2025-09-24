@@ -12,6 +12,11 @@
 #import <opencv2/imgproc.hpp>
 #import <opencv2/opencv.hpp>
 
+// Swift のクラスが生成されていればブリッジヘッダをインクルードして直接呼べる。
+#if __has_include("CSAApp-Swift.h")
+#import "CSAApp-Swift.h"
+#endif
+
 using namespace cv;
 
 // OpenCV をインクルードするために一時的に NO を undef しているため、
@@ -1268,6 +1273,27 @@ using namespace cv;
     if (recognizedText) {
       // 括弧を除去する処理
       NSString *cleanedText = [self removeParenthesesFromText:recognizedText];
+
+#if __has_include("CSAApp-Swift.h")
+      // Swift の OCRManager が利用可能ならまずそちらを試す
+      @try {
+        // ROI を UIImage として渡す
+        NSString *swiftResult = [OCRManager recognizeText:textImage];
+        if (swiftResult && swiftResult.length > 0) {
+          NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
+                @"結果: '%@'",
+                swiftResult);
+          return swiftResult;
+        }
+      } @catch (NSException *ex) {
+        // Swift 呼び出しで問題があればフォールバックして Vision を実行
+        NSLog(@"OpenCVWrapper: recognizeTextFromImage - OCRManager "
+              @"呼び出し例外: %@",
+              ex.reason);
+      }
+#endif
+
+      // Swift 経由が空の場合は Vision の結果（cleanedText）を使う
       NSLog(@"OpenCVWrapper: detectOtherFreeText - 認識されたテキスト: '%@' -> "
             @"クリーンアップ後: '%@'",
             recognizedText, cleanedText);
@@ -1455,6 +1481,26 @@ using namespace cv;
     NSLog(@"OpenCVWrapper: recognizeTextFromImage - 画像がnilです");
     return @"";
   }
+
+#if __has_include("CSAApp-Swift.h")
+  // まず Swift 側の OCRManager を試みる（LLM 校正のパスに到達させるため）
+  @try {
+    NSString *swiftResult = [OCRManager recognizeText:image];
+    if (swiftResult && swiftResult.length > 0) {
+      NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager 結果: "
+            @"'%@'",
+            swiftResult);
+      return swiftResult;
+    } else {
+      NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
+            @"は空の結果を返しました");
+    }
+  } @catch (NSException *ex) {
+    NSLog(
+        @"OpenCVWrapper: recognizeTextFromImage - OCRManager 呼び出し例外: %@",
+        ex.reason);
+  }
+#endif
 
   __block NSString *recognizedText = @"";
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
