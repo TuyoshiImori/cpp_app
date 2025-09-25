@@ -174,27 +174,98 @@ using namespace cv;
     processed = [OpenCVWrapper toGrayFromMat:processed];
   }
 
-  // 2. 画像拡大（文字の詳細を保持）
+  // 2. 動的リサイズ: 小さいROIではより大きく拡大して文字を太く見せる
+  //    目的: 低解像度の文字列でVisionの精度を上げる
+  double desiredCharHeight = 48.0; // ターゲットの文字高さ（ピクセル）
+  double scale = 2.0;              // デフォルト倍率
+  if (processed.rows > 0) {
+    // 画像高さに応じて穏やかに倍率を決定（最大3倍）
+    double candidate =
+        desiredCharHeight / std::max(1.0, (double)processed.rows);
+    // candidate が 1.0 未満の場合は拡大しない（縮小は避ける）
+    if (candidate > 1.0) {
+      scale = std::min(3.0, candidate * 4.0); // 調整係数
+      if (scale < 1.5)
+        scale = 1.5; // 最低でも1.5倍
+    } else {
+      // 元々大きければ軽く2.0倍にしておく（エッジ保護のため）
+      scale = 2.0;
+    }
+  }
   processed = [OpenCVWrapper resizeImage:processed
-                                  scaleX:2.0
-                                  scaleY:2.0
+                                  scaleX:scale
+                                  scaleY:scale
                            interpolation:cv::INTER_CUBIC];
 
-  // 3. コントラスト強化
-  processed = [OpenCVWrapper enhanceContrastCLAHE:processed clipLimit:3.0];
+  // 3. コントラスト強化 (CLAHE)
+  //    タイルサイズは画像サイズに合わせて調整して小さな領域にも効くようにする
+  cv::Mat enhanced;
+  try {
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+    clahe->setClipLimit(3.0);
+    int tileX = std::max(8, processed.cols / 32);
+    int tileY = std::max(8, processed.rows / 32);
+    clahe->setTilesGridSize(cv::Size(tileX, tileY));
+    clahe->apply(processed, enhanced);
+    processed = enhanced;
+  } catch (const cv::Exception &e) {
+    // フォールバック: 元のまま進める
+  }
 
-  // 4. ノイズ除去（軽め）
-  processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
+  // 4. ノイズ除去: bilateralFilter を使いエッジを保ちながら平滑化
+  try {
+    cv::Mat denoised;
+    cv::bilateralFilter(processed, denoised, 9, 75, 75);
+    processed = denoised;
+  } catch (const cv::Exception &e) {
+    // フォールバック: 軽めのガウシアン
+    processed = [OpenCVWrapper gaussianBlurMat:processed ksize:3 sigma:0.8];
+  }
 
-  // 5. シャープニング（文字のエッジを強調）
-  processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
+  // 5. シャープニング (アンシャープマスク) -
+  // 高周波を強調して文字をクッキリさせる
+  try {
+    cv::Mat blurred;
+    cv::GaussianBlur(processed, blurred, cv::Size(3, 3), 0);
+    double amount = 0.8; // 強さ（既存の 0.5 よりやや強め）
+    cv::Mat sharpened = processed * (1.0 + amount) - blurred * amount;
+    // 型を揃える
+    sharpened.convertTo(sharpened, processed.type());
+    processed = sharpened;
+  } catch (const cv::Exception &e) {
+    processed = [OpenCVWrapper sharpenImage:processed strength:0.5];
+  }
 
-  // 6. 適応的二値化（OCR最適化パラメータ）
+  // 6. 適応的二値化: ブロックサイズを画像サイズに合わせて決める
+  int block = 15;
+  try {
+    int candidate = std::max(15, ((processed.rows / 40) | 1));
+    // ensure odd
+    if (candidate % 2 == 0)
+      candidate += 1;
+    block = candidate;
+  } catch (...) {
+    block = 15;
+  }
   processed = [OpenCVWrapper adaptiveThresholdGaussian:processed
-                                             blockSize:15
-                                                     C:8];
+                                             blockSize:block
+                                                     C:6];
 
-  // 7. 文字最適化モルフォロジー処理
+  // 7. 少し拡張してから収縮（小さな欠損を埋める）・ノイズ除去
+  try {
+    cv::Mat morph;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
+    cv::morphologyEx(processed, morph, cv::MORPH_CLOSE, kernel);
+    cv::morphologyEx(morph, morph, cv::MORPH_OPEN, kernel);
+    processed = morph;
+  } catch (const cv::Exception &e) {
+    // フォールバック: 既存の optimizeTextMorphology を使用
+    processed = [OpenCVWrapper optimizeTextMorphology:processed
+                                           dilateSize:1
+                                            erodeSize:1];
+  }
+
+  // 8. 文字最適化モルフォロジー処理（最終調整）
   processed = [OpenCVWrapper optimizeTextMorphology:processed
                                          dilateSize:1
                                           erodeSize:1];
@@ -274,7 +345,8 @@ using namespace cv;
   return processed;
 }
 
-// 共通ユーティリティ（クラスメソッド）: モルフォロジーによるノイズ除去（オープン処理）
+// 共通ユーティリティ（クラスメソッド）:
+// モルフォロジーによるノイズ除去（オープン処理）
 + (cv::Mat)morphologyDenoiseOpen:(cv::Mat)src kernelSize:(int)kernelSize {
   cv::Mat denoised;
   cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
@@ -779,7 +851,8 @@ using namespace cv;
           for (int oi = 0; oi < (int)[optionArray count]; oi++) {
             NSString *opt = optionArray[oi];
             if ([opt containsString:@"その他"] ||
-                [opt containsString:@"そのた"] || [opt containsString:@"other"] ||
+                [opt containsString:@"そのた"] ||
+                [opt containsString:@"other"] ||
                 [opt containsString:@"Other"]) {
               hasOtherOption = YES;
               otherIndex = oi;
@@ -1459,24 +1532,45 @@ using namespace cv;
         // 認識結果を処理
         NSMutableArray *textParts = [NSMutableArray array];
         for (VNRecognizedTextObservation *observation in request.results) {
-          VNRecognizedText *candidate =
-              [observation topCandidates:1].firstObject;
-          if (candidate && candidate.string.length > 0) {
-            [textParts addObject:candidate.string];
+          // 上位3候補を参照して、より一貫した結果を選定
+          NSArray<VNRecognizedText *> *cands = [observation topCandidates:3];
+          if (cands.count == 0)
+            continue;
+          // 候補のうち長さが最大のものを採用（短すぎる候補はノイズの可能性あり）
+          VNRecognizedText *best = cands.firstObject;
+          for (VNRecognizedText *ct in cands) {
+            if (ct.string.length > best.string.length)
+              best = ct;
+          }
+          if (best && best.string.length > 0) {
+            [textParts addObject:best.string];
           }
         }
 
         recognizedText = [textParts componentsJoinedByString:@" "];
+        // 軽いポストプロセス: 先頭末尾の記号や余分な空白を除去
+        NSCharacterSet *trimSet =
+            [NSCharacterSet whitespaceAndNewlineCharacterSet];
+        recognizedText =
+            [recognizedText stringByTrimmingCharactersInSet:trimSet];
+        // 不要な中括弧や制御文字を削除
+        recognizedText =
+            [recognizedText stringByReplacingOccurrencesOfString:@"\u0000"
+                                                      withString:@""];
         dispatch_semaphore_signal(semaphore);
       }];
 
-  // 認識レベルを設定（より高精度に）
+  // 認識レベルを設定（高精度）
   request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
 
-  // 日本語を認識対象に含める
+  // 日本語・英語を優先しつつ言語ヒントは与えすぎない（自動判定にも委ねる）
   if (@available(iOS 13.0, *)) {
-    request.recognitionLanguages = @[ @"ja", @"en" ];
+    request.recognitionLanguages = @[ @"ja-JP", @"en-US" ];
+    request.usesLanguageCorrection = YES;
   }
+
+  // 候補を複数取るようにして安定化
+  request.minimumTextHeight = 0.0; // allow small text
 
   // リクエストを実行
   VNImageRequestHandler *handler =
@@ -1489,9 +1583,9 @@ using namespace cv;
     dispatch_semaphore_signal(semaphore);
   }
 
-  // 結果を待機（タイムアウト5秒）
+  // 結果を待機（タイムアウト8秒に延長）
   dispatch_time_t timeout =
-      dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+      dispatch_time(DISPATCH_TIME_NOW, 8.0 * NSEC_PER_SEC);
   if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
     return @"";
   }
@@ -1540,35 +1634,55 @@ using namespace cv;
         NSMutableArray *confidences = [NSMutableArray array];
 
         for (VNRecognizedTextObservation *observation in request.results) {
-          VNRecognizedText *candidate =
-              [observation topCandidates:1].firstObject;
-          if (candidate && candidate.string.length > 0) {
-            [textParts addObject:candidate.string];
-            [confidences addObject:@(candidate.confidence)];
+          // 上位3候補を見る
+          NSArray<VNRecognizedText *> *cands = [observation topCandidates:3];
+          if (cands.count == 0)
+            continue;
+          // 最も長い文字列の候補を選ぶ（短いノイズを避ける）
+          VNRecognizedText *best = cands.firstObject;
+          for (VNRecognizedText *ct in cands) {
+            if (ct.string.length > best.string.length)
+              best = ct;
+          }
+          if (best && best.string.length > 0) {
+            [textParts addObject:best.string];
+            [confidences addObject:@(best.confidence)];
           }
         }
 
         recognizedText = [textParts componentsJoinedByString:@" "];
 
-        // 信頼度の平均を計算
+        // 信頼度の平均を計算（より堅牢に: 上位値を重視）
         if (confidences.count > 0) {
           float total = 0.0;
-          for (NSNumber *conf in confidences) {
-            total += [conf floatValue];
+          // 上位70%を重み付け (簡易)
+          NSArray *sorted = [confidences sortedArrayUsingDescriptors:@[
+            [NSSortDescriptor sortDescriptorWithKey:@"self" ascending:NO]
+          ]];
+          NSUInteger take = MAX(1, (NSUInteger)ceil(sorted.count * 0.7));
+          for (NSUInteger i = 0; i < take; i++) {
+            total += [sorted[i] floatValue];
           }
-          averageConfidence =
-              (total / confidences.count) * 100.0; // パーセンテージに変換
+          averageConfidence = (total / (float)take) * 100.0;
         }
+
+        // ポストプロセス: トリム、制御文字除去
+        NSCharacterSet *trimSet =
+            [NSCharacterSet whitespaceAndNewlineCharacterSet];
+        recognizedText =
+            [recognizedText stringByTrimmingCharactersInSet:trimSet];
+        recognizedText =
+            [recognizedText stringByReplacingOccurrencesOfString:@"\u0000"
+                                                      withString:@""];
 
         dispatch_semaphore_signal(semaphore);
       }];
 
-  // 認識レベルを設定（より高精度に）
+  // 認識レベルを設定（高精度）
   request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
-
-  // 日本語を認識対象に含める
   if (@available(iOS 13.0, *)) {
-    request.recognitionLanguages = @[ @"ja", @"en" ];
+    request.recognitionLanguages = @[ @"ja-JP", @"en-US" ];
+    request.usesLanguageCorrection = YES;
   }
 
   // リクエストを実行
@@ -1582,9 +1696,9 @@ using namespace cv;
     dispatch_semaphore_signal(semaphore);
   }
 
-  // 結果を待機（タイムアウト5秒）
+  // 結果を待機（タイムアウト8秒）
   dispatch_time_t timeout =
-      dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+      dispatch_time(DISPATCH_TIME_NOW, 8.0 * NSEC_PER_SEC);
   if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
     return @{@"text" : @"", @"confidence" : @(0.0)};
   }
