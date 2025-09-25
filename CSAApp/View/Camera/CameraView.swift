@@ -273,6 +273,7 @@ public struct CameraView: View {
         previewIndex: $previewIndex,
         croppedImageSets: croppedImageSets,
         parsedAnswersSets: recognizedTexts,
+        item: item,
         viewModel: viewModel,
         confidenceScores: confidenceScoreSets
       )

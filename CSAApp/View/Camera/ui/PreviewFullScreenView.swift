@@ -15,9 +15,14 @@ struct PreviewFullScreenView: View {
   let parsedAnswersSets: [[String]]
   // ViewModel を注入してフォーマット関数を利用できるようにする
   var viewModel: CameraViewModel? = nil
+  // 分析画面に渡すItem
+  let item: Item?
 
   // 信頼度情報を格納するための配列（将来の実装用）
   let confidenceScores: [[Float]]?
+
+  // 分析画面の表示状態
+  @State private var isAnalysisPresented = false
 
   // MARK: - Init
   init(
@@ -25,7 +30,8 @@ struct PreviewFullScreenView: View {
     previewIndex: Binding<Int>,
     croppedImageSets: [[UIImage]],
     parsedAnswersSets: [[String]],
-    // item パラメータは廃止。必要なら viewModel.initialQuestionTypes を渡す
+    // 分析画面に渡すItemを追加
+    item: Item? = nil,
     viewModel: CameraViewModel? = nil,
     confidenceScores: [[Float]]? = nil
   ) {
@@ -33,13 +39,14 @@ struct PreviewFullScreenView: View {
     self._previewIndex = previewIndex
     self.croppedImageSets = croppedImageSets
     self.parsedAnswersSets = parsedAnswersSets
+    self.item = item
     self.viewModel = viewModel
     self.confidenceScores = confidenceScores
   }
 
   // MARK: - Body
   var body: some View {
-    ZStack(alignment: .topTrailing) {
+    ZStack {
       Color.black.ignoresSafeArea()
 
       if !croppedImageSets.isEmpty {
@@ -173,12 +180,46 @@ struct PreviewFullScreenView: View {
         .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
       }
 
-      // 閉じるボタン
-      Button(action: { isPreviewPresented = false }) {
-        Image(systemName: "xmark.circle.fill")
-          .font(.system(size: 36))
-          .foregroundColor(.white)
-          .padding()
+      // 上部のボタンオーバーレイ
+      VStack {
+        HStack {
+          // 左上の閉じるボタン
+          Button(action: { isPreviewPresented = false }) {
+            Image(systemName: "xmark.circle.fill")
+              .font(.system(size: 36))
+              .foregroundColor(.white)
+              .background(Color.black.opacity(0.3))
+              .clipShape(Circle())
+          }
+
+          Spacer()
+
+          // 右上の分析ボタン
+          if item != nil {
+            Button(action: { isAnalysisPresented = true }) {
+              HStack(spacing: 8) {
+                Image(systemName: "chart.bar.doc.horizontal")
+                  .font(.system(size: 20))
+                Text("分析")
+                  .font(.headline)
+              }
+              .foregroundColor(.white)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 10)
+              .background(Color.blue.opacity(0.8))
+              .cornerRadius(20)
+            }
+          }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 50)  // セーフエリアを考慮
+
+        Spacer()
+      }
+    }
+    .sheet(isPresented: $isAnalysisPresented) {
+      if let item = item {
+        AnalysisView(item: item)
       }
     }
   }
@@ -213,7 +254,8 @@ struct PreviewFullScreenView_Previews: PreviewProvider {
       isPreviewPresented: $isPresented,
       previewIndex: $previewIndex,
       croppedImageSets: [],
-      parsedAnswersSets: []
+      parsedAnswersSets: [],
+      item: nil
     )
   }
 }
