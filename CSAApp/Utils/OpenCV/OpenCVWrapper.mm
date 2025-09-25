@@ -787,7 +787,7 @@ using namespace cv;
         float confidence = 0.0;  // デフォルト信頼度
 
         // StoredType ごとの分岐：実際のOpenCV処理を実装
-  if ([storedType isEqualToString:@"single"]) {
+        if ([storedType isEqualToString:@"single"]) {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as SINGLE with "
                 @"%ld options",
                 i, (long)optCount);
@@ -811,7 +811,10 @@ using namespace cv;
           int otherIndex = -1;
           for (int oi = 0; oi < (int)[optionArray count]; oi++) {
             NSString *opt = optionArray[oi];
-            if ([opt containsString:@"その他"] || [opt containsString:@"そのた"] || [opt containsString:@"other"] || [opt containsString:@"Other"]) {
+            if ([opt containsString:@"その他"] ||
+                [opt containsString:@"そのた"] ||
+                [opt containsString:@"other"] ||
+                [opt containsString:@"Other"]) {
               hasOtherOption = YES;
               otherIndex = oi;
               break;
@@ -820,42 +823,76 @@ using namespace cv;
 
           // もしその他オプションがある場合、detectSingleAnswerFromImage 内で
           // 自由回答が見つかったかどうかを調べて、見つかっていればその OCR
-          // の信頼度を取得する試みを行う。detectSingleAnswerFromImage は文字列を返す
-          // だけなので、ここで自由回答が返ってきたかを判定して追加で OCR を呼ぶ。
+          // の信頼度を取得する試みを行う。detectSingleAnswerFromImage
+          // は文字列を返す
+          // だけなので、ここで自由回答が返ってきたかを判定して追加で OCR
+          // を呼ぶ。
           if (hasOtherOption) {
-            // 既に result を取得している（detectSingleAnswerFromImage を呼んでいる）
-            // result がオプション文字列と異なる場合は自由回答とみなす
+            // 既に result を取得している（detectSingleAnswerFromImage
+            // を呼んでいる） result
+            // がオプション文字列と異なる場合は自由回答とみなす
             if (result && ![result isEqualToString:@"-1"]) {
-              // 自由回答の可能性がある。追加で自由回答領域の OCR 結果と信頼度を得る
-              // 他のヘルパーを使って OCR 結果を得る。まず灰度画像を取得してから
+              // 自由回答の可能性がある。追加で自由回答領域の OCR
+              // 結果と信頼度を得る 他のヘルパーを使って OCR
+              // 結果を得る。まず灰度画像を取得してから
               UIImage *ciImg = croppedImage;
               @try {
                 // detectOtherFreeTextAtIndex を使ってテキストを取得
-                NSString *detectedOther = [self detectOtherFreeTextAtIndex: [self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectSingleAnswer" originalMat:NULL] 
-                                                                          checkboxes: [self detectCheckboxes:[self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectSingleAnswer" originalMat:NULL]]
-                                                                               index: otherIndex];
+                NSString *detectedOther = [self
+                    detectOtherFreeTextAtIndex:
+                        [self prepareImageForProcessing:ciImg
+                                              errorCode:NULL
+                                             methodName:@"detectSingleAnswer"
+                                            originalMat:NULL]
+                                    checkboxes:
+                                        [self
+                                            detectCheckboxes:
+                                                [self
+                                                    prepareImageForProcessing:
+                                                        ciImg
+                                                                    errorCode:
+                                                                        NULL
+                                                                   methodName:
+                                                                       @"detect"
+                                                                       @"Single"
+                                                                       @"Answer"
+                                                                  originalMat:
+                                                                      NULL]]
+                                         index:otherIndex];
                 if (detectedOther && ![detectedOther isEqualToString:@""]) {
-                  // OCRManager から信頼度を取得できるか試す
+              // OCRManager から信頼度を取得できるか試す
 #if __has_include("CSAApp-Swift.h")
                   @try {
-                    NSDictionary *swiftResult = [OCRManager recognizeText: MatToUIImage([self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectSingleAnswer" originalMat:NULL]) question:nil storedType:@"single" infoFields:nil];
+                    NSDictionary *swiftResult = [OCRManager
+                        recognizeText:
+                            MatToUIImage([self
+                                prepareImageForProcessing:ciImg
+                                                errorCode:NULL
+                                               methodName:@"detectSingleAnswer"
+                                              originalMat:NULL])
+                             question:nil
+                           storedType:@"single"
+                           infoFields:nil];
                     NSNumber *confNum = swiftResult[@"confidence"];
                     if (confNum) {
                       confidence = [confNum floatValue];
                     }
                   } @catch (NSException *ex) {
-                    // フォールバック: Vision を直接呼んで信頼度を取る方法がない場合は
-                    // 既定の 100% を維持する
-                    NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@", ex.reason);
+                    // フォールバック: Vision
+                    // を直接呼んで信頼度を取る方法がない場合は 既定の 100%
+                    // を維持する
+                    NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@",
+                          ex.reason);
                   }
 #endif
                 }
               } @catch (NSException *ex) {
-                NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@", ex.reason);
+                NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@",
+                      ex.reason);
               }
             }
           }
-  } else if ([storedType isEqualToString:@"multiple"]) {
+        } else if ([storedType isEqualToString:@"multiple"]) {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as MULTIPLE with "
                 @"%ld options",
                 i, (long)optCount);
@@ -867,13 +904,17 @@ using namespace cv;
           // 複数回答: デフォルトはチェックボックスのみ→信頼度100%
           confidence = 100.0f;
 
-          // options にその他が含まれるかチェックし、括弧内の自由回答を検出している
+          // options
+          // にその他が含まれるかチェックし、括弧内の自由回答を検出している
           // 場合はその OCR の信頼度を取得する
           BOOL hasOtherOption = NO;
           int otherIndex = -1;
           for (int oi = 0; oi < (int)[optionArray count]; oi++) {
             NSString *opt = optionArray[oi];
-            if ([opt containsString:@"その他"] || [opt containsString:@"そのた"] || [opt containsString:@"other"] || [opt containsString:@"Other"]) {
+            if ([opt containsString:@"その他"] ||
+                [opt containsString:@"そのた"] ||
+                [opt containsString:@"other"] ||
+                [opt containsString:@"Other"]) {
               hasOtherOption = YES;
               otherIndex = oi;
               break;
@@ -886,24 +927,52 @@ using namespace cv;
             // 信頼度を取得する試みを行う。
             @try {
               UIImage *ciImg = croppedImage;
-              NSString *detectedOther = [self detectOtherFreeTextAtIndex: [self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectMultipleAnswer" originalMat:NULL]
-                                                               checkboxes: [self detectCheckboxes:[self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectMultipleAnswer" originalMat:NULL]]
-                                                                    index: otherIndex];
+              NSString *detectedOther = [self
+                  detectOtherFreeTextAtIndex:
+                      [self prepareImageForProcessing:ciImg
+                                            errorCode:NULL
+                                           methodName:@"detectMultipleAnswer"
+                                          originalMat:NULL]
+                                  checkboxes:
+                                      [self
+                                          detectCheckboxes:
+                                              [self
+                                                  prepareImageForProcessing:
+                                                      ciImg
+                                                                  errorCode:NULL
+                                                                 methodName:
+                                                                     @"detectMu"
+                                                                     @"ltipleAn"
+                                                                     @"swer"
+                                                                originalMat:
+                                                                    NULL]]
+                                       index:otherIndex];
               if (detectedOther && ![detectedOther isEqualToString:@""]) {
 #if __has_include("CSAApp-Swift.h")
                 @try {
-                  NSDictionary *swiftResult = [OCRManager recognizeText: MatToUIImage([self prepareImageForProcessing:ciImg errorCode:NULL methodName:@"detectMultipleAnswer" originalMat:NULL]) question:nil storedType:@"multiple" infoFields:nil];
+                  NSDictionary *swiftResult = [OCRManager
+                      recognizeText:
+                          MatToUIImage([self
+                              prepareImageForProcessing:ciImg
+                                              errorCode:NULL
+                                             methodName:@"detectMultipleAnswer"
+                                            originalMat:NULL])
+                           question:nil
+                         storedType:@"multiple"
+                         infoFields:nil];
                   NSNumber *confNum = swiftResult[@"confidence"];
                   if (confNum) {
                     confidence = [confNum floatValue];
                   }
                 } @catch (NSException *ex) {
-                  NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@", ex.reason);
+                  NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@",
+                        ex.reason);
                 }
 #endif
               }
             } @catch (NSException *ex) {
-              NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@", ex.reason);
+              NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@",
+                    ex.reason);
             }
           }
         } else if ([storedType isEqualToString:@"text"]) {
