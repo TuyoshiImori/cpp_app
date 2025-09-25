@@ -21,7 +21,6 @@ import Vision
   ) -> NSDictionary {
     // CGImage が取れない場合は空の辞書を返す
     guard let cgImage = image.cgImage else {
-      NSLog("OCRManager: recognizeText - UIImage.CGImage が nil です")
       return ["text": "", "confidence": 0.0]
     }
 
@@ -31,7 +30,6 @@ import Vision
 
     let request = VNRecognizeTextRequest { request, error in
       if let error = error {
-        NSLog("OCRManager: VNRecognizeTextRequest エラー: %@", error.localizedDescription)
         semaphore.signal()
         return
       }
@@ -68,7 +66,6 @@ import Vision
     do {
       try handler.perform([request])
     } catch {
-      NSLog("OCRManager: VNImageRequestHandler.perform エラー: %@", error.localizedDescription)
       semaphore.signal()
     }
 
@@ -81,8 +78,6 @@ import Vision
 
     // 信頼度をパーセンテージに変換（0-1の値を0-100にする）
     let confidencePercentage = confidenceScore * 100.0
-
-    NSLog("OCRManager: recognizeText - 認識結果: '%@', 信頼度: %.1f%%", forOpenCV, confidencePercentage)
 
     return [
       "text": forOpenCV,

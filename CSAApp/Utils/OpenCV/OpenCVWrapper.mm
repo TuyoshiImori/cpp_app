@@ -116,7 +116,6 @@ using namespace cv;
 
   // 入力チェック
   if (image == nil) {
-    NSLog(@"OpenCVWrapper: %@ - 無効な入力", methodName);
     if (errorCode) {
       *errorCode = @"invalid_input";
     }
@@ -129,7 +128,6 @@ using namespace cv;
 
   // 空の画像チェック
   if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: %@ - 空の画像", methodName);
     if (errorCode) {
       *errorCode = @"empty_image";
     }
@@ -143,9 +141,6 @@ using namespace cv;
 
   // グレースケール変換
   cv::Mat gray = [self toGrayFromMat:mat];
-
-  NSLog(@"OpenCVWrapper: %@ - 画像前処理完了 (%dx%d)", methodName, gray.cols,
-        gray.rows);
 
   return gray;
 }
@@ -168,7 +163,6 @@ using namespace cv;
 + (cv::Mat)prepareImageForOCRProcessingFromMat:(cv::Mat)mat {
   // 空の画像チェック
   if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: prepareImageForOCRProcessing(Mat) - 空の画像");
     return cv::Mat();
   }
 
@@ -205,10 +199,6 @@ using namespace cv;
                                          dilateSize:1
                                           erodeSize:1];
 
-  NSLog(@"OpenCVWrapper: prepareImageForOCRProcessingFromMat - "
-        @"OCR用高精度前処理完了 (%dx%d)",
-        processed.cols, processed.rows);
-
   return processed;
 }
 
@@ -225,7 +215,6 @@ using namespace cv;
 
   // 入力チェック
   if (image == nil) {
-    NSLog(@"OpenCVWrapper: %@ - 無効な入力", methodName);
     if (errorCode) {
       *errorCode = @"invalid_input";
     }
@@ -238,7 +227,6 @@ using namespace cv;
 
   // 空の画像チェック
   if (mat.empty()) {
-    NSLog(@"OpenCVWrapper: %@ - 空の画像", methodName);
     if (errorCode) {
       *errorCode = @"empty_image";
     }
@@ -283,14 +271,10 @@ using namespace cv;
                                          dilateSize:1
                                           erodeSize:1];
 
-  NSLog(@"OpenCVWrapper: %@ - OCR用高精度前処理完了 (%dx%d)", methodName,
-        processed.cols, processed.rows);
-
   return processed;
 }
 
-// 共通ユーティリティ（クラスメソッド）:
-// モルフォロジーによるノイズ除去（オープン処理）
+// 共通ユーティリティ（クラスメソッド）: モルフォロジーによるノイズ除去（オープン処理）
 + (cv::Mat)morphologyDenoiseOpen:(cv::Mat)src kernelSize:(int)kernelSize {
   cv::Mat denoised;
   cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
@@ -382,9 +366,6 @@ using namespace cv;
     };
   }
 
-  NSLog(@"OpenCVWrapper: 元画像 channels=%d, type=%d, size=%dx%d",
-        mat.channels(), mat.type(), mat.cols, mat.rows);
-
   // === 画像処理部分 ===
   // 1. 画像を拡大（処理の精度向上のため）
   cv::Mat resizedMat;
@@ -394,7 +375,6 @@ using namespace cv;
                                      scaleY:2.0
                               interpolation:cv::INTER_LINEAR];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: resizeでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -407,7 +387,6 @@ using namespace cv;
   try {
     grayMat = [OpenCVWrapper toGrayFromMat:resizedMat];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: グレースケール変換でエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -420,7 +399,6 @@ using namespace cv;
   try {
     blurMat = [OpenCVWrapper gaussianBlurMat:grayMat ksize:3 sigma:1.0];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: GaussianBlurでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -436,7 +414,6 @@ using namespace cv;
                                                blockSize:25
                                                        C:5];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: adaptiveThresholdでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -449,7 +426,6 @@ using namespace cv;
   try {
     extraBlurMat = [OpenCVWrapper gaussianBlurMat:binaryMat ksize:5 sigma:2.0];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: extra GaussianBlurでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -462,7 +438,6 @@ using namespace cv;
   try {
     invMat = [OpenCVWrapper invertImage:extraBlurMat];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: bitwise_notでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -475,7 +450,6 @@ using namespace cv;
   try {
     noNoiseMat = [OpenCVWrapper morphologyDenoiseOpen:invMat kernelSize:3];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: morphologyExでエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -488,7 +462,6 @@ using namespace cv;
   try {
     finalMat = [OpenCVWrapper invertImage:noNoiseMat];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: bitwise_not(2)でエラー: %s", e.what());
     return @{
       @"processedImage" : image,
       @"templateCenters" : @[],
@@ -501,7 +474,6 @@ using namespace cv;
   try {
     processedImage = MatToUIImage(finalMat);
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: 処理済み画像変換でエラー: %s", e.what());
     processedImage = image;
   }
 
@@ -511,7 +483,6 @@ using namespace cv;
   try {
     originalGrayMat = [OpenCVWrapper toGrayFromMat:mat];
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: 元画像グレースケール変換でエラー: %s", e.what());
     return @{
       @"processedImage" : processedImage ?: image,
       @"templateCenters" : @[],
@@ -541,7 +512,6 @@ using namespace cv;
     }
 
     if (tplUIImage == nil) {
-      NSLog(@"OpenCVWrapper: テンプレート画像 q.png を読み込めませんでした");
       return @{
         @"processedImage" : [NSNull null],
         @"templateCenters" : @[],
@@ -552,7 +522,6 @@ using namespace cv;
     cv::Mat tplMat;
     UIImageToMat(tplUIImage, tplMat);
     if (tplMat.empty()) {
-      NSLog(@"OpenCVWrapper: テンプレート画像が空です");
       return @{
         @"processedImage" : [NSNull null],
         @"templateCenters" : @[],
@@ -596,10 +565,7 @@ using namespace cv;
       }
     }
 
-    NSLog(@"OpenCVWrapper: テンプレートマッチングで検出された個数: %zu",
-          markers.size());
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: テンプレートマッチングでエラー: %s", e.what());
     return @{
       @"processedImage" : processedImage ?: image,
       @"templateCenters" : @[],
@@ -609,7 +575,6 @@ using namespace cv;
 
   // テンプレート検出結果がなければ終了
   if (markers.empty()) {
-    NSLog(@"OpenCVWrapper: テンプレートマッチで何も検出されませんでした");
     return @{
       @"processedImage" : [NSNull null],
       @"templateCenters" : @[],
@@ -634,7 +599,6 @@ using namespace cv;
         markers.begin(), markers.end(),
         [](const cv::Vec3f &a, const cv::Vec3f &b) { return a[1] < b[1]; });
 
-    NSLog(@"OpenCVWrapper: 切り取り領域計算開始");
     for (size_t i = 0; i < markers.size(); i++) {
       const auto &marker = markers[i];
       float centerX = marker[0];
@@ -664,15 +628,11 @@ using namespace cv;
 
       // 縦幅が0以下の場合はスキップ
       if (height <= 0) {
-        NSLog(@"OpenCVWrapper: マーカー%zu: 高さが不正 (%d)", i, height);
         continue;
       }
 
       // 画像の範囲内に調整
       height = std::min(height, mat.rows - startY);
-
-      NSLog(@"OpenCVWrapper: マーカー%zu: 切り取り領域 x=%d, y=%d, w=%d, h=%d",
-            i, startX, startY, width, height);
 
       try {
         cv::Rect cropRect(startX, startY, width, height);
@@ -682,7 +642,6 @@ using namespace cv;
           [croppedImages addObject:croppedImage];
         }
       } catch (const cv::Exception &e) {
-        NSLog(@"OpenCVWrapper: マーカー%zu: 切り取りでエラー: %s", i, e.what());
         continue;
       }
     }
@@ -692,9 +651,6 @@ using namespace cv;
   if ([croppedImages count] == 0) {
     [croppedImages addObject:image];
   }
-
-  NSLog(@"OpenCVWrapper: 処理完了 - 切り取った画像数: %lu",
-        (unsigned long)[croppedImages count]);
 
   return @{
     @"processedImage" : processedImage ?: image,
@@ -713,31 +669,16 @@ using namespace cv;
                          (NSArray<NSArray<NSString *> *> *)optionTexts {
   // 引数チェック
   if (croppedImages == nil || [croppedImages count] == 0) {
-    NSLog(@"OpenCVWrapper.parseCroppedImages: croppedImages が空です");
     return
         @{@"processedImage" : image ?: [NSNull null], @"parsedAnswers" : @[]};
   }
 
   size_t n = [croppedImages count];
-  NSLog(@"OpenCVWrapper.parseCroppedImages: images=%zu, types=%zu, "
-        @"optionTexts=%zu",
-        n, (size_t)(types ? [types count] : 0),
-        (size_t)(optionTexts ? [optionTexts count] : 0));
-
-  // 全体の types と optionTexts を出力（デバッグ用）
-  NSLog(@"OpenCVWrapper.parseCroppedImages: provided types=%@", types ?: @[]);
-  NSLog(@"OpenCVWrapper.parseCroppedImages: provided optionTexts (count=%lu):",
-        (unsigned long)(optionTexts ? [optionTexts count] : 0));
 
   // optionTexts の内容も個別に出力して文字化けを回避
   if (optionTexts) {
     for (NSUInteger idx = 0; idx < [optionTexts count]; idx++) {
-      NSArray<NSString *> *optionsAtIndex = optionTexts[idx];
-      NSLog(@"  optionTexts[%lu] (count=%lu):", (unsigned long)idx,
-            (unsigned long)[optionsAtIndex count]);
-      for (NSUInteger j = 0; j < [optionsAtIndex count]; j++) {
-        NSLog(@"    [%lu]: %@", (unsigned long)j, optionsAtIndex[j]);
-      }
+      // intentionally no logging
     }
   }
 
@@ -760,9 +701,6 @@ using namespace cv;
     [rowConfidences addObject:@[]];
   }
 
-  NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理開始 - %zu個の設問を処理",
-        n);
-
   // 並列処理でループを実行（CPUコア数に応じて自動分散）
   dispatch_apply(
       n, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
@@ -773,36 +711,16 @@ using namespace cv;
             (optionTexts && i < [optionTexts count]) ? optionTexts[i] : @[];
         NSInteger optCount = [optionArray count];
 
-        // 各要素ごとに storedType と対応する optionCount を明示的に出力
-        // optionTexts の内容を個別に出力して文字化けを回避
-        NSLog(@"OpenCVWrapper: [並列] index=%zu -> storedType=%@, "
-              @"optionCount=%ld",
-              i, storedType, (long)optCount);
-        for (NSUInteger j = 0; j < [optionArray count]; j++) {
-          NSString *option = optionArray[j];
-          NSLog(@"  [並列] option[%lu]: %@", (unsigned long)j, option);
-        }
-
         NSString *result = @"0"; // デフォルト値
         float confidence = 0.0;  // デフォルト信頼度
 
         // StoredType ごとの分岐：実際のOpenCV処理を実装
         if ([storedType isEqualToString:@"single"]) {
-          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as SINGLE with "
-                @"%ld options",
-                i, (long)optCount);
 
           // チェックボックス検出処理を実行
           UIImage *croppedImage = croppedImages[i];
           result = [self detectSingleAnswerFromImage:croppedImage
                                          withOptions:optionArray];
-          // チェックボックスのみの判定（その他を含む場合は自由回答を検出してその
-          // 信頼度を使う）
-          // まず detectSingleAnswerFromImage の結果を得る
-          // result は通常選択肢文字列、またはその他の自由回答文字列が返る
-          // ここでその他候補を含むオプションかどうかチェックし、
-          // 自由回答が含まれる場合は detectOtherFreeText 系で信頼度を試行する
-
           // デフォルトはチェックボックスのみ→信頼度100%
           confidence = 100.0f;
 
@@ -821,81 +739,30 @@ using namespace cv;
             }
           }
 
-          // もしその他オプションがある場合、detectSingleAnswerFromImage 内で
-          // 自由回答が見つかったかどうかを調べて、見つかっていればその OCR
-          // の信頼度を取得する試みを行う。detectSingleAnswerFromImage
-          // は文字列を返す
-          // だけなので、ここで自由回答が返ってきたかを判定して追加で OCR
-          // を呼ぶ。
           if (hasOtherOption) {
-            // 既に result を取得している（detectSingleAnswerFromImage
-            // を呼んでいる） result
-            // がオプション文字列と異なる場合は自由回答とみなす
             if (result && ![result isEqualToString:@"-1"]) {
-              // 自由回答の可能性がある。追加で自由回答領域の OCR
-              // 結果と信頼度を得る 他のヘルパーを使って OCR
-              // 結果を得る。まず灰度画像を取得してから
               UIImage *ciImg = croppedImage;
               @try {
-                // detectOtherFreeTextAtIndex を使ってテキストを取得
-                NSString *detectedOther = [self
-                    detectOtherFreeTextAtIndex:
-                        [self prepareImageForProcessing:ciImg
-                                              errorCode:NULL
-                                             methodName:@"detectSingleAnswer"
-                                            originalMat:NULL]
-                                    checkboxes:
-                                        [self
-                                            detectCheckboxes:
-                                                [self
-                                                    prepareImageForProcessing:
-                                                        ciImg
-                                                                    errorCode:
-                                                                        NULL
-                                                                   methodName:
-                                                                       @"detect"
-                                                                       @"Single"
-                                                                       @"Answer"
-                                                                  originalMat:
-                                                                      NULL]]
-                                         index:otherIndex];
-                if (detectedOther && ![detectedOther isEqualToString:@""]) {
-              // OCRManager から信頼度を取得できるか試す
-#if __has_include("CSAApp-Swift.h")
-                  @try {
-                    NSDictionary *swiftResult = [OCRManager
-                        recognizeText:
-                            MatToUIImage([self
-                                prepareImageForProcessing:ciImg
-                                                errorCode:NULL
-                                               methodName:@"detectSingleAnswer"
-                                              originalMat:NULL])
-                             question:nil
-                           storedType:@"single"
-                           infoFields:nil];
-                    NSNumber *confNum = swiftResult[@"confidence"];
-                    if (confNum) {
-                      confidence = [confNum floatValue];
-                    }
-                  } @catch (NSException *ex) {
-                    // フォールバック: Vision
-                    // を直接呼んで信頼度を取る方法がない場合は 既定の 100%
-                    // を維持する
-                    NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@",
-                          ex.reason);
-                  }
-#endif
+                NSDictionary *swiftResult = [OCRManager
+                    recognizeText:
+                        MatToUIImage([self
+                            prepareImageForProcessing:ciImg
+                                            errorCode:NULL
+                                           methodName:@"detectSingleAnswer"
+                                          originalMat:NULL])
+                         question:nil
+                       storedType:@"single"
+                       infoFields:nil];
+                NSNumber *confNum = swiftResult[@"confidence"];
+                if (confNum) {
+                  confidence = [confNum floatValue];
                 }
               } @catch (NSException *ex) {
-                NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@",
-                      ex.reason);
+                // fallback: ignore logging
               }
             }
           }
         } else if ([storedType isEqualToString:@"multiple"]) {
-          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as MULTIPLE with "
-                @"%ld options",
-                i, (long)optCount);
 
           // 複数回答チェックボックス検出処理を実行
           UIImage *croppedImage = croppedImages[i];
@@ -912,8 +779,7 @@ using namespace cv;
           for (int oi = 0; oi < (int)[optionArray count]; oi++) {
             NSString *opt = optionArray[oi];
             if ([opt containsString:@"その他"] ||
-                [opt containsString:@"そのた"] ||
-                [opt containsString:@"other"] ||
+                [opt containsString:@"そのた"] || [opt containsString:@"other"] ||
                 [opt containsString:@"Other"]) {
               hasOtherOption = YES;
               otherIndex = oi;
@@ -922,9 +788,6 @@ using namespace cv;
           }
 
           if (hasOtherOption) {
-            // detectMultipleAnswerFromImage が既に括弧内テキストを検出して
-            // いる場合はそれを返すようになっている。ここでは追加で OCR の
-            // 信頼度を取得する試みを行う。
             @try {
               UIImage *ciImg = croppedImage;
               NSString *detectedOther = [self
@@ -948,7 +811,6 @@ using namespace cv;
                                                                     NULL]]
                                        index:otherIndex];
               if (detectedOther && ![detectedOther isEqualToString:@""]) {
-#if __has_include("CSAApp-Swift.h")
                 @try {
                   NSDictionary *swiftResult = [OCRManager
                       recognizeText:
@@ -965,18 +827,13 @@ using namespace cv;
                     confidence = [confNum floatValue];
                   }
                 } @catch (NSException *ex) {
-                  NSLog(@"OpenCVWrapper: OCRManager 呼び出し失敗: %@",
-                        ex.reason);
+                  // fallback: ignore logging
                 }
-#endif
               }
             } @catch (NSException *ex) {
-              NSLog(@"OpenCVWrapper: その他自由回答 OCR の取得で例外: %@",
-                    ex.reason);
             }
           }
         } else if ([storedType isEqualToString:@"text"]) {
-          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as TEXT", i);
 
           // テキスト検出処理を実行（信頼度付き）
           UIImage *croppedImage = croppedImages[i];
@@ -985,7 +842,6 @@ using namespace cv;
           result = textResult[@"text"] ?: @"";
           confidence = [textResult[@"confidence"] floatValue];
         } else if ([storedType isEqualToString:@"info"]) {
-          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as INFO", i);
 
           // info設問専用の処理を実行
           UIImage *croppedImage = croppedImages[i];
@@ -1018,7 +874,6 @@ using namespace cv;
             confidence = 0.0;
           }
         } else {
-          NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as UNKNOWN", i);
           result = @"0";
           confidence = 0.0;
         }
@@ -1030,13 +885,8 @@ using namespace cv;
         @synchronized(confidenceScores) {
           confidenceScores[i] = @(confidence);
         }
-
-        NSLog(@"OpenCVWrapper: [並列] index=%zu 完了 -> result=%@", i, result);
       });
 
-  NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理完了");
-
-  // ここで dispatch_apply 内で埋められた rowConfidences をそのまま返す
   return @{
     @"processedImage" : image ?: [NSNull null],
     @"parsedAnswers" : parsedAnswers,
@@ -1050,7 +900,6 @@ using namespace cv;
 + (NSString *)detectSingleAnswerFromImage:(UIImage *)image
                               withOptions:(NSArray<NSString *> *)options {
   if ([options count] == 0) {
-    NSLog(@"OpenCVWrapper: detectSingleAnswer - オプションが空");
     return @"-1";
   }
 
@@ -1072,8 +921,6 @@ using namespace cv;
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
 
   if (checkboxes.empty()) {
-    NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-          @"チェックボックスが見つかりません");
     return @"-1";
   }
 
@@ -1081,9 +928,6 @@ using namespace cv;
   int checkedIndex = -1;
   for (size_t i = 0; i < checkboxes.size() && i < [options count]; i++) {
     if ([self isCheckboxChecked:gray rect:checkboxes[i]]) {
-      NSLog(@"OpenCVWrapper: detectSingleAnswer - チェック検出: index=%zu, "
-            @"option=%@",
-            i, options[i]);
       checkedIndex = (int)i;
       break; // 単数回答なので最初のチェックで終了
     }
@@ -1091,8 +935,6 @@ using namespace cv;
 
   // チェックが見つからない場合は「その他」の可能性をチェック
   if (checkedIndex == -1) {
-    NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-          @"通常のチェックが見つからないため、その他を確認");
 
     // 選択肢に「その他」が含まれているかチェック
     BOOL hasOtherOption = false;
@@ -1106,9 +948,6 @@ using namespace cv;
           [option containsString:@"Other"]) {
         hasOtherOption = true;
         otherOptionIndex = i;
-        NSLog(@"OpenCVWrapper: detectSingleAnswer - 「その他」選択肢を発見: "
-              @"index=%d, option=%@",
-              i, option);
         break;
       }
     }
@@ -1116,8 +955,6 @@ using namespace cv;
     if (hasOtherOption && otherOptionIndex >= 0 &&
         otherOptionIndex < checkboxes.size()) {
       // 「その他」の選択肢があり、対応するチェックボックスが存在するため、自由回答を検出
-      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-            @"「その他」の自由回答を検出試行中（チェックなし）");
 
       // 最後の選択肢（その他）のチェックボックス位置で自由記述を探す
       NSString *otherText = [self detectOtherFreeTextAtIndex:gray
@@ -1125,18 +962,10 @@ using namespace cv;
                                                        index:otherOptionIndex];
 
       if (otherText && ![otherText isEqualToString:@""]) {
-        NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-              @"チェックなしでその他の自由回答を検出: %@",
-              otherText);
         return otherText;
       } else {
-        NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-              @"「その他」の自由回答が見つからない");
       }
     } else {
-      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-            @"選択肢に「その他」がないか、対応するチェックボックスが見つからな"
-            @"い");
     }
   } else {
     // チェックされた選択肢が「その他」かどうかを確認
@@ -1147,27 +976,18 @@ using namespace cv;
                           [selectedOption containsString:@"Other"]);
 
     if (isOtherOption) {
-      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-            @"選択された選択肢「%@」は「その他」のため、自由回答を検出",
-            selectedOption);
       NSString *otherText = [self detectOtherFreeText:gray
                                            checkboxes:checkboxes];
       if (otherText && ![otherText isEqualToString:@""]) {
-        NSLog(@"OpenCVWrapper: detectSingleAnswer - その他の自由回答を検出: %@",
-              otherText);
         return otherText;
       }
     } else {
-      NSLog(@"OpenCVWrapper: detectSingleAnswer - "
-            @"選択された選択肢「%@」は通常の選択肢",
-            selectedOption);
     }
 
     // 通常の選択肢の文章を返す（インデックスではなく）
     return selectedOption;
   }
 
-  NSLog(@"OpenCVWrapper: detectSingleAnswer - チェックが見つかりません");
   return @"-1";
 }
 
@@ -1176,7 +996,6 @@ using namespace cv;
 + (NSString *)detectMultipleAnswerFromImage:(UIImage *)image
                                 withOptions:(NSArray<NSString *> *)options {
   if ([options count] == 0) {
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - オプションが空");
     return @"-1";
   }
 
@@ -1198,8 +1017,6 @@ using namespace cv;
   std::vector<cv::Rect> checkboxes = [self detectCheckboxes:gray];
 
   if (checkboxes.empty()) {
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-          @"チェックボックスが見つかりません");
     return @"-1";
   }
 
@@ -1208,9 +1025,6 @@ using namespace cv;
   for (size_t i = 0; i < checkboxes.size() && i < [options count]; i++) {
     if ([self isCheckboxChecked:gray rect:checkboxes[i]]) {
       NSString *option = options[i];
-      NSLog(@"OpenCVWrapper: detectMultipleAnswer - チェック検出: index=%zu, "
-            @"option=%@",
-            i, option);
       [checkedOptions addObject:option];
     }
   }
@@ -1224,9 +1038,6 @@ using namespace cv;
         [option containsString:@"そのた"] || [option containsString:@"other"] ||
         [option containsString:@"Other"]) {
       otherOptionIndex = i;
-      NSLog(@"OpenCVWrapper: detectMultipleAnswer - 「その他」選択肢を発見: "
-            @"index=%d, option=%@",
-            i, option);
       break;
     }
   }
@@ -1239,9 +1050,6 @@ using namespace cv;
                               checkboxes:checkboxes
                                    index:otherOptionIndex];
     if (freeTextAtIndex && ![freeTextAtIndex isEqualToString:@""]) {
-      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-            @"括弧内の自由回答を検出（その他候補）: %@",
-            freeTextAtIndex);
       // チェックが一つもない場合は単独で返す（single と同様の振る舞い）
       if ([checkedOptions count] == 0) {
         return freeTextAtIndex;
@@ -1260,18 +1068,12 @@ using namespace cv;
                           [checkedOption containsString:@"Other"]);
 
     if (isOtherOption) {
-      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-            @"チェックされた選択肢に「その他」が含まれています: %@",
-            checkedOption);
       // 既に括弧内テキストが見つかっていればそれを使う
       if (!otherText || [otherText isEqualToString:@""]) {
         NSString *freeText = [self detectOtherFreeText:gray
                                             checkboxes:checkboxes];
         if (freeText && ![freeText isEqualToString:@""]) {
           otherText = freeText;
-          NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-                @"チェックされたその他から自由回答を検出: %@",
-                otherText);
         }
       }
       break;
@@ -1281,12 +1083,8 @@ using namespace cv;
   // チェックが見つからない場合は、その他の括弧内テキストが既に検出されていればそれを返す
   if ([checkedOptions count] == 0) {
     if (otherText && ![otherText isEqualToString:@""]) {
-      NSLog(@"OpenCVWrapper: detectMultipleAnswer - "
-            @"チェックなしだがその他の括弧内テキストを返す: %@",
-            otherText);
       return otherText;
     }
-    NSLog(@"OpenCVWrapper: detectMultipleAnswer - チェックが見つかりません");
     return @"-1";
   }
 
@@ -1317,7 +1115,7 @@ using namespace cv;
   }
 
   NSString *finalResult = [results componentsJoinedByString:@","];
-  NSLog(@"OpenCVWrapper: detectMultipleAnswer - 最終結果: %@", finalResult);
+
   return finalResult;
 }
 
@@ -1397,11 +1195,7 @@ using namespace cv;
                 return a.y < b.y;
               });
 
-    NSLog(@"OpenCVWrapper: detectCheckboxes - %zu個のチェックボックスを検出",
-          checkboxes.size());
-
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: detectCheckboxes でエラー: %s", e.what());
   }
 
   return checkboxes;
@@ -1425,14 +1219,9 @@ using namespace cv;
     // 閾値以上の黒いピクセルがあればチェック済みと判定
     bool isChecked = blackRatio > 0.1; // 10%以上が黒ならチェック済み
 
-    NSLog(@"OpenCVWrapper: チェックボックス判定 - 黒ピクセル率: %.2f%%, "
-          @"チェック済み: %s",
-          blackRatio * 100, isChecked ? "YES" : "NO");
-
     return isChecked;
 
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: isCheckboxChecked でエラー: %s", e.what());
     return false;
   }
 }
@@ -1443,17 +1232,11 @@ using namespace cv;
                        checkboxes:(std::vector<cv::Rect>)checkboxes {
   @try {
     if (checkboxes.empty()) {
-      NSLog(@"OpenCVWrapper: detectOtherFreeText - "
-            @"チェックボックスが見つかりません");
       return @"";
     }
 
     // 最後のチェックボックス（その他）を取得
     cv::Rect lastCheckbox = checkboxes.back();
-    NSLog(@"OpenCVWrapper: detectOtherFreeText - 最後のチェックボックス位置: "
-          @"x=%d, y=%d, w=%d, h=%d",
-          lastCheckbox.x, lastCheckbox.y, lastCheckbox.width,
-          lastCheckbox.height);
 
     // その他のチェックボックスから3つ分右の座標を計算
     // チェックボックス幅の3倍分右にオフセット
@@ -1466,8 +1249,6 @@ using namespace cv;
     // 範囲チェック
     if (textStartX >= gray.cols || textY < 0 ||
         textY + textHeight >= gray.rows || textWidth <= 0) {
-      NSLog(
-          @"OpenCVWrapper: detectOtherFreeText - テキスト領域が画像範囲外です");
       return @"";
     }
 
@@ -1478,9 +1259,6 @@ using namespace cv;
     // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
     cv::Mat processedTextROI =
         [OpenCVWrapper prepareImageForOCRProcessingFromMat:textROI];
-    NSLog(@"OpenCVWrapper: detectOtherFreeText - テキスト領域: x=%d, y=%d, "
-          @"w=%d, h=%d (OCR前処理適用済み)",
-          textRect.x, textRect.y, textRect.width, textRect.height);
 
     // ROIをUIImageに変換してVisionで文字認識
     UIImage *textImage = MatToUIImage(processedTextROI);
@@ -1493,9 +1271,7 @@ using namespace cv;
       NSString *cleanedText = [self removeParenthesesFromText:recognizedText];
 
 #if __has_include("CSAApp-Swift.h")
-      // Swift の OCRManager が利用可能ならまずそちらを試す
       @try {
-        // ROI を UIImage として渡し、信頼度を含む結果を取得
         NSDictionary *swiftResult = [OCRManager recognizeText:textImage
                                                      question:nil
                                                    storedType:nil
@@ -1504,30 +1280,18 @@ using namespace cv;
         NSNumber *confidence = swiftResult[@"confidence"];
 
         if (text && text.length > 0) {
-          NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
-                @"結果: '%@' (信頼度: %.1f%%)",
-                text, confidence.floatValue);
           return text;
         }
       } @catch (NSException *ex) {
-        // Swift 呼び出しで問題があればフォールバックして Vision を実行
-        NSLog(@"OpenCVWrapper: recognizeTextFromImage - OCRManager "
-              @"呼び出し例外: %@",
-              ex.reason);
       }
 #endif
 
-      // Swift 経由が空の場合は Vision の結果（cleanedText）を使う
-      NSLog(@"OpenCVWrapper: detectOtherFreeText - 認識されたテキスト: '%@' -> "
-            @"クリーンアップ後: '%@'",
-            recognizedText, cleanedText);
       return cleanedText;
     }
 
     return @"";
 
   } @catch (NSException *exception) {
-    NSLog(@"OpenCVWrapper: detectOtherFreeText でエラー: %@", exception.reason);
     return @"";
   }
 }
@@ -1539,71 +1303,44 @@ using namespace cv;
                                    index:(int)index {
   @try {
     if (checkboxes.empty() || index < 0 || index >= checkboxes.size()) {
-      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
-            @"無効なインデックスまたは空のチェックボックス配列: index=%d, "
-            @"size=%zu",
-            index, checkboxes.size());
       return @"";
     }
 
     // 指定したインデックスのチェックボックスを取得
     cv::Rect targetCheckbox = checkboxes[index];
-    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
-          @"ターゲットチェックボックス位置: "
-          @"x=%d, y=%d, w=%d, h=%d (index=%d)",
-          targetCheckbox.x, targetCheckbox.y, targetCheckbox.width,
-          targetCheckbox.height, index);
 
     // その他のチェックボックスから3つ分右の座標を計算
     // チェックボックス幅の3倍分右にオフセット
     int textStartX = targetCheckbox.x + (targetCheckbox.width * 3);
     int textY = targetCheckbox.y - 5; // 上に少し
-    int textHeight =
-        targetCheckbox.height + 10; // チェックボックスの高さに少し余裕を加える
-    int textWidth = gray.cols - textStartX - 10; // 右端まで（余裕を持って）
+    int textHeight = targetCheckbox.height + 10;
+    int textWidth = gray.cols - textStartX - 10;
 
     // 範囲チェック
     if (textStartX >= gray.cols || textY < 0 ||
         textY + textHeight >= gray.rows || textWidth <= 0) {
-      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - "
-            @"テキスト領域が画像範囲外です");
       return @"";
     }
 
-    // テキスト領域を切り取り
     cv::Rect textRect(textStartX, textY, textWidth, textHeight);
     cv::Mat textROI = gray(textRect);
 
-    // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
     cv::Mat processedTextROI =
         [OpenCVWrapper prepareImageForOCRProcessingFromMat:textROI];
-    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - テキスト領域: x=%d, "
-          @"y=%d, "
-          @"w=%d, h=%d (OCR前処理適用済み)",
-          textRect.x, textRect.y, textRect.width, textRect.height);
 
-    // ROIをUIImageに変換してVisionで文字認識
     UIImage *textImage = MatToUIImage(processedTextROI);
 
-    // Vision APIを使用して文字認識
     NSString *recognizedText = [self recognizeTextFromImage:textImage];
 
     if (recognizedText) {
-      // 括弧内の文字列のみを抽出する処理
       NSString *extractedText =
           [self extractTextFromParentheses:recognizedText];
-      NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex - 認識されたテキスト: "
-            @"'%@' -> "
-            @"括弧内抽出後: '%@'",
-            recognizedText, extractedText);
       return extractedText;
     }
 
     return @"";
 
   } @catch (NSException *exception) {
-    NSLog(@"OpenCVWrapper: detectOtherFreeTextAtIndex でエラー: %@",
-          exception.reason);
     return @"";
   }
 }
@@ -1621,8 +1358,6 @@ using namespace cv;
                            options:NSRegularExpressionCaseInsensitive
                              error:&error];
   if (error) {
-    NSLog(@"OpenCVWrapper: removeParenthesesFromText - 正規表現エラー: %@",
-          error.localizedDescription);
     return text;
   }
 
@@ -1652,18 +1387,12 @@ using namespace cv;
 
   if (openParenRange.location == NSNotFound) {
     // 括弧が見つからない場合は空文字を返す
-    NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
-          @"開き括弧が見つかりません: '%@'",
-          text);
     return @"";
   }
 
   // 「（」以降の文字列を取得
   NSUInteger startIndex = openParenRange.location + openParenRange.length;
   if (startIndex >= [text length]) {
-    NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
-          @"括弧の後に文字がありません: '%@'",
-          text);
     return @"";
   }
 
@@ -1676,8 +1405,6 @@ using namespace cv;
                            options:NSRegularExpressionCaseInsensitive
                              error:&error];
   if (error) {
-    NSLog(@"OpenCVWrapper: extractTextFromParentheses - 正規表現エラー: %@",
-          error.localizedDescription);
     return afterOpenParen;
   }
 
@@ -1692,22 +1419,16 @@ using namespace cv;
       stringByTrimmingCharactersInSet:[NSCharacterSet
                                           whitespaceAndNewlineCharacterSet]];
 
-  NSLog(@"OpenCVWrapper: extractTextFromParentheses - "
-        @"元テキスト: '%@' -> 抽出結果: '%@'",
-        text, trimmedResult);
-
   return trimmedResult;
 }
 
 // Vision APIを使用した文字認識
 + (NSString *)recognizeTextFromImage:(UIImage *)image {
   if (!image) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImage - 画像がnilです");
     return @"";
   }
 
 #if __has_include("CSAApp-Swift.h")
-  // まず Swift 側の OCRManager を試みる（LLM 校正のパスに到達させるため）
   @try {
     NSDictionary *swiftResult = [OCRManager recognizeText:image
                                                  question:nil
@@ -1717,18 +1438,10 @@ using namespace cv;
     NSNumber *confidence = swiftResult[@"confidence"];
 
     if (text && text.length > 0) {
-      NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager 結果: "
-            @"'%@' (信頼度: %.1f%%)",
-            text, confidence.floatValue);
       return text;
     } else {
-      NSLog(@"OpenCVWrapper: recognizeTextFromImage - Swift OCRManager "
-            @"は空の結果を返しました");
     }
   } @catch (NSException *ex) {
-    NSLog(
-        @"OpenCVWrapper: recognizeTextFromImage - OCRManager 呼び出し例外: %@",
-        ex.reason);
   }
 #endif
 
@@ -1739,8 +1452,6 @@ using namespace cv;
   VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc]
       initWithCompletionHandler:^(VNRequest *request, NSError *error) {
         if (error) {
-          NSLog(@"OpenCVWrapper: recognizeTextFromImage - Visionエラー: %@",
-                error.localizedDescription);
           dispatch_semaphore_signal(semaphore);
           return;
         }
@@ -1756,8 +1467,6 @@ using namespace cv;
         }
 
         recognizedText = [textParts componentsJoinedByString:@" "];
-        NSLog(@"OpenCVWrapper: recognizeTextFromImage - 認識結果: '%@'",
-              recognizedText);
         dispatch_semaphore_signal(semaphore);
       }];
 
@@ -1777,8 +1486,6 @@ using namespace cv;
   BOOL success = [handler performRequests:@[ request ] error:&error];
 
   if (!success || error) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImage - リクエスト実行エラー: %@",
-          error ? error.localizedDescription : @"不明なエラー");
     dispatch_semaphore_signal(semaphore);
   }
 
@@ -1786,7 +1493,6 @@ using namespace cv;
   dispatch_time_t timeout =
       dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
   if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImage - タイムアウトしました");
     return @"";
   }
 
@@ -1796,13 +1502,10 @@ using namespace cv;
 // Vision APIを使用した文字認識（信頼度付き）
 + (NSDictionary *)recognizeTextFromImageWithConfidence:(UIImage *)image {
   if (!image) {
-    NSLog(
-        @"OpenCVWrapper: recognizeTextFromImageWithConfidence - 画像がnilです");
     return @{@"text" : @"", @"confidence" : @(0.0)};
   }
 
 #if __has_include("CSAApp-Swift.h")
-  // まず Swift 側の OCRManager を試みる（LLM 校正のパスに到達させるため）
   @try {
     NSDictionary *swiftResult = [OCRManager recognizeText:image
                                                  question:nil
@@ -1812,20 +1515,10 @@ using namespace cv;
     NSNumber *confidence = swiftResult[@"confidence"];
 
     if (text && text.length > 0) {
-      NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - Swift "
-            @"OCRManager 結果: "
-            @"'%@' (信頼度: %.1f%%)",
-            text, confidence.floatValue);
       return @{@"text" : text, @"confidence" : confidence ?: @(0.0)};
     } else {
-      NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - Swift "
-            @"OCRManager "
-            @"は空の結果を返しました");
     }
   } @catch (NSException *ex) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - OCRManager "
-          @"呼び出し例外: %@",
-          ex.reason);
   }
 #endif
 
@@ -1838,9 +1531,6 @@ using namespace cv;
   VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc]
       initWithCompletionHandler:^(VNRequest *request, NSError *error) {
         if (error) {
-          NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
-                @"Visionエラー: %@",
-                error.localizedDescription);
           dispatch_semaphore_signal(semaphore);
           return;
         }
@@ -1870,9 +1560,6 @@ using namespace cv;
               (total / confidences.count) * 100.0; // パーセンテージに変換
         }
 
-        NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
-              @"認識結果: '%@' (信頼度: %.1f%%)",
-              recognizedText, averageConfidence);
         dispatch_semaphore_signal(semaphore);
       }];
 
@@ -1892,9 +1579,6 @@ using namespace cv;
   BOOL success = [handler performRequests:@[ request ] error:&error];
 
   if (!success || error) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
-          @"リクエスト実行エラー: %@",
-          error ? error.localizedDescription : @"不明なエラー");
     dispatch_semaphore_signal(semaphore);
   }
 
@@ -1902,8 +1586,6 @@ using namespace cv;
   dispatch_time_t timeout =
       dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
   if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
-    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
-          @"タイムアウトしました");
     return @{@"text" : @"", @"confidence" : @(0.0)};
   }
 
@@ -1943,8 +1625,6 @@ using namespace cv;
   cv::Rect textBox = [self detectLargestTextBox:gray];
 
   if (textBox.width <= 0 || textBox.height <= 0) {
-    NSLog(
-        @"OpenCVWrapper: detectTextAnswer - テキストボックスが見つかりません");
     return @"";
   }
 
@@ -1981,9 +1661,6 @@ using namespace cv;
     // 改行とスペースを削除して1行にする（正規化）
     NSString *cleanedText = [self normalizeOCRText:recognizedText
                                       removeSpaces:YES];
-    NSLog(@"OpenCVWrapper: detectTextAnswer - 認識されたテキスト: '%@' -> "
-          @"クリーンアップ後: '%@' (信頼度: %.1f%%)",
-          recognizedText, cleanedText, confidence.floatValue);
     return cleanedText;
   }
 
@@ -2022,8 +1699,6 @@ using namespace cv;
   cv::Rect textBox = [self detectLargestTextBox:gray];
 
   if (textBox.width <= 0 || textBox.height <= 0) {
-    NSLog(
-        @"OpenCVWrapper: detectTextAnswer - テキストボックスが見つかりません");
     return @{@"text" : @"", @"confidence" : @(0.0)};
   }
 
@@ -2060,10 +1735,6 @@ using namespace cv;
     // 改行とスペースを削除して1行にする（正規化）
     NSString *cleanedText = [self normalizeOCRText:recognizedText
                                       removeSpaces:YES];
-    NSLog(@"OpenCVWrapper: detectTextAnswerWithConfidence - "
-          @"認識されたテキスト: '%@' -> "
-          @"クリーンアップ後: '%@' (信頼度: %.1f%%)",
-          recognizedText, cleanedText, confidence.floatValue);
     return @{@"text" : cleanedText, @"confidence" : confidence ?: @(0.0)};
   }
 
@@ -2132,17 +1803,10 @@ using namespace cv;
     }
 
     if (outerBounds.width > 0 && outerBounds.height > 0) {
-      NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
-            @"morphology法で外枠を検出: x=%d, y=%d, w=%d, h=%d (area=%d)",
-            outerBounds.x, outerBounds.y, outerBounds.width, outerBounds.height,
-            maxArea);
       return outerBounds;
     }
 
     // morphology法で見つからなければ、Canny + findContours によるフォールバック
-    NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
-          @"morphology法で外枠検出失敗、Cannyフォールバックを試行");
-
     cv::Mat edges;
     // コントラストが低い場合のために軽く平滑化
     cv::Mat smooth;
@@ -2157,11 +1821,7 @@ using namespace cv;
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(dil, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    NSLog(@"OpenCVWrapper: detectTableOuterBounds - findContours で %zu "
-          @"個の輪郭を検出",
-          contours.size());
-
-    maxArea = 0;
+    int maxArea2 = 0;
     for (size_t i = 0; i < contours.size(); i++) {
       std::vector<cv::Point> approx;
       double peri = cv::arcLength(contours[i], true);
@@ -2172,100 +1832,20 @@ using namespace cv;
 
       bool isLikelyTable =
           (r.width > gray.cols * 0.25 && r.height > gray.rows * 0.25 &&
-           area > maxArea && r.width < gray.cols * 0.99 &&
+           area > maxArea2 && r.width < gray.cols * 0.99 &&
            r.height < gray.rows * 0.99);
 
       if (isLikelyTable) {
-        maxArea = area;
+        maxArea2 = area;
         outerBounds = r;
       }
     }
 
     if (outerBounds.width > 0 && outerBounds.height > 0) {
-      NSLog(@"OpenCVWrapper: detectTableOuterBounds - Canny法で外枠を検出: "
-            @"x=%d, y=%d, w=%d, h=%d (area=%d)",
-            outerBounds.x, outerBounds.y, outerBounds.width, outerBounds.height,
-            maxArea);
       return outerBounds;
     }
 
-    NSLog(@"OpenCVWrapper: detectTableOuterBounds - "
-          @"外枠が見つかりませんでした（両手法とも失敗）");
-
-    // デバッグ用に中間画像を保存（閾値化・morphology結果・エッジ）
-    try {
-      NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-      [fmt setDateFormat:@"yyyyMMdd_HHmmss_SSS"];
-      NSString *t = [fmt stringFromDate:[NSDate date]];
-
-      // imgBinFinal が利用可能なら保存
-      if (imgBinFinal.data && !imgBinFinal.empty()) {
-        @try {
-          UIImage *u = MatToUIImage(imgBinFinal);
-          if (u) {
-            NSString *p = [@"/tmp/CSA_debug_imgBinFinal_"
-                stringByAppendingFormat:@"%@.png", t];
-            NSData *d = UIImagePNGRepresentation(u);
-            if (d)
-              [d writeToFile:p atomically:YES];
-            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved imgBinFinal "
-                  @"to %@",
-                  p);
-          }
-        } @catch (NSException *ex) {
-          NSLog(@"OpenCVWrapper: detectTableOuterBounds - imgBinFinal save "
-                @"exception: %@",
-                ex);
-        }
-      }
-
-      // edges が利用可能なら保存
-      if (edges.data && !edges.empty()) {
-        @try {
-          UIImage *ue = MatToUIImage(edges);
-          if (ue) {
-            NSString *pe =
-                [@"/tmp/CSA_debug_edges_" stringByAppendingFormat:@"%@.png", t];
-            NSData *de = UIImagePNGRepresentation(ue);
-            if (de)
-              [de writeToFile:pe atomically:YES];
-            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved edges to %@",
-                  pe);
-          }
-        } @catch (NSException *ex) {
-          NSLog(@"OpenCVWrapper: detectTableOuterBounds - edges save "
-                @"exception: %@",
-                ex);
-        }
-      }
-
-      // dil（膨張画像）も保存しておく
-      if (dil.data && !dil.empty()) {
-        @try {
-          UIImage *ud = MatToUIImage(dil);
-          if (ud) {
-            NSString *pd =
-                [@"/tmp/CSA_debug_dil_" stringByAppendingFormat:@"%@.png", t];
-            NSData *dd = UIImagePNGRepresentation(ud);
-            if (dd)
-              [dd writeToFile:pd atomically:YES];
-            NSLog(@"OpenCVWrapper: detectTableOuterBounds - saved dil to %@",
-                  pd);
-          }
-        } @catch (NSException *ex) {
-          NSLog(
-              @"OpenCVWrapper: detectTableOuterBounds - dil save exception: %@",
-              ex);
-        }
-      }
-
-    } catch (const cv::Exception &e) {
-      NSLog(@"OpenCVWrapper: detectTableOuterBounds - debug save でエラー: %s",
-            e.what());
-    }
-
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: detectTableOuterBounds でエラー: %s", e.what());
   }
 
   return outerBounds;
@@ -2335,12 +1915,6 @@ using namespace cv;
       bool notImageBorder =
           (x > 5 && y > 5 && x + w < gray.cols - 5 && y + h < gray.rows - 5);
 
-      NSLog(@"OpenCVWrapper: detectLargestTextBox - label=%d "
-            @"rect=(x=%d,y=%d,w=%d,h=%d) area=%d sizeOK=%d rectOK=%d areaOK=%d "
-            @"borderOK=%d",
-            i, x, y, w, h, area, isValidSize ? 1 : 0, isRectangular ? 1 : 0,
-            hasReasonableArea ? 1 : 0, notImageBorder ? 1 : 0);
-
       if (isValidSize && isRectangular && hasReasonableArea && notImageBorder) {
         textBoxCandidates.push_back(cv::Rect(x, y, w, h));
         if (area > maxArea) {
@@ -2350,28 +1924,20 @@ using namespace cv;
       }
     }
 
-    NSLog(@"OpenCVWrapper: detectLargestTextBox - %zu candidates, maxArea=%d",
-          textBoxCandidates.size(), maxArea);
-
     // 画像全体に近い矩形の場合は警告
     if (largestBox.width > 0 && largestBox.height > 0) {
       if (largestBox.width >= gray.cols * 0.95 &&
           largestBox.height >= gray.rows * 0.95) {
-        NSLog(@"OpenCVWrapper: detectLargestTextBox - Warning: largest box "
-              @"close to whole image (w=%d,h=%d, img=%dx%d)",
-              largestBox.width, largestBox.height, gray.cols, gray.rows);
       }
     }
 
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: detectLargestTextBox でエラー: %s", e.what());
   }
 
   return largestBox;
 }
 
 // 改行を除去するヘルパーメソッド
-// 使用StoredType: text, info
 + (NSString *)removeNewlinesFromText:(NSString *)text {
   if (!text || [text length] == 0) {
     return @"";
@@ -2489,21 +2055,12 @@ using namespace cv;
     return @"";
   }
 
-  NSLog(@"OpenCVWrapper: detectInfoAnswer - 入力画像サイズ: %dx%d", gray.cols,
-        gray.rows);
-
   // Step 1: 表の外側枠線を検出
   cv::Rect tableOuterBounds = [self detectTableOuterBounds:gray];
 
   if (tableOuterBounds.width <= 0 || tableOuterBounds.height <= 0) {
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 表の外側枠線が見つかりません");
     return @"";
   }
-
-  NSLog(
-      @"OpenCVWrapper: detectInfoAnswer - 表の外側枠線: x=%d, y=%d, w=%d, h=%d",
-      tableOuterBounds.x, tableOuterBounds.y, tableOuterBounds.width,
-      tableOuterBounds.height);
 
   // Step 2: 表内領域を抽出
   cv::Mat tableROI = gray(tableOuterBounds);
@@ -2512,40 +2069,27 @@ using namespace cv;
   int dividerX = [self detectColumnDivider:tableROI];
 
   if (dividerX <= 0) {
-    NSLog(
-        @"OpenCVWrapper: detectInfoAnswer - 列分割用の垂直線が見つかりません");
     return @"";
   }
-
-  NSLog(@"OpenCVWrapper: detectInfoAnswer - 列分割位置: x=%d", dividerX);
 
   // Step 4: 右列（記述欄）を抽出
   int rightColumnX = dividerX + 5; // 垂直線から少し右にオフセット
   int rightColumnWidth = tableROI.cols - rightColumnX - 5; // 右端から少し内側
 
   if (rightColumnWidth <= 0) {
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 右列の幅が無効です");
     return @"";
   }
 
   cv::Rect rightColumnRect(rightColumnX, 0, rightColumnWidth, tableROI.rows);
   cv::Mat rightColumnROI = tableROI(rightColumnRect);
 
-  NSLog(@"OpenCVWrapper: detectInfoAnswer - 右列領域: x=%d, y=%d, w=%d, h=%d",
-        rightColumnRect.x, rightColumnRect.y, rightColumnRect.width,
-        rightColumnRect.height);
-
   // Step 5: 右列内の水平線を検出して行を分割
   std::vector<int> horizontalLines =
       [self detectHorizontalLinesInColumn:rightColumnROI];
 
   if (horizontalLines.size() < 2) {
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 十分な水平線が見つかりません");
     return @"";
   }
-
-  NSLog(@"OpenCVWrapper: detectInfoAnswer - 検出された水平線数: %zu",
-        horizontalLines.size());
 
   // Step 6: 各行から文字を抽出
   NSMutableArray<NSString *> *rowTexts = [NSMutableArray array];
@@ -2556,9 +2100,6 @@ using namespace cv;
     int rowHeight = bottomY - topY;
 
     if (rowHeight <= 10) { // 高さが小さすぎる場合はスキップ
-      NSLog(
-          @"OpenCVWrapper: detectInfoAnswer - 行%zu: 高さが小さすぎます (h=%d)",
-          i, rowHeight);
       continue;
     }
 
@@ -2568,9 +2109,6 @@ using namespace cv;
     // 統一されたOCR前処理を適用（cv::Matオーバーロードを使用）
     cv::Mat processedRowROI =
         [OpenCVWrapper prepareImageForOCRProcessingFromMat:rowROI];
-    NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: y=%d, h=%d "
-          @"(OCR前処理適用済み)",
-          i, topY, rowHeight);
 
     // 前処理済みの行のROIをUIImageに変換してVisionで文字認識
     UIImage *rowImage = MatToUIImage(processedRowROI);
@@ -2583,26 +2121,19 @@ using namespace cv;
       // 郵便記号 '〒' を削除して正規化
       NSString *noPostal = [self removePostalMarkFromText:cleanedText];
       [rowTexts addObject:noPostal];
-      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu認識テキスト: '%@' -> "
-            @"郵便記号除去後: '%@'",
-            i, cleanedText, noPostal);
     } else {
       [rowTexts addObject:@""];
-      NSLog(@"OpenCVWrapper: detectInfoAnswer - 行%zu: "
-            @"テキストが認識されませんでした",
-            i);
     }
   }
 
   // 結果を結合して返す（各行を改行で区切り）
-  NSString *result = [rowTexts componentsJoinedByString:@"\n"];
-  NSLog(@"OpenCVWrapper: detectInfoAnswer - 最終結果: '%@'", result);
+  NSString *result = [rowTexts componentsJoinedByString:@""];
 
   return result;
 }
 
 // optionTexts を考慮したラッパー
-// optionArray は行ごとの InfoField.rawValue の配列 (例: @[["name"],["zip"],
+// optionArray は行ごとの InfoField.rawValue の配列 (例: @[ ["name"],["zip"],
 // ...]) を想定
 + (NSString *)detectInfoAnswerFromImage:(UIImage *)image
                         withOptionArray:(NSArray<NSString *> *)optionArray {
@@ -2610,8 +2141,6 @@ using namespace cv;
     return @"";
   }
 
-  // 既存のテーブル/行分割 OCR
-  // 実装を呼び出して、行ごとのテキストを改行で受け取る
   NSString *rawResult = [self detectInfoAnswerRawFromImage:image];
   if (!rawResult || [rawResult length] == 0) {
     return @"";
@@ -2627,7 +2156,6 @@ using namespace cv;
         stringByTrimmingCharactersInSet:[NSCharacterSet
                                             whitespaceAndNewlineCharacterSet]];
 
-    // 対応する option が存在し、かつそれが "zip" の場合は郵便記号を除去する
     NSString *opt = nil;
     if (optionArray && i < [optionArray count]) {
       opt = optionArray[i];
@@ -2734,13 +2262,6 @@ using namespace cv;
   int dividerX = -1;
 
   try {
-    // 改善点:
-    // - 投影値は画素強度の総和に相当するため、255で割って白ピクセル数に変換する
-    // - 複数のスケール(minLineHeight) を試して縦線が見つかるか確認する
-    // - 投影閾値は絶対値ではなく割合に基づく柔軟な閾値を使う
-    // - 最後のフォールバックとして Sobel と HoughLinesP を試行する
-
-    // 二値化は共通ラッパを使用して adaptive -> Otsu の流れを統一
     cv::Mat binary = [self adaptiveOrOtsuThreshold:tableROI blockSize:15 C:5];
 
     cv::Mat binaryInv;
@@ -2749,7 +2270,6 @@ using namespace cv;
     int imgCols = tableROI.cols;
     int imgRows = tableROI.rows;
 
-    // 試すスケール(表の高さに対する縦線の最小長さ比)
     std::vector<double> scales = {0.6, 0.4, 0.25, 0.15};
     int bestCount = 0;
     int bestX = -1;
@@ -2762,7 +2282,6 @@ using namespace cv;
       cv::Mat verticalLines;
       cv::morphologyEx(binaryInv, verticalLines, cv::MORPH_OPEN, kernel);
 
-      // 投影（列ごとの白ピクセル数）を得る
       cv::Mat projection = [self projectionSum:verticalLines axis:0];
 
       int startX = imgCols * 0.05;
@@ -2772,7 +2291,6 @@ using namespace cv;
 
       for (int x = startX; x < endX; x++) {
         int sumVal = projection.at<int>(0, x);
-        // 255で割ることで "白ピクセル数" に変換
         int whitePixels = sumVal / 255;
         if (whitePixels > maxCount) {
           maxCount = whitePixels;
@@ -2781,9 +2299,6 @@ using namespace cv;
       }
 
       double ratio = (double)maxCount / (double)imgRows; // 0.0 - 1.0
-      NSLog(@"OpenCVWrapper: detectColumnDivider(scale=%.2f) - maxWhite=%d, "
-            @"ratio=%.3f, x=%d",
-            scale, maxCount, ratio, maxX);
 
       // 柔軟閾値: 列の高さの15%程度の連続白ピクセルがあれば採用
       if (maxCount > bestCount && ratio >= 0.08) {
@@ -2821,9 +2336,6 @@ using namespace cv;
         }
       }
       double ratio = (double)maxCount / (double)imgRows;
-      NSLog(@"OpenCVWrapper: detectColumnDivider(sobel) - maxWhite=%d, "
-            @"ratio=%.3f, x=%d",
-            maxCount, ratio, maxX);
       if (maxX >= 0 && ratio >= 0.06) {
         dividerX = maxX;
       }
@@ -2834,7 +2346,6 @@ using namespace cv;
       cv::Mat edges;
       cv::Canny(tableROI, edges, 50, 150);
       std::vector<cv::Vec4i> linesP;
-      // minLineLength を表の高さの 40% 程度に設定
       int minLineLen = std::max(10, (int)std::round(imgRows * 0.4));
       cv::HoughLinesP(edges, linesP, 1, CV_PI / 180, 50, minLineLen, 10);
 
@@ -2856,26 +2367,10 @@ using namespace cv;
         std::sort(xCandidates.begin(), xCandidates.end());
         int mid = xCandidates[xCandidates.size() / 2];
         dividerX = mid;
-        NSLog(@"OpenCVWrapper: detectColumnDivider(hough) - candidates=%zu, "
-              @"selected=%d",
-              xCandidates.size(), dividerX);
-      } else {
-        NSLog(@"OpenCVWrapper: detectColumnDivider - Hough "
-              @"でも垂直線が見つかりませんでした");
       }
     }
 
-    if (dividerX > 0) {
-      NSLog(@"OpenCVWrapper: detectColumnDivider - 最終検出位置: x=%d",
-            dividerX);
-    } else {
-      NSLog(@"OpenCVWrapper: detectColumnDivider - 検出に失敗しました "
-            @"(dividerX=%d)",
-            dividerX);
-    }
-
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: detectColumnDivider でエラー: %s", e.what());
   }
 
   return dividerX;
@@ -2915,19 +2410,9 @@ using namespace cv;
     // 近接する線をマージ（mergeCloseLines ヘルパを使用、10ピクセル）
     std::vector<int> mergedLines = [self mergeCloseLines:lines gap:10];
 
-    NSLog(@"OpenCVWrapper: detectHorizontalLinesInColumn - 検出された水平線数: "
-          @"%zu -> %zu (マージ後)",
-          lines.size(), mergedLines.size());
-
-    for (size_t i = 0; i < mergedLines.size(); i++) {
-      NSLog(@"  水平線%zu: y=%d", i, mergedLines[i]);
-    }
-
     return mergedLines;
 
   } catch (const cv::Exception &e) {
-    NSLog(@"OpenCVWrapper: detectHorizontalLinesInColumn でエラー: %s",
-          e.what());
   }
 
   return lines;

@@ -142,12 +142,6 @@ final class CameraViewModel: NSObject, ObservableObject {
       }
     }
 
-    // デバッグ: Swift側でのoptionTextsの内容を確認
-    print("Swift側 optionTexts:")
-    for (index, texts) in optionTexts.enumerated() {
-      print("  index[\(index)]: \(texts)")
-    }
-
     // OpenCVWrapper の新 API を呼び出す
     let raw = OpenCVWrapper.parseCroppedImages(
       self.capturedImage ?? UIImage(),
@@ -159,13 +153,10 @@ final class CameraViewModel: NSObject, ObservableObject {
     // 信頼度スコアも取得して保存（OpenCV からのフラットな配列をまず格納）
     if let scores = raw?["confidenceScores"] as? [NSNumber] {
       self.confidenceScores = scores.map { $0.floatValue }
-      NSLog("CameraViewModel: 信頼度スコアを取得: %@", scores)
     } else if let scores = raw?["confidenceScores"] as? [Float] {
       self.confidenceScores = scores
-      NSLog("CameraViewModel: 信頼度スコアを取得 (Float array): %@", scores)
     } else {
       self.confidenceScores = []
-      NSLog("CameraViewModel: 信頼度スコアが見つかりません")
     }
 
     // OpenCV の parsedAnswers を利用して、info 設問については
@@ -286,9 +277,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 extension CameraViewModel: DocumentScannerDelegate {
   func didCapture(image: UIImage) {
     // 共通処理
-    self.processCapturedImage(image) {
-      NSLog("CameraViewModel.didCapture: parsedAnswers=%@", self.parsedAnswers)
-    }
+    self.processCapturedImage(image)
   }
 
   func didRecognize(feature: RectangleFeature?, in image: CIImage) {
