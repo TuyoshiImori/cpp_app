@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 import Vision
@@ -8,6 +9,7 @@ public struct CameraView: View {
   @StateObject private var viewModel: CameraViewModel
   @Binding public var image: UIImage?
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
 
   @State private var capturedImages: [UIImage] = []
   @State private var croppedImageSets: [[UIImage]] = []  // 各キャプチャごとの切り取り画像セット
@@ -88,28 +90,34 @@ public struct CameraView: View {
         Spacer()
       }
 
-      // 左下サムネイル（最後の画像のみ、セーフエリア考慮）
+      // 左下に代表サムネイルを1つだけ表示する（最新のスキャン）
       VStack {
         Spacer()
         HStack {
-          if let lastImageSet = croppedImageSets.last, let firstImage = lastImageSet.first {
+          if let latestThumb = croppedImageSets.last?.first {
             Button(action: {
-              previewIndex = croppedImageSets.count - 1
+              // 最新セットをプレビューする
+              previewIndex = max(0, croppedImageSets.count - 1)
               isPreviewPresented = true
             }) {
-              Image(uiImage: firstImage)
+              Image(uiImage: latestThumb)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 56, height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                  RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.white, lineWidth: 2)
-                )
-                .padding(.leading, 8 + safeAreaInsets.left)
-                .padding(.bottom, 16 + safeAreaInsets.bottom)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white, lineWidth: 2))
             }
+            .padding(.leading, 8 + safeAreaInsets.left)
+            .padding(.bottom, 16 + safeAreaInsets.bottom)
+          } else {
+            // サムネイルが無い場合は空スペースで場所を確保
+            Rectangle()
+              .fill(Color.clear)
+              .frame(width: 56, height: 56)
+              .padding(.leading, 8 + safeAreaInsets.left)
+              .padding(.bottom, 16 + safeAreaInsets.bottom)
           }
+
           Spacer()
         }
       }
@@ -195,6 +203,8 @@ public struct CameraView: View {
               viewModel.processCapturedImage(sample) {
                 // 処理完了でボタンを再度有効化
                 isProcessingSample = false
+                // UI 配列や永続化は `.onReceive(viewModel.$capturedImage)` 側で行うため
+                // ここでは処理中フラグの解除のみを行う（重複保存防止）
               }
             }
           }) {
@@ -233,6 +243,9 @@ public struct CameraView: View {
     }
     // アニメーションの起動/停止を観測して、Paused 状態のときだけパルスさせる
     .onAppear {
+      // 保存されたスキャンデータを復元
+      loadExistingData()
+
       if viewModel.scanState == .paused {
         // repeatForever のアニメーションでパルスを開始
         withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
@@ -253,11 +266,13 @@ public struct CameraView: View {
       }
     }
     .fullScreenCover(isPresented: $isPreviewPresented) {
+      // PreviewFullScreenView は複数の解析セットを受け取るため、
+      // recognizedTexts は既に [[String]] なのでそのまま渡す。
       PreviewFullScreenView(
         isPreviewPresented: $isPreviewPresented,
         previewIndex: $previewIndex,
         croppedImageSets: croppedImageSets,
-        parsedAnswers: viewModel.parsedAnswers,
+        parsedAnswersSets: recognizedTexts,
         viewModel: viewModel,
         confidenceScores: confidenceScoreSets
       )
@@ -266,16 +281,40 @@ public struct CameraView: View {
       // ViewModel が既に画像処理と切り取りを実行しているため、
       // ここでは ViewModel が保持する結果を利用して UI を更新する
       let croppedImages = viewModel.lastCroppedImages
-      let texts = viewModel.recognizedTexts
-
+      // 生のrecognizedTextsの代わりに、parsedAnswers（質問ごとに解析された結果）を使用してください。
+      // recognizeTextsにはページ全体のOCR結果が含まれる場合があり、正しく表示されないことがあります。
+      let texts = viewModel.parsedAnswers
       if croppedImages.isEmpty {
         isCircleDetectionFailed = true
-      } else {
-        capturedImages.append(img)
-        croppedImageSets.append(croppedImages)
-        recognizedTexts.append(texts)
-        confidenceScoreSets.append(viewModel.confidenceScores)  // 信頼度スコアも保存
-        image = img
+        return
+      }
+
+      // 新規スキャンは常に UI に追加して永続化する
+      // （過去の二重追加はサンプル完了側の保存を削除して対処済み）
+      print(
+        "CameraView: appending parsedAnswers count=\(texts.count), croppedImages=\(croppedImages.count)"
+      )
+      capturedImages.append(img)
+      croppedImageSets.append(croppedImages)
+      recognizedTexts.append(texts)
+      confidenceScoreSets.append(viewModel.confidenceScores)  // 信頼度スコアも保存
+      image = img
+
+      // スキャン結果をItemに保存（Itemが存在する場合）
+      if let item = item {
+        viewModel.saveResultsToItem(
+          item,
+          croppedImages: croppedImages,
+          parsedAnswers: viewModel.parsedAnswers,
+          confidenceScores: viewModel.confidenceScores
+        )
+
+        // SwiftDataで変更を永続化
+        do {
+          try modelContext.save()
+        } catch {
+          print("データ保存エラー: \(error)")
+        }
       }
     }
   }
@@ -287,6 +326,70 @@ public struct CameraView: View {
       return 0
     }
     return window.safeAreaInsets.top
+  }
+
+  /// 保存されたスキャンデータを復元してUIに表示する
+  private func loadExistingData() {
+    guard let item = item else { return }
+    // 既存のUI配列をクリアしてから復元する（重複追加防止）
+    croppedImageSets = []
+    recognizedTexts = []
+    confidenceScoreSets = []
+
+    // 保存されたすべてのScanResultを復元してUI配列に追加する
+    var allCroppedSets: [[UIImage]] = []
+    var allRecognized: [[String]] = []
+    var allConfidences: [[Float]] = []
+
+    // まず新しいScanResult配列から復元
+    for scan in item.scanResults {
+      let imgs = scan.getAllQuestionImages().compactMap { $0 }
+      if !imgs.isEmpty {
+        allCroppedSets.append(imgs)
+        allRecognized.append(scan.answerTexts)
+        // 2D信頼度が存在する場合は設問ごとの平均値を計算して使用
+        if !scan.confidenceScores2D.isEmpty {
+          let flattenedConfidences = scan.confidenceScores2D.map { rows -> Float in
+            if rows.isEmpty { return 0.0 }
+            let sum = rows.reduce(0.0, +)
+            return sum / Float(rows.count)
+          }
+          allConfidences.append(flattenedConfidences)
+        } else {
+          allConfidences.append(scan.confidenceScores)
+        }
+      }
+    }
+
+    // 新しい構造が空の場合は古いプロパティから復元しておく（後方互換）
+    if allCroppedSets.isEmpty {
+      let savedImages = item.getAllQuestionImages().compactMap { $0 }
+      if !savedImages.isEmpty && !item.answerTexts.isEmpty {
+        allCroppedSets = [savedImages]
+        allRecognized = [item.answerTexts]
+        allConfidences = [item.confidenceScores]
+      }
+    }
+
+    // UI配列に反映（空でなければ上書き）
+    if !allCroppedSets.isEmpty {
+      croppedImageSets = allCroppedSets
+      recognizedTexts = allRecognized
+      confidenceScoreSets = allConfidences
+
+      // ViewModelの2D信頼度も最新のScanResultから復元（PreviewFullScreenViewでの表示用）
+      if let latestScan = item.scanResults.max(by: { $0.timestamp < $1.timestamp }),
+        !latestScan.confidenceScores2D.isEmpty
+      {
+        viewModel.confidenceScores2D = latestScan.confidenceScores2D
+      }
+
+      // 代表画像を先頭の最初の画像にする
+      if let firstImg = allCroppedSets.first?.first {
+        capturedImages = [firstImg]
+        image = firstImg
+      }
+    }
   }
 }
 

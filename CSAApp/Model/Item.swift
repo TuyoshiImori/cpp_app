@@ -1,6 +1,56 @@
 import Foundation
 import SwiftData
 
+#if canImport(UIKit)
+  import UIKit
+#endif
+
+@Model
+public final class ScanResult {
+  public var scanID: String  // 固有のスキャンID
+  public var timestamp: Date  // スキャン実行時刻
+  public var confidenceScores: [Float]  // 各設問の信頼度スコア
+  public var confidenceScores2D: [[Float]]  // info設問など行ごとの信頼度スコア
+  public var answerTexts: [String]  // 各設問の回答文
+  public var questionImageData: [Data?]  // 各設問の切り取り画像データ
+
+  public init(
+    scanID: String = UUID().uuidString,
+    timestamp: Date = Date(),
+    confidenceScores: [Float] = [],
+    confidenceScores2D: [[Float]] = [],
+    answerTexts: [String] = [],
+    questionImageData: [Data?] = []
+  ) {
+    self.scanID = scanID
+    self.timestamp = timestamp
+    self.confidenceScores = confidenceScores
+    self.confidenceScores2D = confidenceScores2D
+    self.answerTexts = answerTexts
+    self.questionImageData = questionImageData
+  }
+
+  #if canImport(UIKit)
+    /// 保存された画像データからUIImageを復元するメソッド
+    /// - Parameter index: 復元したい設問画像のインデックス
+    /// - Returns: 復元されたUIImage、またはnil
+    public func getQuestionImage(at index: Int) -> UIImage? {
+      guard index >= 0, index < questionImageData.count else { return nil }
+      guard let data = questionImageData[index] else { return nil }
+      return UIImage(data: data)
+    }
+
+    /// すべての設問画像を復元するメソッド
+    /// - Returns: 復元されたUIImageの配列（復元できなかった画像はnilとして配列に含まれる）
+    public func getAllQuestionImages() -> [UIImage?] {
+      return questionImageData.map { data in
+        guard let data = data else { return nil }
+        return UIImage(data: data)
+      }
+    }
+  #endif
+}
+
 public enum QuestionType: Codable, Hashable {
   case single(String, [String])
   case multiple(String, [String])
@@ -144,9 +194,19 @@ public final class Item {
   // 各設問の選択肢テキストを格納するストアドプロパティ
   public var optionTexts: [[String]]
 
+  // 複数のスキャン結果を保持するための配列
+  public var scanResults: [ScanResult]
+
+  // 後方互換性のための一時的なプロパティ（将来的には削除予定）
+  public var confidenceScores: [Float]
+  public var answerTexts: [String]
+  public var questionImageData: [Data?]
+
   public init(
     timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
-    title: String = "", isNew: Bool = false, optionTexts: [[String]] = []
+    title: String = "", isNew: Bool = false, optionTexts: [[String]] = [],
+    scanResults: [ScanResult] = [],
+    confidenceScores: [Float] = [], answerTexts: [String] = [], questionImageData: [Data?] = []
   ) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
@@ -154,5 +214,61 @@ public final class Item {
     self.title = title
     self.isNew = isNew
     self.optionTexts = optionTexts
+    self.scanResults = scanResults
+    self.confidenceScores = confidenceScores
+    self.answerTexts = answerTexts
+    self.questionImageData = questionImageData
+  }
+
+  #if canImport(UIKit)
+    /// 最新のスキャン結果から画像を復元するメソッド
+    /// - Parameter index: 復元したい設問画像のインデックス
+    /// - Returns: 復元されたUIImage、またはnil
+    public func getQuestionImage(at index: Int) -> UIImage? {
+      // 最新のスキャン結果を取得
+      guard let latestScanResult = getLatestScanResult() else {
+        // 後方互換性: 古いデータ構造から復元を試行
+        guard index >= 0, index < questionImageData.count else { return nil }
+        guard let data = questionImageData[index] else { return nil }
+        return UIImage(data: data)
+      }
+      return latestScanResult.getQuestionImage(at: index)
+    }
+
+    /// 最新のスキャン結果からすべての設問画像を復元するメソッド
+    /// - Returns: 復元されたUIImageの配列（復元できなかった画像はnilとして配列に含まれる）
+    public func getAllQuestionImages() -> [UIImage?] {
+      // 最新のスキャン結果を取得
+      guard let latestScanResult = getLatestScanResult() else {
+        // 後方互換性: 古いデータ構造から復元を試行
+        return questionImageData.map { data in
+          guard let data = data else { return nil }
+          return UIImage(data: data)
+        }
+      }
+      return latestScanResult.getAllQuestionImages()
+    }
+
+    /// 特定のスキャン結果から画像を復元するメソッド
+    /// - Parameters:
+    ///   - scanID: 取得したいスキャン結果のID
+    ///   - index: 復元したい設問画像のインデックス
+    /// - Returns: 復元されたUIImage、またはnil
+    public func getQuestionImage(scanID: String, at index: Int) -> UIImage? {
+      guard let scanResult = scanResults.first(where: { $0.scanID == scanID }) else { return nil }
+      return scanResult.getQuestionImage(at: index)
+    }
+  #endif
+
+  /// 最新のスキャン結果を取得するメソッド
+  /// - Returns: 最新のScanResult、またはnil
+  public func getLatestScanResult() -> ScanResult? {
+    return scanResults.max(by: { $0.timestamp < $1.timestamp })
+  }
+
+  /// 新しいスキャン結果を追加するメソッド
+  /// - Parameter scanResult: 追加するScanResult
+  public func addScanResult(_ scanResult: ScanResult) {
+    scanResults.append(scanResult)
   }
 }

@@ -1,11 +1,8 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 import Vision
-
-#if canImport(UIKit)
-  import UIKit
-#endif
 
 /// プレビュー全画面表示用のコンポーネント
 /// CameraViewから切り出して、信頼度表示機能も追加
@@ -15,7 +12,7 @@ struct PreviewFullScreenView: View {
   @Binding var previewIndex: Int
 
   let croppedImageSets: [[UIImage]]
-  let parsedAnswers: [String]
+  let parsedAnswersSets: [[String]]
   // ViewModel を注入してフォーマット関数を利用できるようにする
   var viewModel: CameraViewModel? = nil
 
@@ -27,7 +24,7 @@ struct PreviewFullScreenView: View {
     isPreviewPresented: Binding<Bool>,
     previewIndex: Binding<Int>,
     croppedImageSets: [[UIImage]],
-    parsedAnswers: [String],
+    parsedAnswersSets: [[String]],
     // item パラメータは廃止。必要なら viewModel.initialQuestionTypes を渡す
     viewModel: CameraViewModel? = nil,
     confidenceScores: [[Float]]? = nil
@@ -35,7 +32,7 @@ struct PreviewFullScreenView: View {
     self._isPreviewPresented = isPreviewPresented
     self._previewIndex = previewIndex
     self.croppedImageSets = croppedImageSets
-    self.parsedAnswers = parsedAnswers
+    self.parsedAnswersSets = parsedAnswersSets
     self.viewModel = viewModel
     self.confidenceScores = confidenceScores
   }
@@ -46,12 +43,15 @@ struct PreviewFullScreenView: View {
       Color.black.ignoresSafeArea()
 
       if !croppedImageSets.isEmpty {
+        // 単一プレビューの TabView を表示（上部のサムネイル一覧は表示しない）
         TabView(selection: $previewIndex) {
-          ForEach(Array(croppedImageSets.enumerated()), id: \.offset) { setIdx, imageSet in
+          ForEach(0..<croppedImageSets.count, id: \.self) { setIdx in
+            let imageSet = croppedImageSets[setIdx]
             GeometryReader { geo in
               ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 10) {
-                  ForEach(Array(imageSet.enumerated()), id: \.offset) { imgIdx, img in
+                  ForEach(0..<imageSet.count, id: \.self) { imgIdx in
+                    let img = imageSet[imgIdx]
                     VStack {
                       Text("設問 \(imgIdx + 1)")
                         .foregroundColor(.white)
@@ -65,8 +65,9 @@ struct PreviewFullScreenView: View {
                         .padding(.horizontal, 10)
 
                       // 検出結果と信頼度を表示
-                      if imgIdx < parsedAnswers.count {
-                        let answerIndex = parsedAnswers[imgIdx]
+                      if setIdx < parsedAnswersSets.count, imgIdx < parsedAnswersSets[setIdx].count
+                      {
+                        let answerIndex = parsedAnswersSets[setIdx][imgIdx]
 
                         VStack(alignment: .leading, spacing: 4) {
                           Text("検出結果:")
@@ -212,7 +213,7 @@ struct PreviewFullScreenView_Previews: PreviewProvider {
       isPreviewPresented: $isPresented,
       previewIndex: $previewIndex,
       croppedImageSets: [],
-      parsedAnswers: []
+      parsedAnswersSets: []
     )
   }
 }

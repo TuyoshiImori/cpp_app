@@ -43,6 +43,40 @@ final class CameraViewModel: NSObject, ObservableObject {
     self.initialQuestionTypes = questionTypes
   }
 
+  /// スキャン結果をItemに保存するメソッド（新しいScanResult構造を使用）
+  /// - Parameters:
+  ///   - item: 保存対象のItem
+  ///   - croppedImages: 切り取られた設問画像の配列
+  ///   - parsedAnswers: 解析された回答文字列の配列
+  ///   - confidenceScores: 信頼度スコアの配列
+  func saveResultsToItem(
+    _ item: Item, croppedImages: [UIImage], parsedAnswers: [String], confidenceScores: [Float]
+  ) {
+    // 切り取り画像をData形式に変換
+    let imageDataArray = croppedImages.map { image in
+      // JPEG形式で圧縮（品質0.8でバランスを取る）
+      return image.jpegData(compressionQuality: 0.8)
+    }
+
+    // 新しいScanResultを作成（2D信頼度も保存）
+    let scanResult = ScanResult(
+      scanID: UUID().uuidString,
+      timestamp: Date(),
+      confidenceScores: confidenceScores,
+      confidenceScores2D: self.confidenceScores2D,
+      answerTexts: parsedAnswers,
+      questionImageData: imageDataArray
+    )
+
+    // ItemにScanResultを追加
+    item.addScanResult(scanResult)
+
+    // 後方互換性のため、最新の結果を古いプロパティにも保存
+    item.answerTexts = parsedAnswers
+    item.confidenceScores = confidenceScores
+    item.questionImageData = imageDataArray
+  }
+
   func toggleTorch() {
     scanner.toggleTorch()
     isTorchOn = scanner.lastTorchLevel > 0
@@ -102,7 +136,8 @@ final class CameraViewModel: NSObject, ObservableObject {
         self.pauseAutoCapture()
 
         // 切り出し画像を解析して parsedAnswers と confidenceScores を更新
-        let parsed = self.parseCroppedImagesWithStoredTypes(cropped)
+        // OpenCV 呼び出しには今回解析対象のフル画像を渡す。
+        let parsed = self.parseCroppedImagesWithStoredTypes(cropped, fullImage: gray)
         self.parsedAnswers = parsed
 
         // 解析結果が揃った後でグレースケール画像を publish して、View 側で UI 更新をトリガーする
@@ -119,7 +154,8 @@ final class CameraViewModel: NSObject, ObservableObject {
 
   /// initialQuestionTypes を元に types (String) と optionTexts ([[String]]) を構築し、
   /// 切り取った画像配列と共に OpenCV の解析 API を呼び出すサンプルメソッド
-  func parseCroppedImagesWithStoredTypes(_ croppedImages: [UIImage]) -> [String] {
+  func parseCroppedImagesWithStoredTypes(_ croppedImages: [UIImage], fullImage: UIImage) -> [String]
+  {
     // StoredType 文字列配列
     let types: [String] = initialQuestionTypes.map { qt in
       switch qt {
@@ -144,7 +180,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     // OpenCVWrapper の新 API を呼び出す
     let raw = OpenCVWrapper.parseCroppedImages(
-      self.capturedImage ?? UIImage(),
+      fullImage,
       withCroppedImages: croppedImages,
       withStoredTypes: types,
       withOptionTexts: optionTexts)
