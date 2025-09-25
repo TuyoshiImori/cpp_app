@@ -1,7 +1,9 @@
 import Foundation
 import SwiftUI
+import UIKit
 import Vision
 
+// iOS 向けの CameraView 実装（UIKit を利用）
 public struct CameraView: View {
   @StateObject private var viewModel: CameraViewModel
   @Binding public var image: UIImage?
@@ -256,7 +258,7 @@ public struct CameraView: View {
         previewIndex: $previewIndex,
         croppedImageSets: croppedImageSets,
         parsedAnswers: viewModel.parsedAnswers,
-        item: item,
+        viewModel: viewModel,
         confidenceScores: confidenceScoreSets
       )
     }

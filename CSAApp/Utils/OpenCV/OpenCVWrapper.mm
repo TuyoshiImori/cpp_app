@@ -751,6 +751,15 @@ using namespace cv;
     [confidenceScores addObject:@(0.0)]; // 信頼度のプレースホルダー
   }
 
+  // info設問向けに行ごとの confidences を格納するコンテナを事前に
+  // 準備しておく。dispatch_apply 内でインデックス単位で安全に設定する。
+  NSMutableArray<NSArray<NSNumber *> *> *rowConfidences =
+      [NSMutableArray arrayWithCapacity:n];
+  for (size_t i = 0; i < n; i++) {
+    // デフォルトは空配列（info 以外は空のまま）
+    [rowConfidences addObject:@[]];
+  }
+
   NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理開始 - %zu個の設問を処理",
         n);
 
@@ -815,10 +824,33 @@ using namespace cv;
           // info設問専用の処理を実行
           UIImage *croppedImage = croppedImages[i];
           // optionArray に InfoField の rawValue (ex: "zip") が入っている想定
-          result = [self detectInfoAnswerFromImage:croppedImage
-                                   withOptionArray:optionArray];
-          // info検出は現在信頼度なし（将来拡張可能）
-          confidence = 75.0; // デフォルト値
+          // 行ごとの信頼度を返す新しいAPIを呼び出す
+          NSDictionary *infoResult =
+              [self detectInfoAnswerWithConfidencesFromImage:croppedImage
+                                             withOptionArray:optionArray];
+          if (infoResult && [infoResult isKindOfClass:[NSDictionary class]]) {
+            NSString *text = infoResult[@"text"] ?: @"";
+            NSArray<NSNumber *> *rowConfs = infoResult[@"confidences"] ?: @[];
+            result = text;
+            // 平均をフラットな confidenceScores
+            // に格納する（既存インターフェース互換）
+            if (rowConfs.count > 0) {
+              float total = 0.0;
+              for (NSNumber *c in rowConfs)
+                total += [c floatValue];
+              confidence = (total / rowConfs.count);
+            } else {
+              confidence = 0.0;
+            }
+            // スレッドセーフに rowConfidences コンテナの該当スロットを設定
+            @synchronized(rowConfidences) {
+              // rowConfs は NSArray<NSNumber *> を期待しているためそのまま格納
+              rowConfidences[i] = rowConfs;
+            }
+          } else {
+            result = @"";
+            confidence = 0.0;
+          }
         } else {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as UNKNOWN", i);
           result = @"0";
@@ -838,10 +870,12 @@ using namespace cv;
 
   NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理完了");
 
+  // ここで dispatch_apply 内で埋められた rowConfidences をそのまま返す
   return @{
     @"processedImage" : image ?: [NSNull null],
     @"parsedAnswers" : parsedAnswers,
-    @"confidenceScores" : confidenceScores
+    @"confidenceScores" : confidenceScores,
+    @"rowConfidences" : rowConfidences
   };
 }
 
@@ -2444,6 +2478,88 @@ using namespace cv;
 
   NSString *final = [outLines componentsJoinedByString:@"\n"];
   return final;
+}
+
+// 新API: info設問用に行ごとのテキストと信頼度を返す
++ (NSDictionary *)detectInfoAnswerWithConfidencesFromImage:(UIImage *)image
+                                           withOptionArray:
+                                               (NSArray<NSString *> *)
+                                                   optionArray {
+  if (!image) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  NSString *errorCode = nil;
+  cv::Mat gray =
+      [self prepareImageForProcessing:image
+                            errorCode:&errorCode
+                           methodName:@"detectInfoAnswerWithConfidences"
+                          originalMat:NULL];
+  if (errorCode) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  cv::Rect tableOuterBounds = [self detectTableOuterBounds:gray];
+  if (tableOuterBounds.width <= 0 || tableOuterBounds.height <= 0) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  cv::Mat tableROI = gray(tableOuterBounds);
+  int dividerX = [self detectColumnDivider:tableROI];
+  if (dividerX <= 0) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  int rightColumnX = dividerX + 5;
+  int rightColumnWidth = tableROI.cols - rightColumnX - 5;
+  if (rightColumnWidth <= 0) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  cv::Rect rightColumnRect(rightColumnX, 0, rightColumnWidth, tableROI.rows);
+  cv::Mat rightColumnROI = tableROI(rightColumnRect);
+
+  std::vector<int> horizontalLines =
+      [self detectHorizontalLinesInColumn:rightColumnROI];
+  if (horizontalLines.size() < 2) {
+    return @{@"text" : @"", @"confidences" : @[]};
+  }
+
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  NSMutableArray<NSNumber *> *confs = [NSMutableArray array];
+
+  for (size_t i = 0; i < horizontalLines.size() - 1; i++) {
+    int topY = horizontalLines[i] + 2;
+    int bottomY = horizontalLines[i + 1] - 2;
+    int rowHeight = bottomY - topY;
+    if (rowHeight <= 10) {
+      [texts addObject:@""];
+      [confs addObject:@(0.0)];
+      continue;
+    }
+
+    cv::Rect rowRect(0, topY, rightColumnROI.cols, rowHeight);
+    cv::Mat rowROI = rightColumnROI(rowRect);
+    cv::Mat processedRowROI =
+        [OpenCVWrapper prepareImageForOCRProcessingFromMat:rowROI];
+    UIImage *rowImage = MatToUIImage(processedRowROI);
+
+    NSDictionary *ocr = [self recognizeTextFromImageWithConfidence:rowImage];
+    NSString *text = ocr[@"text"] ?: @"";
+    NSNumber *conf = ocr[@"confidence"] ?: @(0.0);
+
+    NSString *cleaned = [self normalizeOCRText:text removeSpaces:YES];
+    if (optionArray && i < [optionArray count] &&
+        [optionArray[i] isEqualToString:@"zip"]) {
+      cleaned = [self removePostalMarkFromText:cleaned];
+    }
+
+    [texts addObject:cleaned];
+    [confs addObject:conf];
+  }
+
+  NSString *joined = [texts componentsJoinedByString:@"\n"];
+  return @{@"text" : joined, @"confidences" : confs};
 }
 
 // 列分割用の垂直線を検出するヘルパーメソッド
