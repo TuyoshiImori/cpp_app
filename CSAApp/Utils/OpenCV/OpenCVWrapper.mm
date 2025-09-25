@@ -744,8 +744,11 @@ using namespace cv;
   // 並列処理用に結果配列を事前に確保（スレッドセーフ）
   NSMutableArray<NSString *> *parsedAnswers =
       [NSMutableArray arrayWithCapacity:n];
+  NSMutableArray<NSNumber *> *confidenceScores =
+      [NSMutableArray arrayWithCapacity:n];
   for (size_t i = 0; i < n; i++) {
-    [parsedAnswers addObject:@""]; // プレースホルダーで初期化
+    [parsedAnswers addObject:@""];       // プレースホルダーで初期化
+    [confidenceScores addObject:@(0.0)]; // 信頼度のプレースホルダー
   }
 
   NSLog(@"OpenCVWrapper.parseCroppedImages: 並列処理開始 - %zu個の設問を処理",
@@ -772,6 +775,7 @@ using namespace cv;
         }
 
         NSString *result = @"0"; // デフォルト値
+        float confidence = 0.0;  // デフォルト信頼度
 
         // StoredType ごとの分岐：実際のOpenCV処理を実装
         if ([storedType isEqualToString:@"single"]) {
@@ -783,6 +787,8 @@ using namespace cv;
           UIImage *croppedImage = croppedImages[i];
           result = [self detectSingleAnswerFromImage:croppedImage
                                          withOptions:optionArray];
+          // チェックボックス検出は現在信頼度なし（将来拡張可能）
+          confidence = 85.0; // デフォルト値
         } else if ([storedType isEqualToString:@"multiple"]) {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as MULTIPLE with "
                 @"%ld options",
@@ -792,12 +798,17 @@ using namespace cv;
           UIImage *croppedImage = croppedImages[i];
           result = [self detectMultipleAnswerFromImage:croppedImage
                                            withOptions:optionArray];
+          // チェックボックス検出は現在信頼度なし（将来拡張可能）
+          confidence = 85.0; // デフォルト値
         } else if ([storedType isEqualToString:@"text"]) {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as TEXT", i);
 
-          // テキスト検出処理を実行
+          // テキスト検出処理を実行（信頼度付き）
           UIImage *croppedImage = croppedImages[i];
-          result = [self detectTextAnswerFromImage:croppedImage];
+          NSDictionary *textResult =
+              [self detectTextAnswerFromImageWithConfidence:croppedImage];
+          result = textResult[@"text"] ?: @"";
+          confidence = [textResult[@"confidence"] floatValue];
         } else if ([storedType isEqualToString:@"info"]) {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as INFO", i);
 
@@ -806,14 +817,20 @@ using namespace cv;
           // optionArray に InfoField の rawValue (ex: "zip") が入っている想定
           result = [self detectInfoAnswerFromImage:croppedImage
                                    withOptionArray:optionArray];
+          // info検出は現在信頼度なし（将来拡張可能）
+          confidence = 75.0; // デフォルト値
         } else {
           NSLog(@"OpenCVWrapper: [並列] index=%zu -> handling as UNKNOWN", i);
           result = @"0";
+          confidence = 0.0;
         }
 
         // 結果を正しいインデックスに格納（スレッドセーフ）
         @synchronized(parsedAnswers) {
           parsedAnswers[i] = result;
+        }
+        @synchronized(confidenceScores) {
+          confidenceScores[i] = @(confidence);
         }
 
         NSLog(@"OpenCVWrapper: [並列] index=%zu 完了 -> result=%@", i, result);
@@ -823,7 +840,8 @@ using namespace cv;
 
   return @{
     @"processedImage" : image ?: [NSNull null],
-    @"parsedAnswers" : parsedAnswers
+    @"parsedAnswers" : parsedAnswers,
+    @"confidenceScores" : confidenceScores
   };
 }
 
@@ -1575,6 +1593,123 @@ using namespace cv;
   return recognizedText;
 }
 
+// Vision APIを使用した文字認識（信頼度付き）
++ (NSDictionary *)recognizeTextFromImageWithConfidence:(UIImage *)image {
+  if (!image) {
+    NSLog(
+        @"OpenCVWrapper: recognizeTextFromImageWithConfidence - 画像がnilです");
+    return @{@"text" : @"", @"confidence" : @(0.0)};
+  }
+
+#if __has_include("CSAApp-Swift.h")
+  // まず Swift 側の OCRManager を試みる（LLM 校正のパスに到達させるため）
+  @try {
+    NSDictionary *swiftResult = [OCRManager recognizeText:image
+                                                 question:nil
+                                               storedType:nil
+                                               infoFields:nil];
+    NSString *text = swiftResult[@"text"];
+    NSNumber *confidence = swiftResult[@"confidence"];
+
+    if (text && text.length > 0) {
+      NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - Swift "
+            @"OCRManager 結果: "
+            @"'%@' (信頼度: %.1f%%)",
+            text, confidence.floatValue);
+      return @{@"text" : text, @"confidence" : confidence ?: @(0.0)};
+    } else {
+      NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - Swift "
+            @"OCRManager "
+            @"は空の結果を返しました");
+    }
+  } @catch (NSException *ex) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - OCRManager "
+          @"呼び出し例外: %@",
+          ex.reason);
+  }
+#endif
+
+  // フォールバック: 従来のVision API（信頼度は平均値を計算）
+  __block NSString *recognizedText = @"";
+  __block float averageConfidence = 0.0;
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+  // Vision API用のリクエストを作成
+  VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc]
+      initWithCompletionHandler:^(VNRequest *request, NSError *error) {
+        if (error) {
+          NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
+                @"Visionエラー: %@",
+                error.localizedDescription);
+          dispatch_semaphore_signal(semaphore);
+          return;
+        }
+
+        // 認識結果を処理
+        NSMutableArray *textParts = [NSMutableArray array];
+        NSMutableArray *confidences = [NSMutableArray array];
+
+        for (VNRecognizedTextObservation *observation in request.results) {
+          VNRecognizedText *candidate =
+              [observation topCandidates:1].firstObject;
+          if (candidate && candidate.string.length > 0) {
+            [textParts addObject:candidate.string];
+            [confidences addObject:@(candidate.confidence)];
+          }
+        }
+
+        recognizedText = [textParts componentsJoinedByString:@" "];
+
+        // 信頼度の平均を計算
+        if (confidences.count > 0) {
+          float total = 0.0;
+          for (NSNumber *conf in confidences) {
+            total += [conf floatValue];
+          }
+          averageConfidence =
+              (total / confidences.count) * 100.0; // パーセンテージに変換
+        }
+
+        NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
+              @"認識結果: '%@' (信頼度: %.1f%%)",
+              recognizedText, averageConfidence);
+        dispatch_semaphore_signal(semaphore);
+      }];
+
+  // 認識レベルを設定（より高精度に）
+  request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
+
+  // 日本語を認識対象に含める
+  if (@available(iOS 13.0, *)) {
+    request.recognitionLanguages = @[ @"ja", @"en" ];
+  }
+
+  // リクエストを実行
+  VNImageRequestHandler *handler =
+      [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
+
+  NSError *error = nil;
+  BOOL success = [handler performRequests:@[ request ] error:&error];
+
+  if (!success || error) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
+          @"リクエスト実行エラー: %@",
+          error ? error.localizedDescription : @"不明なエラー");
+    dispatch_semaphore_signal(semaphore);
+  }
+
+  // 結果を待機（タイムアウト5秒）
+  dispatch_time_t timeout =
+      dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+  if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
+    NSLog(@"OpenCVWrapper: recognizeTextFromImageWithConfidence - "
+          @"タイムアウトしました");
+    return @{@"text" : @"", @"confidence" : @(0.0)};
+  }
+
+  return @{@"text" : recognizedText, @"confidence" : @(averageConfidence)};
+}
+
 // テキスト回答検出のメソッド
 // 使用StoredType: text
 + (NSString *)detectTextAnswerFromImage:(UIImage *)image {
@@ -1636,20 +1771,103 @@ using namespace cv;
   // ROIをUIImageに変換してVisionで文字認識
   UIImage *textImage = MatToUIImage(textROI);
 
-  // Vision APIを使用して文字認識
-  NSString *recognizedText = [self recognizeTextFromImage:textImage];
+  // Vision APIを使用して文字認識（信頼度付き）
+  NSDictionary *ocrResult =
+      [self recognizeTextFromImageWithConfidence:textImage];
+  NSString *recognizedText = ocrResult[@"text"];
+  NSNumber *confidence = ocrResult[@"confidence"];
 
-  if (recognizedText) {
+  if (recognizedText && recognizedText.length > 0) {
     // 改行とスペースを削除して1行にする（正規化）
     NSString *cleanedText = [self normalizeOCRText:recognizedText
                                       removeSpaces:YES];
     NSLog(@"OpenCVWrapper: detectTextAnswer - 認識されたテキスト: '%@' -> "
-          @"クリーンアップ後: '%@'",
-          recognizedText, cleanedText);
+          @"クリーンアップ後: '%@' (信頼度: %.1f%%)",
+          recognizedText, cleanedText, confidence.floatValue);
     return cleanedText;
   }
 
   return @"";
+}
+
+// テキスト回答検出のメソッド（信頼度付き）
++ (NSDictionary *)detectTextAnswerFromImageWithConfidence:(UIImage *)image {
+  // 統一前処理を適用（matも取得する必要があるため、少し異なる処理）
+  NSString *errorCode = nil;
+  cv::Mat gray = [self prepareImageForProcessing:image
+                                       errorCode:&errorCode
+                                      methodName:@"detectTextAnswer"
+                                     originalMat:NULL];
+
+  if (errorCode) {
+    return @{@"text" : @"", @"confidence" : @(0.0)};
+  }
+
+  // 元のmatも必要なので再取得（座標計算とOCR前処理用）
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+
+  // 統一されたOCR前処理をUIImageから直接適用
+  cv::Mat processedMat =
+      [OpenCVWrapper prepareImageForOCRProcessing:image
+                                        errorCode:&errorCode
+                                       methodName:@"detectTextAnswer"
+                                      originalMat:NULL];
+
+  if (errorCode) {
+    return @{@"text" : @"", @"confidence" : @(0.0)};
+  }
+
+  // テキストボックス検出処理（グレースケール画像で検出）
+  cv::Rect textBox = [self detectLargestTextBox:gray];
+
+  if (textBox.width <= 0 || textBox.height <= 0) {
+    NSLog(
+        @"OpenCVWrapper: detectTextAnswer - テキストボックスが見つかりません");
+    return @{@"text" : @"", @"confidence" : @(0.0)};
+  }
+
+  // 前処理された画像から該当領域を抽出（座標をスケール調整）
+  double scaleX = (double)processedMat.cols / mat.cols;
+  double scaleY = (double)processedMat.rows / mat.rows;
+
+  cv::Rect scaledTextBox;
+  scaledTextBox.x = (int)(textBox.x * scaleX);
+  scaledTextBox.y = (int)(textBox.y * scaleY);
+  scaledTextBox.width = (int)(textBox.width * scaleX);
+  scaledTextBox.height = (int)(textBox.height * scaleY);
+
+  // 境界チェック
+  scaledTextBox.x = std::max(0, scaledTextBox.x);
+  scaledTextBox.y = std::max(0, scaledTextBox.y);
+  scaledTextBox.width =
+      std::min(scaledTextBox.width, processedMat.cols - scaledTextBox.x);
+  scaledTextBox.height =
+      std::min(scaledTextBox.height, processedMat.rows - scaledTextBox.y);
+
+  cv::Mat textROI = processedMat(scaledTextBox);
+
+  // ROIをUIImageに変換してVisionで文字認識
+  UIImage *textImage = MatToUIImage(textROI);
+
+  // Vision APIを使用して文字認識（信頼度付き）
+  NSDictionary *ocrResult =
+      [self recognizeTextFromImageWithConfidence:textImage];
+  NSString *recognizedText = ocrResult[@"text"];
+  NSNumber *confidence = ocrResult[@"confidence"];
+
+  if (recognizedText && recognizedText.length > 0) {
+    // 改行とスペースを削除して1行にする（正規化）
+    NSString *cleanedText = [self normalizeOCRText:recognizedText
+                                      removeSpaces:YES];
+    NSLog(@"OpenCVWrapper: detectTextAnswerWithConfidence - "
+          @"認識されたテキスト: '%@' -> "
+          @"クリーンアップ後: '%@' (信頼度: %.1f%%)",
+          recognizedText, cleanedText, confidence.floatValue);
+    return @{@"text" : cleanedText, @"confidence" : confidence ?: @(0.0)};
+  }
+
+  return @{@"text" : @"", @"confidence" : @(0.0)};
 }
 
 // 最大のテキストボックスを検出するメソッド

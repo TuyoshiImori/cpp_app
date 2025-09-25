@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Vision
 
@@ -11,6 +12,7 @@ public struct CameraView: View {
   @State private var isPreviewPresented: Bool = false
   @State private var previewIndex: Int = 0
   @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
+  @State private var confidenceScoreSets: [[Float]] = []  // 各キャプチャごとの信頼度スコアセット
   @State private var isCircleDetectionFailed: Bool = false
   @State private var isProcessingSample: Bool = false
   @State private var isPulseActive: Bool = false
@@ -255,7 +257,7 @@ public struct CameraView: View {
         croppedImageSets: croppedImageSets,
         parsedAnswers: viewModel.parsedAnswers,
         item: item,
-        confidenceScores: nil  // 将来的にviewModel.confidenceScoresを渡す予定
+        confidenceScores: confidenceScoreSets
       )
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
@@ -270,6 +272,7 @@ public struct CameraView: View {
         capturedImages.append(img)
         croppedImageSets.append(croppedImages)
         recognizedTexts.append(texts)
+        confidenceScoreSets.append(viewModel.confidenceScores)  // 信頼度スコアも保存
         image = img
       }
     }

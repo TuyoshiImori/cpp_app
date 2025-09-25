@@ -66,7 +66,7 @@ struct PreviewFullScreenView: View {
                             .font(.subheadline)
                             .bold()
 
-                          // 信頼度表示（もし利用可能なら）
+                          // 信頼度表示（もし利用可能なら）。存在しない場合は「信頼度なし」を表示する
                           if let confidenceScores = confidenceScores,
                             setIdx < confidenceScores.count,
                             imgIdx < confidenceScores[setIdx].count
@@ -80,6 +80,17 @@ struct PreviewFullScreenView: View {
                                 .foregroundColor(confidenceColor(for: confidence))
                                 .font(.caption)
                                 .bold()
+                            }
+                          } else {
+                            // 信頼度データが存在しない、またはインデックスが範囲外の場合のフォールバック表示
+                            HStack {
+                              Text("信頼度:")
+                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption)
+                              Text("信頼度なし")
+                                .foregroundColor(.gray)
+                                .font(.caption)
+                                .italic()
                             }
                           }
 

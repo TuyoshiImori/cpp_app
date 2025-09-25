@@ -88,18 +88,23 @@ final class CameraViewModel: NSObject, ObservableObject {
 
       // 解析結果をメインスレッドで反映させる
       DispatchQueue.main.async {
-        // 切り取った設問画像を先に保持してから capturedImage を公開する
-        // -> `.onReceive(viewModel.$capturedImage)` 側が `lastCroppedImages` を参照するため、
-        //    先に `lastCroppedImages` を設定してから `capturedImage` を publish する。
+        // 切り取った設問画像を保持してから解析を実行し、
+        // 解析結果（parsedAnswers / confidenceScores）をセットしてから
+        // 最後に capturedImage を publish するように順序を調整する。
+        // これにより、View 側の `.onReceive(viewModel.$capturedImage)` が
+        // 受け取った際に、関連する解析結果が既に揃っていることを保証する。
         self.recognizedTexts = texts
         self.lastCroppedImages = cropped
-        self.capturedImage = gray
 
         // 自動キャプチャを一時停止
         self.pauseAutoCapture()
 
+        // 切り出し画像を解析して parsedAnswers と confidenceScores を更新
         let parsed = self.parseCroppedImagesWithStoredTypes(cropped)
         self.parsedAnswers = parsed
+
+        // 解析結果が揃った後でグレースケール画像を publish して、View 側で UI 更新をトリガーする
+        self.capturedImage = gray
 
         // 完了コールバック
         completion?()
@@ -148,6 +153,16 @@ final class CameraViewModel: NSObject, ObservableObject {
       withStoredTypes: types,
       withOptionTexts: optionTexts)
     guard let parsed = raw?["parsedAnswers"] as? [String] else { return [] }
+
+    // 信頼度スコアも取得して保存
+    if let scores = raw?["confidenceScores"] as? [NSNumber] {
+      self.confidenceScores = scores.map { $0.floatValue }
+      NSLog("CameraViewModel: 信頼度スコアを取得: %@", scores)
+    } else {
+      self.confidenceScores = []
+      NSLog("CameraViewModel: 信頼度スコアが見つかりません")
+    }
+
     return parsed
   }
 }
