@@ -69,12 +69,12 @@ struct PreviewFullScreenView: View {
                         let answerIndex = parsedAnswers[imgIdx]
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("検出結果:")
-                              .foregroundColor(.white)
-                              .font(.subheadline)
-                              .bold()
-                              .frame(maxWidth: .infinity, alignment: .leading)
-                              .multilineTextAlignment(.leading)
+                          Text("検出結果:")
+                            .foregroundColor(.white)
+                            .font(.subheadline)
+                            .bold()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
 
                           // info 設問は parsedAnswer に改行を含む想定なので、
                           // 改行が含まれる場合は総合的な信頼度表示をスキップする。
