@@ -17,6 +17,8 @@ struct PreviewFullScreenView: View {
   var viewModel: CameraViewModel? = nil
   // 分析画面に渡すItem
   let item: Item?
+  // プレビュー中のセットが削除されたときに呼ばれるクロージャ
+  var onDelete: ((Int) -> Void)? = nil
 
   // 信頼度情報を格納するための配列（将来の実装用）
   let confidenceScores: [[Float]]?
@@ -35,7 +37,8 @@ struct PreviewFullScreenView: View {
     // 分析画面に渡すItemを追加
     item: Item? = nil,
     viewModel: CameraViewModel? = nil,
-    confidenceScores: [[Float]]? = nil
+    confidenceScores: [[Float]]? = nil,
+    onDelete: ((Int) -> Void)? = nil
   ) {
     self._isPreviewPresented = isPreviewPresented
     self._previewIndex = previewIndex
@@ -44,6 +47,7 @@ struct PreviewFullScreenView: View {
     self.item = item
     self.viewModel = viewModel
     self.confidenceScores = confidenceScores
+    self.onDelete = onDelete
   }
 
   // MARK: - Body
@@ -105,6 +109,70 @@ struct PreviewFullScreenView: View {
           }
           .hidden()
         }
+
+        // 下部の削除ボタンオーバーレイ
+        VStack {
+          Spacer()
+          HStack {
+            Spacer()
+            DeleteButtonView(
+              previewIndex: $previewIndex,
+              croppedImageSets: croppedImageSets,
+              parsedAnswersSets: parsedAnswersSets,
+              item: item,
+              viewModel: viewModel,
+              isPreviewPresented: $isPreviewPresented,
+              onDelete: onDelete
+            )
+            Spacer()
+          }
+          .padding(.bottom, 30)
+        }
+      }
+    }
+  }
+
+  // MARK: - Delete Button Subview
+  private struct DeleteButtonView: View {
+    @Binding var previewIndex: Int
+    let croppedImageSets: [[UIImage]]
+    let parsedAnswersSets: [[String]]
+    let item: Item?
+    var viewModel: CameraViewModel?
+    @Binding var isPreviewPresented: Bool
+    var onDelete: ((Int) -> Void)?
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var showConfirm = false
+
+    var body: some View {
+      Button(role: .destructive) {
+        showConfirm = true
+      } label: {
+        HStack {
+          Image(systemName: "trash")
+          Text("削除")
+            .font(.headline)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .background(Color.red.opacity(0.85))
+        .cornerRadius(12)
+      }
+      .confirmationDialog("この回答を削除しますか？", isPresented: $showConfirm, titleVisibility: .visible) {
+        Button("削除", role: .destructive) {
+          // 削除処理: item 単体削除 or 特定セット削除のコールバック
+          if let callback = onDelete {
+            callback(previewIndex)
+          } else if let it = item {
+            // フォールバック: item を丸ごと削除
+            modelContext.delete(it)
+          }
+          // プレビューを閉じる
+          isPreviewPresented = false
+        }
+        Button("キャンセル", role: .cancel) {}
       }
     }
   }

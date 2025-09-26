@@ -249,7 +249,35 @@ public struct CameraView: View {
         parsedAnswersSets: recognizedTexts,
         item: item,
         viewModel: viewModel,
-        confidenceScores: confidenceScoreSets
+        confidenceScores: confidenceScoreSets,
+        onDelete: { index in
+          // UI配列と永続化された scanResults の両方から指定インデックスのセットを削除する
+          guard index >= 0 && index < croppedImageSets.count else { return }
+
+          // UI側配列を更新
+          croppedImageSets.remove(at: index)
+          recognizedTexts.remove(at: index)
+          confidenceScoreSets.remove(at: index)
+
+          // ItemのscanResultsから対応する ScanResult を削除する
+          if let item = item {
+            // scanResults の中で、UIで表示している順序は item.scanResults の順序と一致している前提
+            // 逆順・タイムスタンプ順などでのズレがある場合は適切なマッピングが必要
+            if index >= 0 && index < item.scanResults.count {
+              item.scanResults.remove(at: index)
+              do {
+                try modelContext.save()
+              } catch {
+                print("データ削除保存エラー: \(error)")
+              }
+            }
+          }
+
+          // previewIndex を調整（削除後に out-of-range にならないように）
+          if previewIndex >= croppedImageSets.count {
+            previewIndex = max(0, croppedImageSets.count - 1)
+          }
+        }
       )
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
