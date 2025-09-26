@@ -62,16 +62,9 @@ struct AnalysisView: View {
               // サマリーカード
               summaryCard
 
-              // 全ての回答データがある場合は、データセット別に表示
-              if !allParsedAnswersSets.isEmpty {
-                ForEach(0..<allParsedAnswersSets.count, id: \.self) { setIndex in
-                  dataSetCard(for: setIndex)
-                }
-              } else {
-                // 従来通り：単一セットの分析結果
-                ForEach(viewModel.analysisResults) { result in
-                  analysisResultCard(result)
-                }
+              // 設問ごとの分析結果を表示
+              ForEach(0..<item.questionTypes.count, id: \.self) { questionIndex in
+                questionAnalysisCard(for: questionIndex)
               }
             }
             .padding()
@@ -158,203 +151,103 @@ struct AnalysisView: View {
     .cornerRadius(12)
   }
 
-  // MARK: - Data Set Card
-  /// データセット別の分析結果カード
-  private func dataSetCard(for setIndex: Int) -> some View {
-    VStack(alignment: .leading, spacing: 16) {
-      // データセットヘッダー
-      HStack {
-        Text("回答データ \(setIndex + 1)")
-          .font(.largeTitle)
-          .bold()
-          .foregroundColor(.primary)
+  // MARK: - Question Analysis Card
+  /// 設問ごとの分析結果カード
+  private func questionAnalysisCard(for questionIndex: Int) -> some View {
+    let questionType = item.questionTypes[questionIndex]
 
-        Spacer()
+    // 全データセットから該当設問の回答を集める
+    var allAnswersForQuestion: [String] = []
+    var allConfidenceForQuestion: [Float] = []
+    var allImagesForQuestion: [Data] = []
 
-        // データセットの信頼度
+    if !allParsedAnswersSets.isEmpty {
+      // 複数データセットがある場合
+      for setIndex in 0..<allParsedAnswersSets.count {
+        let answerSet = allParsedAnswersSets[setIndex]
+        if questionIndex < answerSet.count {
+          allAnswersForQuestion.append(answerSet[questionIndex])
+        }
+
         if let confidenceScores = allConfidenceScores,
           setIndex < confidenceScores.count,
-          !confidenceScores[setIndex].isEmpty
+          questionIndex < confidenceScores[setIndex].count
         {
-          let avgConfidence =
-            confidenceScores[setIndex].reduce(0, +) / Float(confidenceScores[setIndex].count)
-          VStack(alignment: .trailing, spacing: 2) {
-            Text("平均信頼度")
-              .font(.caption)
-              .foregroundColor(.secondary)
-            Text("\(String(format: "%.1f", avgConfidence))%")
-              .font(.headline)
-              .bold()
-              .foregroundColor(confidenceColor(Double(avgConfidence)))
-          }
+          allConfidenceForQuestion.append(confidenceScores[setIndex][questionIndex])
         }
-      }
 
-      // このデータセットの各設問
-      if setIndex < allParsedAnswersSets.count {
-        let answerSet = allParsedAnswersSets[setIndex]
-        let confidenceSet =
-          (allConfidenceScores != nil && setIndex < allConfidenceScores!.count)
-          ? allConfidenceScores![setIndex] : []
-
-        ForEach(0..<answerSet.count, id: \.self) { questionIndex in
-          questionCard(
-            questionIndex: questionIndex,
-            answer: answerSet[questionIndex],
-            confidence: questionIndex < confidenceSet.count ? confidenceSet[questionIndex] : 0.0,
-            imageSet: setIndex < allCroppedImageSets.count ? allCroppedImageSets[setIndex] : []
-          )
-        }
-      }
-    }
-    .padding()
-    .background(Color(UIColor.secondarySystemBackground))
-    .cornerRadius(16)
-  }
-
-  // MARK: - Question Card
-  /// 設問別の詳細カード
-  private func questionCard(
-    questionIndex: Int,
-    answer: String,
-    confidence: Float,
-    imageSet: [UIImage]
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      // 設問ヘッダー
-      HStack {
-        Text("設問 \(questionIndex + 1)")
-          .font(.headline)
-          .foregroundColor(.primary)
-
-        Spacer()
-
-        // 設問タイプアイコン（もしQuestionTypeが取得できるなら）
-        if questionIndex < item.questionTypes.count {
-          questionTypeIcon(item.questionTypes[questionIndex])
-        }
-      }
-
-      // 設問文
-      if questionIndex < item.questionTypes.count {
-        Text(getQuestionText(from: item.questionTypes[questionIndex]))
-          .font(.subheadline)
-          .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-
-      // 検出画像（ある場合）
-      if questionIndex < imageSet.count {
-        Image(uiImage: imageSet[questionIndex])
-          .resizable()
-          .scaledToFit()
-          .frame(maxHeight: 150)
-          .cornerRadius(8)
-          .shadow(radius: 2)
-      }
-
-      // 回答結果
-      VStack(alignment: .leading, spacing: 8) {
-        Text("検出結果:")
-          .font(.subheadline)
-          .bold()
-          .foregroundColor(.primary)
-
-        HStack {
-          Text(answer.isEmpty || answer == "-1" ? "未検出" : answer)
-            .font(.body)
-            .foregroundColor(answer.isEmpty || answer == "-1" ? .secondary : .primary)
-            .fixedSize(horizontal: false, vertical: true)
-
-          Spacer()
-
-          if !answer.isEmpty && answer != "-1" {
-            Text("\(String(format: "%.1f", confidence))%")
-              .font(.caption)
-              .bold()
-              .foregroundColor(confidenceColor(Double(confidence)))
-          }
-        }
-        .padding(.vertical, 4)
-      }
-    }
-    .padding()
-    .background(Color(UIColor.tertiarySystemBackground))
-    .cornerRadius(12)
-  }
-
-  // MARK: - Analysis Result Card
-  private func analysisResultCard(_ result: AnalysisViewModel.AnalysisResult) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      // 設問ヘッダー
-      HStack {
-        Text("設問 \(result.questionIndex + 1)")
-          .font(.headline)
-          .foregroundColor(.primary)
-
-        Spacer()
-
-        // 設問タイプアイコン
-        questionTypeIcon(result.questionType)
-      }
-
-      // 設問文
-      Text(result.questionText)
-        .font(.subheadline)
-        .foregroundColor(.primary)
-        .fixedSize(horizontal: false, vertical: true)
-
-      // 回答結果
-      VStack(alignment: .leading, spacing: 8) {
-        Text("検出結果:")
-          .font(.subheadline)
-          .bold()
-          .foregroundColor(.primary)
-
-        ForEach(result.answers.indices, id: \.self) { index in
-          let answer = result.answers[index]
-          let confidence =
-            index < result.confidenceScores.count ? result.confidenceScores[index] : 0.0
-
-          HStack {
-            Text(answer.isEmpty || answer == "-1" ? "未検出" : answer)
-              .font(.body)
-              .foregroundColor(answer.isEmpty || answer == "-1" ? .secondary : .primary)
-
-            Spacer()
-
-            if !answer.isEmpty && answer != "-1" {
-              Text("\(String(format: "%.1f", confidence))%")
-                .font(.caption)
-                .bold()
-                .foregroundColor(confidenceColor(Double(confidence)))
+        // 画像データがある場合
+        if setIndex < allCroppedImageSets.count,
+          questionIndex < allCroppedImageSets[setIndex].count
+        {
+          if let imageData = allCroppedImageSets[setIndex][questionIndex] as? UIImage {
+            if let data = imageData.pngData() {
+              allImagesForQuestion.append(data)
             }
+          } else if let data = allCroppedImageSets[setIndex][questionIndex] as? Data {
+            allImagesForQuestion.append(data)
           }
-          .padding(.vertical, 2)
         }
       }
-
-      // 推奨事項（ある場合のみ表示）
-      if !result.recommendations.isEmpty {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("推奨事項:")
-            .font(.subheadline)
-            .bold()
-            .foregroundColor(.primary)
-
-          ForEach(result.recommendations.indices, id: \.self) { index in
-            Text("• \(result.recommendations[index])")
-              .font(.caption)
-              .foregroundColor(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
+    } else {
+      // 単一データセットの場合（従来の互換性）
+      if let analysisResult = viewModel.analysisResults.first(where: {
+        $0.questionIndex == questionIndex
+      }) {
+        allAnswersForQuestion = analysisResult.answers
+        allConfidenceForQuestion = analysisResult.confidenceScores
       }
     }
-    .padding()
-    // カードは secondarySystemBackground を使ってダーク/ライトに適応
-    .background(Color(UIColor.secondarySystemBackground))
-    .cornerRadius(12)
+
+    // 設問タイプに応じて適切なコンポーネントを返す
+    switch questionType {
+    case .single(let question, let options):
+      return AnyView(
+        SingleQuestionAnalysisView(
+          questionIndex: questionIndex,
+          questionText: question,
+          answers: allAnswersForQuestion,
+          confidenceScores: allConfidenceForQuestion,
+          images: allImagesForQuestion,
+          options: options
+        )
+      )
+
+    case .multiple(let question, let options):
+      return AnyView(
+        MultipleQuestionAnalysisView(
+          questionIndex: questionIndex,
+          questionText: question,
+          answers: allAnswersForQuestion,
+          confidenceScores: allConfidenceForQuestion,
+          images: allImagesForQuestion,
+          options: options
+        )
+      )
+
+    case .text(let question):
+      return AnyView(
+        TextQuestionAnalysisView(
+          questionIndex: questionIndex,
+          questionText: question,
+          answers: allAnswersForQuestion,
+          confidenceScores: allConfidenceForQuestion,
+          images: allImagesForQuestion
+        )
+      )
+
+    case .info(let question, let options):
+      return AnyView(
+        InfoQuestionAnalysisView(
+          questionIndex: questionIndex,
+          questionText: question,
+          answers: allAnswersForQuestion,
+          confidenceScores: allConfidenceForQuestion,
+          images: allImagesForQuestion,
+          options: options.map { $0.displayName }
+        )
+      )
+    }
   }
 
   // MARK: - Helper Methods
