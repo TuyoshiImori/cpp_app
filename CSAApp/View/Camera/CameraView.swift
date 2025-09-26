@@ -62,6 +62,9 @@ public struct CameraView: View {
             Button(action: {
               // 最新セットをプレビューする
               previewIndex = max(0, croppedImageSets.count - 1)
+              // プレビューを表示する前にカメラを確実に停止してセッションを解放する
+              viewModel.pauseAutoCapture()
+              viewModel.scanner.stop()
               isPreviewPresented = true
             }) {
               Image(uiImage: latestThumb)
@@ -231,9 +234,11 @@ public struct CameraView: View {
         }
       }
     }
-    .fullScreenCover(isPresented: $isPreviewPresented) {
-      // PreviewFullScreenView は複数の解析セットを受け取るため、
-      // recognizedTexts は既に [[String]] なのでそのまま渡す。
+    .fullScreenCover(isPresented: $isPreviewPresented, onDismiss: {
+      // プレビューを閉じたらカメラを再開
+      viewModel.resumeAutoCapture()
+    }) {
+      // PreviewFullScreenView は複数の解析セットを受け取るため、recognizedTexts は既に [[String]] なのでそのまま渡す。
       PreviewFullScreenView(
         isPreviewPresented: $isPreviewPresented,
         previewIndex: $previewIndex,
