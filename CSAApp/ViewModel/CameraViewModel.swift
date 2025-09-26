@@ -27,6 +27,8 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var isAutoCaptureEnabled: Bool = true
   // スキャン状態を公開する（View 側はこれを監視してボタン表示を変更する）
   @Published var scanState: ScanState = .possible
+  /// 画像解析中かどうか（UI 側でローディングを表示するために使用）
+  @Published var isProcessing: Bool = false
 
   let scanner = AVDocumentScanner()
 
@@ -117,6 +119,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     // UI の即時反映のため、状態はメインスレッドで切り替え、重い解析はバックグラウンドで行う
     DispatchQueue.main.async {
       self.scanState = .scanning
+      // ローディング開始
+      self.isProcessing = true
     }
 
     DispatchQueue.global(qos: .userInitiated).async {
@@ -142,6 +146,9 @@ final class CameraViewModel: NSObject, ObservableObject {
 
         // 解析結果が揃った後でグレースケール画像を publish して、View 側で UI 更新をトリガーする
         self.capturedImage = gray
+
+        // ローディング解除（解析完了）
+        self.isProcessing = false
 
         // 完了コールバック
         completion?()

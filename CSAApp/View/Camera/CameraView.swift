@@ -52,6 +52,24 @@ public struct CameraView: View {
       )
       .edgesIgnoringSafeArea(.all)
 
+      // ViewModel が処理中フラグを出しているときは全画面のローディングオーバーレイを表示
+      if viewModel.isProcessing {
+        Color.black.opacity(0.45)
+          .edgesIgnoringSafeArea(.all)
+
+        VStack(spacing: 12) {
+          ProgressView()
+            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            .scaleEffect(1.5)
+          Text("スキャン中...")
+            .foregroundColor(.white)
+            .font(.headline)
+        }
+        .padding(24)
+        .background(Color.black.opacity(0.25))
+        .cornerRadius(12)
+      }
+
       // (上部バーは削除) NavigationStack 側のナビゲーションバーを使う
 
       // 左下に代表サムネイルを1つだけ表示する（最新のスキャン）
