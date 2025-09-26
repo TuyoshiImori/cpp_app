@@ -234,10 +234,13 @@ public struct CameraView: View {
         }
       }
     }
-    .fullScreenCover(isPresented: $isPreviewPresented, onDismiss: {
-      // プレビューを閉じたらカメラを再開
-      viewModel.resumeAutoCapture()
-    }) {
+    .fullScreenCover(
+      isPresented: $isPreviewPresented,
+      onDismiss: {
+        // プレビューを閉じたらカメラを再開
+        viewModel.resumeAutoCapture()
+      }
+    ) {
       // PreviewFullScreenView は複数の解析セットを受け取るため、recognizedTexts は既に [[String]] なのでそのまま渡す。
       PreviewFullScreenView(
         isPreviewPresented: $isPreviewPresented,
