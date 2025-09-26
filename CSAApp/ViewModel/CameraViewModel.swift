@@ -1,5 +1,7 @@
 import AVFoundation
 import Combine
+import SwiftData
+import SwiftUI
 import UIKit
 
 // カメラのスキャン状態を表す列挙型
@@ -18,7 +20,6 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var detectedFeature: RectangleFeature? = nil
   @Published var parsedAnswers: [String] = []
   @Published var lastCroppedImages: [UIImage] = []
-  @Published var recognizedTexts: [String] = []
   @Published var confidenceScores: [Float] = []  // OCR信頼度スコア
   // info設問向けに行単位の信頼度を保持する（各設問ごとに行が複数ある場合がある）
   @Published var confidenceScores2D: [[Float]] = []
@@ -29,6 +30,28 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var scanState: ScanState = .possible
   /// 画像解析中かどうか（UI 側でローディングを表示するために使用）
   @Published var isProcessing: Bool = false
+
+  // MARK: - Data Management Properties
+  /// キャプチャされた画像の配列
+  @Published var capturedImages: [UIImage] = []
+  /// 各キャプチャごとの切り取り画像セット
+  @Published var croppedImageSets: [[UIImage]] = []
+  /// 各画像ごとの認識された文字列（2次元配列）
+  @Published var recognizedTextsSets: [[String]] = []
+  /// 各キャプチャごとの信頼度スコアセット
+  @Published var confidenceScoreSets: [[Float]] = []
+
+  // MARK: - UI State Properties
+  /// プレビューが表示されているかどうか
+  @Published var isPreviewPresented: Bool = false
+  /// プレビューのインデックス
+  @Published var previewIndex: Int = 0
+  /// サンプル処理中かどうか
+  @Published var isProcessingSample: Bool = false
+  /// パルスアニメーションが有効かどうか
+  @Published var isPulseActive: Bool = false
+  /// 円検出が失敗したかどうか
+  @Published var isCircleDetectionFailed: Bool = false
 
   let scanner = AVDocumentScanner()
 
@@ -133,7 +156,6 @@ final class CameraViewModel: NSObject, ObservableObject {
         // 最後に capturedImage を publish するように順序を調整する。
         // これにより、View 側の `.onReceive(viewModel.$capturedImage)` が
         // 受け取った際に、関連する解析結果が既に揃っていることを保証する。
-        self.recognizedTexts = texts
         self.lastCroppedImages = cropped
 
         // 自動キャプチャを一時停止
@@ -279,7 +301,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     guard index < initialQuestionTypes.count else { return [] }
     let qtype = initialQuestionTypes[index]
     switch qtype {
-    case .info(let questionText, let infoFields):
+    case .info(_, let infoFields):
       // parsedAnswer は行ごとに分割されている想定
       let lines = parsedAnswer.components(separatedBy: "\n")
       var out: [String] = []
@@ -313,6 +335,212 @@ final class CameraViewModel: NSObject, ObservableObject {
     switch initialQuestionTypes[index] {
     case .info(_, _): return true
     default: return false
+    }
+  }
+}
+
+// MARK: - Data Management Methods
+extension CameraViewModel {
+  /// 保存されたスキャンデータを復元してUIに表示する
+  func loadExistingData(for item: Item?) {
+    guard let item = item else { return }
+    // 既存のUI配列をクリアしてから復元する（重複追加防止）
+    croppedImageSets = []
+    recognizedTextsSets = []
+    confidenceScoreSets = []
+
+    // 保存されたすべてのScanResultを復元してUI配列に追加する
+    var allCroppedSets: [[UIImage]] = []
+    var allRecognized: [[String]] = []
+    var allConfidences: [[Float]] = []
+
+    // まず新しいScanResult配列から復元
+    for scan in item.scanResults {
+      let imgs = scan.getAllQuestionImages().compactMap { $0 }
+      if !imgs.isEmpty {
+        allCroppedSets.append(imgs)
+        allRecognized.append(scan.answerTexts)
+        // 2D信頼度が存在する場合は設問ごとの平均値を計算して使用
+        if !scan.confidenceScores2D.isEmpty {
+          let flattenedConfidences = scan.confidenceScores2D.map { rows -> Float in
+            if rows.isEmpty { return 0.0 }
+            let sum = rows.reduce(0.0, +)
+            return sum / Float(rows.count)
+          }
+          allConfidences.append(flattenedConfidences)
+        } else {
+          allConfidences.append(scan.confidenceScores)
+        }
+      }
+    }
+
+    // 新しい構造が空の場合は古いプロパティから復元しておく（後方互換）
+    if allCroppedSets.isEmpty {
+      let savedImages = item.getAllQuestionImages().compactMap { $0 }
+      if !savedImages.isEmpty && !item.answerTexts.isEmpty {
+        allCroppedSets = [savedImages]
+        allRecognized = [item.answerTexts]
+        allConfidences = [item.confidenceScores]
+      }
+    }
+
+    // UI配列に反映（空でなければ上書き）
+    if !allCroppedSets.isEmpty {
+      croppedImageSets = allCroppedSets
+      recognizedTextsSets = allRecognized
+      confidenceScoreSets = allConfidences
+
+      // ViewModelの2D信頼度も最新のScanResultから復元（PreviewFullScreenViewでの表示用）
+      if let latestScan = item.scanResults.max(by: { $0.timestamp < $1.timestamp }),
+        !latestScan.confidenceScores2D.isEmpty
+      {
+        confidenceScores2D = latestScan.confidenceScores2D
+      }
+
+      // 代表画像を先頭の最初の画像にする
+      if let firstImg = allCroppedSets.first?.first {
+        capturedImages = [firstImg]
+      }
+    }
+  }
+
+  /// サンプル画像を読み込んで処理する
+  func loadSampleImage() {
+    guard !isProcessingSample else { return }
+
+    let loadedSample = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
+    if let sample = loadedSample {
+      isProcessingSample = true
+      processCapturedImage(sample) {
+        self.isProcessingSample = false
+      }
+    }
+  }
+
+  /// プレビューを開始する
+  func startPreview(with index: Int) {
+    previewIndex = max(0, index)
+    // プレビューを表示する前にカメラを確実に停止してセッションを解放する
+    pauseAutoCapture()
+    scanner.stop()
+    isPreviewPresented = true
+  }
+
+  /// プレビューを終了する
+  func dismissPreview() {
+    isPreviewPresented = false
+    // プレビューを閉じたらカメラを再開
+    resumeAutoCapture()
+  }
+
+  /// 指定インデックスのデータセットを削除する
+  func deleteDataSet(at index: Int, item: Item?, modelContext: Any?) -> Bool {
+    guard index >= 0 && index < croppedImageSets.count else { return false }
+
+    // UI側配列を更新
+    croppedImageSets.remove(at: index)
+    recognizedTextsSets.remove(at: index)
+    confidenceScoreSets.remove(at: index)
+
+    // ItemのscanResultsから対応する ScanResult を削除する
+    if let item = item {
+      // scanResults の中で、UIで表示している順序は item.scanResults の順序と一致している前提
+      // 逆順・タイムスタンプ順などでのズレがある場合は適切なマッピングが必要
+      if index >= 0 && index < item.scanResults.count {
+        item.scanResults.remove(at: index)
+        if let context = modelContext as? ModelContext {
+          do {
+            try context.save()
+          } catch {
+            print("データ削除保存エラー: \(error)")
+          }
+        }
+      }
+    }
+
+    // previewIndex を調整（削除後に out-of-range にならないように）
+    if previewIndex >= croppedImageSets.count {
+      previewIndex = max(0, croppedImageSets.count - 1)
+    }
+    // 削除後に残りがあればモーダルは閉じない（false）、なければ閉じる（true）
+    return croppedImageSets.isEmpty
+  }
+
+  /// キャプチャされた画像を処理して配列に追加する
+  func addCapturedImage(_ image: UIImage, item: Item?, modelContext: Any?) {
+    // 画像処理と切り取りはすでにprocessCapturedImageで実行済み
+    let croppedImages = lastCroppedImages
+    let texts = parsedAnswers
+
+    if croppedImages.isEmpty {
+      isCircleDetectionFailed = true
+      return
+    }
+
+    // 新規スキャンは常に UI に追加して永続化する
+    print(
+      "CameraViewModel: appending parsedAnswers count=\(texts.count), croppedImages=\(croppedImages.count)"
+    )
+    capturedImages.append(image)
+    croppedImageSets.append(croppedImages)
+    recognizedTextsSets.append(texts)
+    confidenceScoreSets.append(confidenceScores)
+
+    // スキャン結果をItemに保存（Itemが存在する場合）
+    if let item = item {
+      saveResultsToItem(
+        item,
+        croppedImages: croppedImages,
+        parsedAnswers: parsedAnswers,
+        confidenceScores: confidenceScores
+      )
+
+      // SwiftDataで変更を永続化
+      if let context = modelContext as? ModelContext {
+        do {
+          try context.save()
+        } catch {
+          print("データ保存エラー: \(error)")
+        }
+      }
+    }
+  }
+
+  /// パルスアニメーションの状態を管理する
+  func updatePulseAnimation(for state: ScanState) {
+    if state == .paused {
+      withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+        isPulseActive = true
+      }
+    } else {
+      // 状態が変わったらアニメーションフラグをオフにする
+      withAnimation(.easeInOut(duration: 0.18)) {
+        isPulseActive = false
+      }
+    }
+  }
+
+  /// ViewのonAppear時の処理
+  func handleViewAppear(with item: Item?) {
+    // 表示時は必要に応じてスキャン再開とデータ復元を行う
+    loadExistingData(for: item)
+    // resumeAutoCapture は scanner.start() を呼ぶため、
+    // ここでカメラを確実に再開できる
+    resumeAutoCapture()
+    if scanState == .paused {
+      updatePulseAnimation(for: .paused)
+    }
+  }
+
+  /// ViewのonDisappear時の処理
+  func handleViewDisappear() {
+    // 画面を離れる（ContentView に戻る等）のタイミングで自動キャプチャを停止し、
+    // セッション自体も停止してカメラを解放する
+    pauseAutoCapture()
+    scanner.stop()
+    // アニメーションフラグをオフ
+    withAnimation(.easeInOut(duration: 0.18)) {
+      isPulseActive = false
     }
   }
 }

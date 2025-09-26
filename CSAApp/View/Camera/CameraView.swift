@@ -11,16 +11,6 @@ public struct CameraView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
 
-  @State private var capturedImages: [UIImage] = []
-  @State private var croppedImageSets: [[UIImage]] = []  // 各キャプチャごとの切り取り画像セット
-  @State private var isPreviewPresented: Bool = false
-  @State private var previewIndex: Int = 0
-  @State private var recognizedTexts: [[String]] = []  // 各画像ごとの認識された文字列
-  @State private var confidenceScoreSets: [[Float]] = []  // 各キャプチャごとの信頼度スコアセット
-  @State private var isCircleDetectionFailed: Bool = false
-  @State private var isProcessingSample: Bool = false
-  @State private var isPulseActive: Bool = false
-
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -76,14 +66,10 @@ public struct CameraView: View {
       VStack {
         Spacer()
         HStack {
-          if let latestThumb = croppedImageSets.last?.first {
+          if let latestThumb = viewModel.croppedImageSets.last?.first {
             Button(action: {
               // 最新セットをプレビューする
-              previewIndex = max(0, croppedImageSets.count - 1)
-              // プレビューを表示する前にカメラを確実に停止してセッションを解放する
-              viewModel.pauseAutoCapture()
-              viewModel.scanner.stop()
-              isPreviewPresented = true
+              viewModel.startPreview(with: max(0, viewModel.croppedImageSets.count - 1))
             }) {
               Image(uiImage: latestThumb)
                 .resizable()
@@ -155,14 +141,15 @@ public struct CameraView: View {
                   .cornerRadius(24)
               }
               // パルスアニメーション
-              .scaleEffect(isPulseActive ? 1.12 : 1.0)
-              .opacity(isPulseActive ? 1.0 : 0.90)
+              .scaleEffect(viewModel.isPulseActive ? 1.12 : 1.0)
+              .opacity(viewModel.isPulseActive ? 1.0 : 0.90)
               .shadow(
-                color: Color.black.opacity(isPulseActive ? 0.28 : 0.06),
-                radius: isPulseActive ? 12 : 3, x: 0, y: 3
+                color: Color.black.opacity(viewModel.isPulseActive ? 0.28 : 0.06),
+                radius: viewModel.isPulseActive ? 12 : 3, x: 0, y: 3
               )
               .animation(
-                .easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: isPulseActive)
+                .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
+                value: viewModel.isPulseActive)
             }
           }
           .padding(.bottom, 24 + safeAreaInsets.bottom)
@@ -177,23 +164,17 @@ public struct CameraView: View {
         HStack {
           Spacer()
           Button(action: {
-            let loadedSample = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
-            if let sample = loadedSample {
-              isProcessingSample = true
-              viewModel.processCapturedImage(sample) {
-                isProcessingSample = false
-              }
-            }
+            viewModel.loadSampleImage()
           }) {
             HStack(spacing: 8) {
-              if isProcessingSample {
+              if viewModel.isProcessingSample {
                 ProgressView()
                   .progressViewStyle(CircularProgressViewStyle(tint: .white))
                   .frame(width: 20, height: 20)
               } else {
                 Image(systemName: "photo.on.rectangle")
               }
-              Text(isProcessingSample ? "読み込み中..." : "サンプル読み込み")
+              Text(viewModel.isProcessingSample ? "読み込み中..." : "サンプル読み込み")
             }
             .font(.headline)
             .foregroundColor(.white)
@@ -203,13 +184,13 @@ public struct CameraView: View {
             .cornerRadius(20)
             .shadow(radius: 6)
           }
-          .disabled(isProcessingSample)
+          .disabled(viewModel.isProcessingSample)
           Spacer()
         }
         .padding(.bottom, 12 + safeAreaInsets.bottom)
       }
 
-      .alert(isPresented: $isCircleDetectionFailed) {
+      .alert(isPresented: $viewModel.isCircleDetectionFailed) {
         Alert(
           title: Text("スキャン失敗"),
           message: Text("適切なフォーマットのアンケートをスキャンしてください。"),
@@ -219,126 +200,38 @@ public struct CameraView: View {
     }
     // View の表示/非表示のライフサイクルでカメラを簡潔に制御する
     .onAppear {
-      // 表示時は必要に応じてスキャン再開とデータ復元を行う
-      loadExistingData()
-      // resumeAutoCapture は scanner.start() を呼ぶため、
-      // ここでカメラを確実に再開できる
-      viewModel.resumeAutoCapture()
-      if viewModel.scanState == .paused {
-        withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-          isPulseActive = true
-        }
-      }
+      viewModel.handleViewAppear(with: item)
     }
     .onDisappear {
-      // 画面を離れる（ContentView に戻る等）のタイミングで自動キャプチャを停止し、
-      // セッション自体も停止してカメラを解放する
-      viewModel.pauseAutoCapture()
-      viewModel.scanner.stop()
-      // アニメーションフラグをオフ
-      withAnimation(.easeInOut(duration: 0.18)) {
-        isPulseActive = false
-      }
+      viewModel.handleViewDisappear()
     }
     .onChange(of: viewModel.scanState) { newState in
-      if newState == .paused {
-        withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-          isPulseActive = true
-        }
-      } else {
-        // 状態が変わったらアニメーションフラグをオフにする
-        withAnimation(.easeInOut(duration: 0.18)) {
-          isPulseActive = false
-        }
-      }
+      viewModel.updatePulseAnimation(for: newState)
     }
     .fullScreenCover(
-      isPresented: $isPreviewPresented,
+      isPresented: $viewModel.isPreviewPresented,
       onDismiss: {
-        // プレビューを閉じたらカメラを再開
-        viewModel.resumeAutoCapture()
+        viewModel.dismissPreview()
       }
     ) {
       // PreviewFullScreenView は複数の解析セットを受け取るため、recognizedTexts は既に [[String]] なのでそのまま渡す。
       PreviewFullScreenView(
-        isPreviewPresented: $isPreviewPresented,
-        previewIndex: $previewIndex,
-        croppedImageSets: croppedImageSets,
-        parsedAnswersSets: recognizedTexts,
+        isPreviewPresented: $viewModel.isPreviewPresented,
+        previewIndex: $viewModel.previewIndex,
+        croppedImageSets: viewModel.croppedImageSets,
+        parsedAnswersSets: viewModel.recognizedTextsSets,
         item: item,
         viewModel: viewModel,
-        confidenceScores: confidenceScoreSets,
+        confidenceScores: viewModel.confidenceScoreSets,
         onDelete: { index in
-          // UI配列と永続化された scanResults の両方から指定インデックスのセットを削除する
-          guard index >= 0 && index < croppedImageSets.count else { return false }
-
-          // UI側配列を更新
-          croppedImageSets.remove(at: index)
-          recognizedTexts.remove(at: index)
-          confidenceScoreSets.remove(at: index)
-
-          // ItemのscanResultsから対応する ScanResult を削除する
-          if let item = item {
-            // scanResults の中で、UIで表示している順序は item.scanResults の順序と一致している前提
-            // 逆順・タイムスタンプ順などでのズレがある場合は適切なマッピングが必要
-            if index >= 0 && index < item.scanResults.count {
-              item.scanResults.remove(at: index)
-              do {
-                try modelContext.save()
-              } catch {
-                print("データ削除保存エラー: \(error)")
-              }
-            }
-          }
-
-          // previewIndex を調整（削除後に out-of-range にならないように）
-          if previewIndex >= croppedImageSets.count {
-            previewIndex = max(0, croppedImageSets.count - 1)
-          }
-          // 削除後に残りがあればモーダルは閉じない（false）、なければ閉じる（true）
-          return croppedImageSets.isEmpty
+          return viewModel.deleteDataSet(at: index, item: item, modelContext: modelContext)
         }
       )
     }
     .onReceive(viewModel.$capturedImage.compactMap { $0 }) { (img: UIImage) in
-      // ViewModel が既に画像処理と切り取りを実行しているため、
-      // ここでは ViewModel が保持する結果を利用して UI を更新する
-      let croppedImages = viewModel.lastCroppedImages
-      // 生のrecognizedTextsの代わりに、parsedAnswers（質問ごとに解析された結果）を使用してください。
-      // recognizeTextsにはページ全体のOCR結果が含まれる場合があり、正しく表示されないことがあります。
-      let texts = viewModel.parsedAnswers
-      if croppedImages.isEmpty {
-        isCircleDetectionFailed = true
-        return
-      }
-
-      // 新規スキャンは常に UI に追加して永続化する
-      // （過去の二重追加はサンプル完了側の保存を削除して対処済み）
-      print(
-        "CameraView: appending parsedAnswers count=\(texts.count), croppedImages=\(croppedImages.count)"
-      )
-      capturedImages.append(img)
-      croppedImageSets.append(croppedImages)
-      recognizedTexts.append(texts)
-      confidenceScoreSets.append(viewModel.confidenceScores)  // 信頼度スコアも保存
+      // ViewModelが処理した画像をViewに反映
+      viewModel.addCapturedImage(img, item: item, modelContext: modelContext)
       image = img
-
-      // スキャン結果をItemに保存（Itemが存在する場合）
-      if let item = item {
-        viewModel.saveResultsToItem(
-          item,
-          croppedImages: croppedImages,
-          parsedAnswers: viewModel.parsedAnswers,
-          confidenceScores: viewModel.confidenceScores
-        )
-
-        // SwiftDataで変更を永続化
-        do {
-          try modelContext.save()
-        } catch {
-          print("データ保存エラー: \(error)")
-        }
-      }
     }
   }
 
@@ -349,70 +242,6 @@ public struct CameraView: View {
       return 0
     }
     return window.safeAreaInsets.top
-  }
-
-  /// 保存されたスキャンデータを復元してUIに表示する
-  private func loadExistingData() {
-    guard let item = item else { return }
-    // 既存のUI配列をクリアしてから復元する（重複追加防止）
-    croppedImageSets = []
-    recognizedTexts = []
-    confidenceScoreSets = []
-
-    // 保存されたすべてのScanResultを復元してUI配列に追加する
-    var allCroppedSets: [[UIImage]] = []
-    var allRecognized: [[String]] = []
-    var allConfidences: [[Float]] = []
-
-    // まず新しいScanResult配列から復元
-    for scan in item.scanResults {
-      let imgs = scan.getAllQuestionImages().compactMap { $0 }
-      if !imgs.isEmpty {
-        allCroppedSets.append(imgs)
-        allRecognized.append(scan.answerTexts)
-        // 2D信頼度が存在する場合は設問ごとの平均値を計算して使用
-        if !scan.confidenceScores2D.isEmpty {
-          let flattenedConfidences = scan.confidenceScores2D.map { rows -> Float in
-            if rows.isEmpty { return 0.0 }
-            let sum = rows.reduce(0.0, +)
-            return sum / Float(rows.count)
-          }
-          allConfidences.append(flattenedConfidences)
-        } else {
-          allConfidences.append(scan.confidenceScores)
-        }
-      }
-    }
-
-    // 新しい構造が空の場合は古いプロパティから復元しておく（後方互換）
-    if allCroppedSets.isEmpty {
-      let savedImages = item.getAllQuestionImages().compactMap { $0 }
-      if !savedImages.isEmpty && !item.answerTexts.isEmpty {
-        allCroppedSets = [savedImages]
-        allRecognized = [item.answerTexts]
-        allConfidences = [item.confidenceScores]
-      }
-    }
-
-    // UI配列に反映（空でなければ上書き）
-    if !allCroppedSets.isEmpty {
-      croppedImageSets = allCroppedSets
-      recognizedTexts = allRecognized
-      confidenceScoreSets = allConfidences
-
-      // ViewModelの2D信頼度も最新のScanResultから復元（PreviewFullScreenViewでの表示用）
-      if let latestScan = item.scanResults.max(by: { $0.timestamp < $1.timestamp }),
-        !latestScan.confidenceScores2D.isEmpty
-      {
-        viewModel.confidenceScores2D = latestScan.confidenceScores2D
-      }
-
-      // 代表画像を先頭の最初の画像にする
-      if let firstImg = allCroppedSets.first?.first {
-        capturedImages = [firstImg]
-        image = firstImg
-      }
-    }
   }
 }
 
