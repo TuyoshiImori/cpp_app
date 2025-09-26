@@ -52,43 +52,7 @@ public struct CameraView: View {
       )
       .edgesIgnoringSafeArea(.all)
 
-      // 上部バー
-      VStack {
-        HStack {
-          Button(action: { dismiss() }) {
-            Image(systemName: "chevron.left")
-              .font(.system(size: 24, weight: .bold))
-              .foregroundColor(.white)
-              .padding(.leading, 16)
-              .padding(.vertical, 8)
-          }
-          Spacer()
-          // アンケートのタイトルとタイムスタンプを表示
-          if let item = item {
-            VStack(alignment: .trailing, spacing: 2) {
-              if !item.title.isEmpty {
-                Text(item.title)
-                  .foregroundColor(.white)
-                  .font(.headline)
-                  .bold()
-                  .lineLimit(1)
-                  .truncationMode(.tail)
-              }
-              HStack(spacing: 8) {
-                Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                  .foregroundColor(.white.opacity(0.85))
-                  .font(.subheadline)
-              }
-            }
-            .padding(.trailing, 16)
-          }
-        }
-        .frame(height: 60)
-        .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.5))
-        .padding(.top, getSafeAreaTop())
-        Spacer()
-      }
+      // (上部バーは削除) NavigationStack 側のナビゲーションバーを使う
 
       // 左下に代表サムネイルを1つだけ表示する（最新のスキャン）
       VStack {
@@ -186,25 +150,17 @@ public struct CameraView: View {
       }
       .edgesIgnoringSafeArea(.bottom)
 
-      // サンプル画像読み込みボタン
+      // サンプル読み込みボタンは下中央に配置
       VStack {
+        Spacer()
         HStack {
           Spacer()
           Button(action: {
             let loadedSample = UIImage(named: "form", in: Bundle.main, compatibleWith: nil)
             if let sample = loadedSample {
-              // ボタンを無効化して処理中フラグを立てる
               isProcessingSample = true
-              // ViewModel に処理を任せる。
-              // 注意: ViewModel は処理中に `capturedImage` を publish するため、
-              // `.onReceive(viewModel.$capturedImage)` 側で UI 更新（配列追加）を行う。
-              // ここで同じ追加処理を行うと二重追加になるため、completion 内では
-              // UI の配列追加を行わず、処理中フラグの解除のみ行う。
               viewModel.processCapturedImage(sample) {
-                // 処理完了でボタンを再度有効化
                 isProcessingSample = false
-                // UI 配列や永続化は `.onReceive(viewModel.$capturedImage)` 側で行うため
-                // ここでは処理中フラグの解除のみを行う（重複保存防止）
               }
             }
           }) {
@@ -221,16 +177,15 @@ public struct CameraView: View {
             .font(.headline)
             .foregroundColor(.white)
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.blue.opacity(0.8))
-            .cornerRadius(16)
-            .shadow(radius: 4)
+            .padding(.vertical, 12)
+            .background(Color.blue.opacity(0.9))
+            .cornerRadius(20)
+            .shadow(radius: 6)
           }
           .disabled(isProcessingSample)
-          .padding(.top, 16 + safeAreaInsets.top)
-          .padding(.trailing, 16)
+          Spacer()
         }
-        Spacer()
+        .padding(.bottom, 12 + safeAreaInsets.bottom)
       }
 
       .alert(isPresented: $isCircleDetectionFailed) {

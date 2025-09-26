@@ -11,7 +11,7 @@ struct ContentView: View {
   // 各行の設問表示を折りたたむ/展開するための状態
   @State private var expandedRowIDs: Set<String> = []
   // Banner の表示は ViewModel 側で管理する（URL 追加など外部イベントに反応するため）
-  @State private var isPresentedCameraView = false
+  @State private var navigationPath = NavigationPath()
   @State private var image: UIImage?
   @State private var currentItem: Item?
 
@@ -35,49 +35,45 @@ struct ContentView: View {
   }()
 
   var body: some View {
-    ZStack {
-      NavigationSplitView {
-        // アイテム一覧部分を分割したサブビューへ移譲
-        ItemsListView(
-          viewModel: viewModel,
-          items: items,
-          expandedRowIDs: $expandedRowIDs,
-          isPresentedCameraView: $isPresentedCameraView,
-          modelContext: modelContext,
-          onTap: { item, rowID in
-            // タップ時の動作は引き続き ContentView が保持
-            viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
-            // 選択されたアイテムを currentItem にセットして CameraView に渡す
-            currentItem = item
-            // 直前の選択画像があればクリアしておく
-            selectedImage = nil
-            isPresentedCameraView = true
-          },
-          onEdit: { item, rowID in
-            // 編集ダイアログを表示する準備
-            editTargetItem = item
-            editTargetRowID = rowID
-            editTitleText = item.title
-            isShowingEditDialog = true
-          }
-        )
-        .toolbar {
-          ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: {
-              viewModel.toggleEditMode()
-              if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
-            }) { Text(viewModel.isEditing ? "Done" : "Edit") }
-            .tint(.blue)
-          }
+    NavigationStack(path: $navigationPath) {
+      // アイテム一覧部分を分割したサブビューへ移譲
+      ItemsListView(
+        viewModel: viewModel,
+        items: items,
+        expandedRowIDs: $expandedRowIDs,
+        modelContext: modelContext,
+        onTap: { item, rowID in
+          // タップ時の動作は引き続き ContentView が保持
+          viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
+          // 選択されたアイテムを currentItem にセットして CameraView に遷移
+          currentItem = item
+          // 直前の選択画像があればクリアしておく
+          selectedImage = nil
+          // プッシュ遷移でCameraViewに移動
+          navigationPath.append("CameraView")
+        },
+        onEdit: { item, rowID in
+          // 編集ダイアログを表示する準備
+          editTargetItem = item
+          editTargetRowID = rowID
+          editTitleText = item.title
+          isShowingEditDialog = true
         }
-      } detail: {
-        // 詳細表示を小さなコンポーネントに分離
-        DetailImageView(image: image)
+      )
+      .navigationDestination(for: String.self) { destination in
+        if destination == "CameraView" {
+          CameraView(image: $selectedImage, item: currentItem)
+        }
       }
-    }
-    .fullScreenCover(isPresented: $isPresentedCameraView) {
-      CameraView(image: $selectedImage, item: currentItem)
-        .ignoresSafeArea()
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button(action: {
+            viewModel.toggleEditMode()
+            if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
+          }) { Text(viewModel.isEditing ? "Done" : "Edit") }
+          .tint(.blue)
+        }
+      }
     }
     // バナー表示を分離したコンポーネントで表示
     .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))

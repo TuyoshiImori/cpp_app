@@ -23,6 +23,8 @@ struct PreviewFullScreenView: View {
 
   // 分析画面の表示状態
   @State private var isAnalysisPresented = false
+  // NavigationLink での push 用フラグ
+  @State private var isAnalysisActive = false
 
   // MARK: - Init
   init(
@@ -46,182 +48,197 @@ struct PreviewFullScreenView: View {
 
   // MARK: - Body
   var body: some View {
-    ZStack {
-      Color.black.ignoresSafeArea()
+    NavigationStack {
+      ZStack {
+        Color.black.ignoresSafeArea()
+        if !croppedImageSets.isEmpty {
+          imagesTab()
+        }
 
-      if !croppedImageSets.isEmpty {
-        // 単一プレビューの TabView を表示（上部のサムネイル一覧は表示しない）
-        TabView(selection: $previewIndex) {
-          ForEach(0..<croppedImageSets.count, id: \.self) { setIdx in
-            let imageSet = croppedImageSets[setIdx]
-            GeometryReader { geo in
-              ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 10) {
-                  ForEach(0..<imageSet.count, id: \.self) { imgIdx in
-                    let img = imageSet[imgIdx]
-                    VStack {
-                      Text("設問 \(imgIdx + 1)")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                        .padding(.top, 10)
+        // 上部のボタンオーバーレイ
+        VStack {
+          HStack {
+            // 左上の閉じるボタン
+            Button(action: { isPreviewPresented = false }) {
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 36))
+                .foregroundColor(.white)
+                .background(Color.black.opacity(0.3))
+                .clipShape(Circle())
+            }
 
-                      Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: geo.size.width - 20)
-                        .padding(.horizontal, 10)
+            Spacer()
 
-                      // 検出結果と信頼度を表示
-                      if setIdx < parsedAnswersSets.count, imgIdx < parsedAnswersSets[setIdx].count
-                      {
-                        let answerIndex = parsedAnswersSets[setIdx][imgIdx]
-
-                        VStack(alignment: .leading, spacing: 4) {
-                          Text("検出結果:")
-                            .foregroundColor(.white)
-                            .font(.subheadline)
-                            .bold()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .multilineTextAlignment(.leading)
-
-                          // info 設問は parsedAnswer に改行を含む想定なので、
-                          // 改行が含まれる場合は総合的な信頼度表示をスキップする。
-                          let shouldShowOverallConfidence = !answerIndex.contains("\n")
-
-                          if shouldShowOverallConfidence {
-                            // 信頼度表示（もし利用可能なら）。存在しない場合は「信頼度なし」を表示する
-                            if let confidenceScores = confidenceScores,
-                              setIdx < confidenceScores.count,
-                              imgIdx < confidenceScores[setIdx].count
-                            {
-                              let confidence = confidenceScores[setIdx][imgIdx]
-                              HStack {
-                                Text("信頼度:")
-                                  .foregroundColor(.white.opacity(0.8))
-                                  .font(.caption)
-                                Text("\(String(format: "%.1f", confidence))%")
-                                  .foregroundColor(confidenceColor(for: confidence))
-                                  .font(.caption)
-                                  .bold()
-                              }
-                            } else {
-                              // 信頼度データが存在しない、またはインデックスが範囲外の場合のフォールバック表示
-                              HStack {
-                                Text("信頼度:")
-                                  .foregroundColor(.white.opacity(0.8))
-                                  .font(.caption)
-                                Text("信頼度なし")
-                                  .foregroundColor(.gray)
-                                  .font(.caption)
-                                  .italic()
-                              }
-                            }
-                          }
-
-                          // ViewModel の initialQuestionTypes を参照して info タイプか判定
-                          if let qtypes = viewModel?.initialQuestionTypes, imgIdx < qtypes.count {
-                            // QuestionType の詳細構造をここで直接扱わず、info かどうかのみ判定
-                            switch qtypes[imgIdx] {
-                            case .info(_, _):
-                              let lines =
-                                viewModel?.formattedInfoLines(
-                                  for: imgIdx, parsedAnswer: answerIndex) ?? []
-                              ForEach(lines.indices, id: \.self) { idx in
-                                Text(lines[idx])
-                                  .foregroundColor(.white)
-                                  .font(.subheadline)
-                                  .frame(maxWidth: .infinity, alignment: .leading)
-                                  .multilineTextAlignment(.leading)
-                                  .fixedSize(horizontal: false, vertical: true)
-                                  .padding(.vertical, 2)
-                              }
-                            default:
-                              // 非 info の場合は単純に回答表示を行う
-                              if answerIndex == "-1" {
-                                Text("回答: 未検出")
-                                  .foregroundColor(.orange)
-                                  .font(.subheadline)
-                                  .frame(maxWidth: .infinity, alignment: .leading)
-                                  .multilineTextAlignment(.leading)
-                              } else if !answerIndex.isEmpty {
-                                Text("回答: \(answerIndex)")
-                                  .foregroundColor(.green)
-                                  .font(.subheadline)
-                                  .bold()
-                                  .frame(maxWidth: .infinity, alignment: .leading)
-                                  .multilineTextAlignment(.leading)
-                              } else {
-                                Text("回答: 検出エラー")
-                                  .foregroundColor(.red)
-                                  .font(.subheadline)
-                                  .frame(maxWidth: .infinity, alignment: .leading)
-                                  .multilineTextAlignment(.leading)
-                              }
-                            }
-                          } else {
-                            Text("設問情報なし")
-                              .foregroundColor(.gray)
-                              .font(.subheadline)
-                          }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 10)
-                      }
-                    }
-                  }
+            // 右上の分析ボタン
+            if item != nil {
+              Button(action: {
+                // isActive フラグを立てて NavigationLink を発火させる
+                isAnalysisActive = true
+              }) {
+                HStack(spacing: 8) {
+                  Image(systemName: "chart.bar.doc.horizontal")
+                    .font(.system(size: 20))
+                  Text("分析")
+                    .font(.headline)
                 }
-                .padding(.top, 50)
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.blue.opacity(0.8))
+                .cornerRadius(20)
               }
             }
-            .tag(setIdx)
           }
-        }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-        .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-      }
-
-      // 上部のボタンオーバーレイ
-      VStack {
-        HStack {
-          // 左上の閉じるボタン
-          Button(action: { isPreviewPresented = false }) {
-            Image(systemName: "xmark.circle.fill")
-              .font(.system(size: 36))
-              .foregroundColor(.white)
-              .background(Color.black.opacity(0.3))
-              .clipShape(Circle())
-          }
+          .padding(.horizontal, 20)
+          .padding(.top, 50)  // セーフエリアを考慮
 
           Spacer()
+        }
 
-          // 右上の分析ボタン
-          if item != nil {
-            Button(action: { isAnalysisPresented = true }) {
-              HStack(spacing: 8) {
-                Image(systemName: "chart.bar.doc.horizontal")
-                  .font(.system(size: 20))
-                Text("分析")
-                  .font(.headline)
+        // 背景に非表示の NavigationLink を置いて、isAnalysisActive を true にすることで push する
+        if let it = item {
+          NavigationLink(
+            destination: AnalysisView(item: it),
+            isActive: $isAnalysisActive
+          ) {
+            EmptyView()
+          }
+          .hidden()
+        }
+      }
+    }
+  }
+
+  // MARK: - Subviews
+  @ViewBuilder
+  private func imagesTab() -> some View {
+    // 単一プレビューの TabView を表示（上部のサムネイル一覧は表示しない）
+    TabView(selection: $previewIndex) {
+      ForEach(0..<croppedImageSets.count, id: \.self) { setIdx in
+        let imageSet = croppedImageSets[setIdx]
+        GeometryReader { geo in
+          ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 10) {
+              ForEach(0..<imageSet.count, id: \.self) { imgIdx in
+                let img = imageSet[imgIdx]
+                VStack {
+                  Text("設問 \(imgIdx + 1)")
+                    .foregroundColor(.white)
+                    .font(.headline)
+                    .padding(.top, 10)
+
+                  Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: geo.size.width - 20)
+                    .padding(.horizontal, 10)
+
+                  // 検出結果と信頼度を表示
+                  if setIdx < parsedAnswersSets.count, imgIdx < parsedAnswersSets[setIdx].count {
+                    let answerIndex = parsedAnswersSets[setIdx][imgIdx]
+
+                    VStack(alignment: .leading, spacing: 4) {
+                      Text("検出結果:")
+                        .foregroundColor(.white)
+                        .font(.subheadline)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
+
+                      // info 設問は parsedAnswer に改行を含む想定なので、
+                      // 改行が含まれる場合は総合的な信頼度表示をスキップする。
+                      let shouldShowOverallConfidence = !answerIndex.contains("\n")
+
+                      if shouldShowOverallConfidence {
+                        // 信頼度表示（もし利用可能なら）。存在しない場合は「信頼度なし」を表示する
+                        if let confidenceScores = confidenceScores,
+                          setIdx < confidenceScores.count,
+                          imgIdx < confidenceScores[setIdx].count
+                        {
+                          let confidence = confidenceScores[setIdx][imgIdx]
+                          HStack {
+                            Text("信頼度:")
+                              .foregroundColor(.white.opacity(0.8))
+                              .font(.caption)
+                            Text("\(String(format: "%.1f", confidence))%")
+                              .foregroundColor(confidenceColor(for: confidence))
+                              .font(.caption)
+                              .bold()
+                          }
+                        } else {
+                          // 信頼度データが存在しない、またはインデックスが範囲外の場合のフォールバック表示
+                          HStack {
+                            Text("信頼度:")
+                              .foregroundColor(.white.opacity(0.8))
+                              .font(.caption)
+                            Text("信頼度なし")
+                              .foregroundColor(.gray)
+                              .font(.caption)
+                              .italic()
+                          }
+                        }
+                      }
+
+                      // ViewModel の initialQuestionTypes を参照して info タイプか判定
+                      if let qtypes = viewModel?.initialQuestionTypes, imgIdx < qtypes.count {
+                        // QuestionType の詳細構造をここで直接扱わず、info かどうかのみ判定
+                        switch qtypes[imgIdx] {
+                        case .info(_, _):
+                          let lines =
+                            viewModel?.formattedInfoLines(for: imgIdx, parsedAnswer: answerIndex)
+                            ?? []
+                          ForEach(lines.indices, id: \.self) { idx in
+                            Text(lines[idx])
+                              .foregroundColor(.white)
+                              .font(.subheadline)
+                              .frame(maxWidth: .infinity, alignment: .leading)
+                              .multilineTextAlignment(.leading)
+                              .fixedSize(horizontal: false, vertical: true)
+                              .padding(.vertical, 2)
+                          }
+                        default:
+                          // 非 info の場合は単純に回答表示を行う
+                          if answerIndex == "-1" {
+                            Text("回答: 未検出")
+                              .foregroundColor(.orange)
+                              .font(.subheadline)
+                              .frame(maxWidth: .infinity, alignment: .leading)
+                              .multilineTextAlignment(.leading)
+                          } else if !answerIndex.isEmpty {
+                            Text("回答: \(answerIndex)")
+                              .foregroundColor(.green)
+                              .font(.subheadline)
+                              .bold()
+                              .frame(maxWidth: .infinity, alignment: .leading)
+                              .multilineTextAlignment(.leading)
+                          } else {
+                            Text("回答: 検出エラー")
+                              .foregroundColor(.red)
+                              .font(.subheadline)
+                              .frame(maxWidth: .infinity, alignment: .leading)
+                              .multilineTextAlignment(.leading)
+                          }
+                        }
+                      } else {
+                        Text("設問情報なし")
+                          .foregroundColor(.gray)
+                          .font(.subheadline)
+                      }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+                  }
+                }
               }
-              .foregroundColor(.white)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 10)
-              .background(Color.blue.opacity(0.8))
-              .cornerRadius(20)
             }
+            .padding(.top, 50)
           }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 50)  // セーフエリアを考慮
-
-        Spacer()
+        .tag(setIdx)
       }
     }
-    .sheet(isPresented: $isAnalysisPresented) {
-      if let item = item {
-        AnalysisView(item: item)
-      }
-    }
+    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+    .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
   }
 
   // MARK: - Helper Methods

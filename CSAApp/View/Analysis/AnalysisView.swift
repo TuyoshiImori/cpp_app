@@ -50,13 +50,6 @@ struct AnalysisView: View {
       }
       .navigationTitle("分析結果")
       .navigationBarTitleDisplayMode(.large)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarLeading) {
-          Button("閉じる") {
-            dismiss()
-          }
-        }
-      }
     }
     .onAppear {
       // Viewが表示されたときにItemを設定して分析開始

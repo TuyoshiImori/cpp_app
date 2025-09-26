@@ -6,7 +6,6 @@ struct ItemsListView: View {
   @ObservedObject var viewModel: ContentViewModel
   var items: [Item]
   @Binding var expandedRowIDs: Set<String>
-  @Binding var isPresentedCameraView: Bool
   let modelContext: ModelContext?
   let onTap: (Item, String) -> Void
   let onEdit: (Item, String) -> Void
@@ -45,7 +44,7 @@ struct ItemsListView: View {
       .background(Color(.systemGroupedBackground).ignoresSafeArea())
       .onReceive(NotificationCenter.default.publisher(for: .didInsertSurvey)) { notif in
         viewModel.handleDidInsertSurvey(userInfo: notif.userInfo)
-        DispatchQueue.main.async { isPresentedCameraView = false }
+        // プッシュ遷移では自動的に戻るため、明示的に処理する必要なし
       }
       .task(id: viewModel.pendingScrollTo) {
         if let target = viewModel.pendingScrollTo {
