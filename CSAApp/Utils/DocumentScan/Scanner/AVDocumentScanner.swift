@@ -22,6 +22,8 @@ public final class AVDocumentScanner: NSObject, ObservableObject, DocumentScanne
   private let imageCapturer: ImageCapturer
   private var rectangleFeatures: [RectangleFeature] = []
   private let captureSession = AVCaptureSession()
+  // CIContext を再利用してフレームから UIImage を作る（サイレントキャプチャ用）
+  private let ciContext = CIContext()
   private let imageQueue = DispatchQueue(label: "imageQueue")
   public var isAutoCaptureEnabled: Bool = true
 
@@ -126,7 +128,8 @@ extension AVDocumentScanner: AVCaptureVideoDataOutputSampleBufferDelegate {
     {
       if isAutoCaptureEnabled {
         pause()  // ← 自動撮影だけ止めたい場合はここでpause()
-        captureImage(in: smoothed) { [weak delegate] image in
+        // サイレントキャプチャ: 現在のフレーム (image) から直接切り出す
+        captureImageSilently(in: smoothed, from: image) { [weak delegate] image in
           delegate?.didCapture(image: image)
         }
       }
@@ -142,6 +145,42 @@ extension AVDocumentScanner: AVCaptureVideoDataOutputSampleBufferDelegate {
 extension AVDocumentScanner {
   public func captureImage(in bounds: RectangleFeature?, completion: @escaping (UIImage) -> Void) {
     imageCapturer.captureImage(in: bounds, completion: completion)
+  }
+
+  /// サイレントキャプチャ: 与えられた CIImage から perspective 補正を行い UIImage を生成する
+  private func captureImageSilently(
+    in feature: RectangleFeature?, from image: CIImage, completion: @escaping (UIImage) -> Void
+  ) {
+    // このメソッドは imageQueue 上で呼ばれる想定
+    let processed: CIImage
+    if let feature = feature {
+      // feature は一度 screen 座標系に正規化されているため、元の画像サイズに合わせて再正規化する
+      let normalized = feature.normalized(
+        source: UIScreen.main.bounds.size, target: image.extent.size)
+      processed = image.applyingFilter(
+        "CIPerspectiveCorrection",
+        parameters: [
+          "inputTopLeft": CIVector(cgPoint: normalized.topLeft),
+          "inputTopRight": CIVector(cgPoint: normalized.topRight),
+          "inputBottomLeft": CIVector(cgPoint: normalized.bottomLeft),
+          "inputBottomRight": CIVector(cgPoint: normalized.bottomRight),
+        ])
+    } else {
+      processed = image
+    }
+
+    if let cgImage = ciContext.createCGImage(processed, from: processed.extent) {
+      let ui = UIImage(cgImage: cgImage)
+      DispatchQueue.main.async {
+        completion(ui)
+      }
+    } else {
+      // フォールバック: CIImage から直接 UIImage を作って completion を呼ぶ
+      let ui = UIImage(ciImage: processed)
+      DispatchQueue.main.async {
+        completion(ui)
+      }
+    }
   }
 
   public func start() {
