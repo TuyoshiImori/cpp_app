@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// 分析画面のView
 /// Itemのスキャン結果を分析して表示します
@@ -19,8 +20,8 @@ struct AnalysisView: View {
   var body: some View {
     NavigationView {
       ZStack {
-        // 背景色
-        Color.gray.opacity(0.1)
+        // 背景色: ダーク/ライトに追随するシステムカラーを使用
+        Color(.systemBackground)
           .ignoresSafeArea()
 
         if viewModel.isLoading {
@@ -31,6 +32,7 @@ struct AnalysisView: View {
             Text("分析中...")
               .font(.headline)
               .padding(.top)
+              .foregroundColor(Color.primary)
           }
         } else {
           // メインコンテンツ
@@ -105,9 +107,10 @@ struct AnalysisView: View {
           .foregroundColor(.secondary)
       }
     }
-    .padding()
-    .background(Color.white)
-    .cornerRadius(12)
+  .padding()
+  // カードは secondarySystemBackground を使ってダーク/ライトに適応
+  .background(Color(UIColor.secondarySystemBackground))
+  .cornerRadius(12)
   }
 
   // MARK: - Analysis Result Card
@@ -178,9 +181,10 @@ struct AnalysisView: View {
         }
       }
     }
-    .padding()
-    .background(Color.white)
-    .cornerRadius(12)
+  .padding()
+  // カードは secondarySystemBackground を使ってダーク/ライトに適応
+  .background(Color(UIColor.secondarySystemBackground))
+  .cornerRadius(12)
   }
 
   // MARK: - Helper Methods
