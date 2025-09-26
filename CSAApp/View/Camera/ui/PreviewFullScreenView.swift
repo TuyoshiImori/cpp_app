@@ -95,8 +95,6 @@ struct PreviewFullScreenView: View {
             }
           }
           .padding(.horizontal, 20)
-          .padding(.top, 50)  // セーフエリアを考慮
-
           Spacer()
         }
 
@@ -111,7 +109,7 @@ struct PreviewFullScreenView: View {
           .hidden()
         }
 
-        // 下部の削除ボタンオーバーレイ
+        // 下部の削除ボタンオーバーレイ（右下に寄せる）
         VStack {
           Spacer()
           HStack {
@@ -125,9 +123,9 @@ struct PreviewFullScreenView: View {
               isPreviewPresented: $isPreviewPresented,
               onDelete: onDelete
             )
-            Spacer()
           }
           .padding(.bottom, 30)
+          .padding(.trailing, 20)
         }
       }
     }
