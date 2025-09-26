@@ -252,7 +252,7 @@ public struct CameraView: View {
         confidenceScores: confidenceScoreSets,
         onDelete: { index in
           // UI配列と永続化された scanResults の両方から指定インデックスのセットを削除する
-          guard index >= 0 && index < croppedImageSets.count else { return }
+          guard index >= 0 && index < croppedImageSets.count else { return false }
 
           // UI側配列を更新
           croppedImageSets.remove(at: index)
@@ -277,6 +277,8 @@ public struct CameraView: View {
           if previewIndex >= croppedImageSets.count {
             previewIndex = max(0, croppedImageSets.count - 1)
           }
+          // 削除後に残りがあればモーダルは閉じない（false）、なければ閉じる（true）
+          return croppedImageSets.isEmpty
         }
       )
     }

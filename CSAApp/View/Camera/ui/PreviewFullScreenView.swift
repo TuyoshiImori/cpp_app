@@ -18,7 +18,8 @@ struct PreviewFullScreenView: View {
   // 分析画面に渡すItem
   let item: Item?
   // プレビュー中のセットが削除されたときに呼ばれるクロージャ
-  var onDelete: ((Int) -> Void)? = nil
+  // 戻り値は「モーダルを閉じるべきか」を示す Bool
+  var onDelete: ((Int) -> Bool)? = nil
 
   // 信頼度情報を格納するための配列（将来の実装用）
   let confidenceScores: [[Float]]?
@@ -38,7 +39,7 @@ struct PreviewFullScreenView: View {
     item: Item? = nil,
     viewModel: CameraViewModel? = nil,
     confidenceScores: [[Float]]? = nil,
-    onDelete: ((Int) -> Void)? = nil
+  onDelete: ((Int) -> Bool)? = nil
   ) {
     self._isPreviewPresented = isPreviewPresented
     self._previewIndex = previewIndex
@@ -140,7 +141,7 @@ struct PreviewFullScreenView: View {
     let item: Item?
     var viewModel: CameraViewModel?
     @Binding var isPreviewPresented: Bool
-    var onDelete: ((Int) -> Void)?
+  var onDelete: ((Int) -> Bool)?
 
     @Environment(\.modelContext) private var modelContext
     @State private var showConfirm = false
@@ -163,14 +164,18 @@ struct PreviewFullScreenView: View {
       .confirmationDialog("この回答を削除しますか？", isPresented: $showConfirm, titleVisibility: .visible) {
         Button("削除", role: .destructive) {
           // 削除処理: item 単体削除 or 特定セット削除のコールバック
+          var shouldClose = true
           if let callback = onDelete {
-            callback(previewIndex)
+            shouldClose = callback(previewIndex)
           } else if let it = item {
             // フォールバック: item を丸ごと削除
             modelContext.delete(it)
+            shouldClose = true
           }
-          // プレビューを閉じる
-          isPreviewPresented = false
+          // モーダルを閉じるかどうかはコールバックの戻り値に従う
+          if shouldClose {
+            isPreviewPresented = false
+          }
         }
         Button("キャンセル", role: .cancel) {}
       }
