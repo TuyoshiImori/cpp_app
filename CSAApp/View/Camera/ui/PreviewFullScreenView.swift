@@ -39,7 +39,7 @@ struct PreviewFullScreenView: View {
     item: Item? = nil,
     viewModel: CameraViewModel? = nil,
     confidenceScores: [[Float]]? = nil,
-  onDelete: ((Int) -> Bool)? = nil
+    onDelete: ((Int) -> Bool)? = nil
   ) {
     self._isPreviewPresented = isPreviewPresented
     self._previewIndex = previewIndex
@@ -141,7 +141,7 @@ struct PreviewFullScreenView: View {
     let item: Item?
     var viewModel: CameraViewModel?
     @Binding var isPreviewPresented: Bool
-  var onDelete: ((Int) -> Bool)?
+    var onDelete: ((Int) -> Bool)?
 
     @Environment(\.modelContext) private var modelContext
     @State private var showConfirm = false
