@@ -107,10 +107,10 @@ struct AnalysisView: View {
           .foregroundColor(.secondary)
       }
     }
-  .padding()
-  // カードは secondarySystemBackground を使ってダーク/ライトに適応
-  .background(Color(UIColor.secondarySystemBackground))
-  .cornerRadius(12)
+    .padding()
+    // カードは secondarySystemBackground を使ってダーク/ライトに適応
+    .background(Color(UIColor.secondarySystemBackground))
+    .cornerRadius(12)
   }
 
   // MARK: - Analysis Result Card
@@ -181,10 +181,10 @@ struct AnalysisView: View {
         }
       }
     }
-  .padding()
-  // カードは secondarySystemBackground を使ってダーク/ライトに適応
-  .background(Color(UIColor.secondarySystemBackground))
-  .cornerRadius(12)
+    .padding()
+    // カードは secondarySystemBackground を使ってダーク/ライトに適応
+    .background(Color(UIColor.secondarySystemBackground))
+    .cornerRadius(12)
   }
 
   // MARK: - Helper Methods
