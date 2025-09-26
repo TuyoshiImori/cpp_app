@@ -196,16 +196,27 @@ public struct CameraView: View {
         )
       }
     }
-    // アニメーションの起動/停止を観測して、Paused 状態のときだけパルスさせる
+    // View の表示/非表示のライフサイクルでカメラを簡潔に制御する
     .onAppear {
-      // 保存されたスキャンデータを復元
+      // 表示時は必要に応じてスキャン再開とデータ復元を行う
       loadExistingData()
-
+      // resumeAutoCapture は scanner.start() を呼ぶため、
+      // ここでカメラを確実に再開できる
+      viewModel.resumeAutoCapture()
       if viewModel.scanState == .paused {
-        // repeatForever のアニメーションでパルスを開始
         withAnimation(Animation.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
           isPulseActive = true
         }
+      }
+    }
+    .onDisappear {
+      // 画面を離れる（ContentView に戻る等）のタイミングで自動キャプチャを停止し、
+      // セッション自体も停止してカメラを解放する
+      viewModel.pauseAutoCapture()
+      viewModel.scanner.stop()
+      // アニメーションフラグをオフ
+      withAnimation(.easeInOut(duration: 0.18)) {
+        isPulseActive = false
       }
     }
     .onChange(of: viewModel.scanState) { newState in

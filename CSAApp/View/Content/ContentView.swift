@@ -65,6 +65,7 @@ struct ContentView: View {
           CameraView(image: $selectedImage, item: currentItem)
         }
       }
+      // navigationPath の変更による副作用はここでは扱わない。
       .toolbar {
         ToolbarItem(placement: .navigationBarTrailing) {
           Button(action: {
