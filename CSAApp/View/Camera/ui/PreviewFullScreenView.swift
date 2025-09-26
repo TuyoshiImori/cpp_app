@@ -101,7 +101,12 @@ struct PreviewFullScreenView: View {
         // 背景に非表示の NavigationLink を置いて、isAnalysisActive を true にすることで push する
         if let it = item {
           NavigationLink(
-            destination: AnalysisView(item: it),
+            destination: AnalysisView(
+              item: it,
+              allCroppedImageSets: croppedImageSets,
+              allParsedAnswersSets: parsedAnswersSets,
+              allConfidenceScores: confidenceScores
+            ),
             isActive: $isAnalysisActive
           ) {
             EmptyView()

@@ -10,10 +10,31 @@ struct AnalysisView: View {
   @Environment(\.dismiss) private var dismiss
 
   let item: Item
+  // 全ての回答データを保持
+  let allCroppedImageSets: [[UIImage]]
+  let allParsedAnswersSets: [[String]]
+  let allConfidenceScores: [[Float]]?
 
   // MARK: - Initializer
+  /// 新しいイニシャライザ：全ての回答データを受け取る
+  init(
+    item: Item,
+    allCroppedImageSets: [[UIImage]] = [],
+    allParsedAnswersSets: [[String]] = [],
+    allConfidenceScores: [[Float]]? = nil
+  ) {
+    self.item = item
+    self.allCroppedImageSets = allCroppedImageSets
+    self.allParsedAnswersSets = allParsedAnswersSets
+    self.allConfidenceScores = allConfidenceScores
+  }
+
+  /// 従来の互換性のためのイニシャライザ
   init(item: Item) {
     self.item = item
+    self.allCroppedImageSets = []
+    self.allParsedAnswersSets = []
+    self.allConfidenceScores = nil
   }
 
   // MARK: - Body
@@ -41,9 +62,16 @@ struct AnalysisView: View {
               // サマリーカード
               summaryCard
 
-              // 各設問の分析結果
-              ForEach(viewModel.analysisResults) { result in
-                analysisResultCard(result)
+              // 全ての回答データがある場合は、データセット別に表示
+              if !allParsedAnswersSets.isEmpty {
+                ForEach(0..<allParsedAnswersSets.count, id: \.self) { setIndex in
+                  dataSetCard(for: setIndex)
+                }
+              } else {
+                // 従来通り：単一セットの分析結果
+                ForEach(viewModel.analysisResults) { result in
+                  analysisResultCard(result)
+                }
               }
             }
             .padding()
@@ -54,8 +82,13 @@ struct AnalysisView: View {
       .navigationBarTitleDisplayMode(.large)
     }
     .onAppear {
-      // Viewが表示されたときにItemを設定して分析開始
-      viewModel.setItem(item)
+      // Viewが表示されたときにItemと全ての回答データを設定して分析開始
+      viewModel.setItem(
+        item,
+        allCroppedImageSets: allCroppedImageSets as [[Any]],
+        allParsedAnswersSets: allParsedAnswersSets,
+        allConfidenceScores: allConfidenceScores
+      )
     }
   }
 
@@ -71,10 +104,22 @@ struct AnalysisView: View {
           Text("全体信頼度")
             .font(.caption)
             .foregroundColor(.secondary)
-          Text("\(String(format: "%.1f", viewModel.overallConfidenceScore))%")
+          Text("\(String(format: "%.1f", calculateOverallConfidence()))%")
             .font(.title2)
             .bold()
-            .foregroundColor(confidenceColor(viewModel.overallConfidenceScore))
+            .foregroundColor(confidenceColor(calculateOverallConfidence()))
+        }
+
+        Spacer()
+
+        VStack(alignment: .trailing, spacing: 4) {
+          Text("回答データセット")
+            .font(.caption)
+            .foregroundColor(.secondary)
+          Text("\(allParsedAnswersSets.count > 0 ? allParsedAnswersSets.count : 1)セット")
+            .font(.title2)
+            .bold()
+            .foregroundColor(.primary)
         }
 
         Spacer()
@@ -83,7 +128,7 @@ struct AnalysisView: View {
           Text("有効回答")
             .font(.caption)
             .foregroundColor(.secondary)
-          Text("\(viewModel.validAnswerCount)/\(viewModel.totalAnswerCount)")
+          Text("\(calculateValidAnswerCount())/\(calculateTotalAnswerCount())")
             .font(.title2)
             .bold()
             .foregroundColor(.primary)
@@ -110,6 +155,131 @@ struct AnalysisView: View {
     .padding()
     // カードは secondarySystemBackground を使ってダーク/ライトに適応
     .background(Color(UIColor.secondarySystemBackground))
+    .cornerRadius(12)
+  }
+
+  // MARK: - Data Set Card
+  /// データセット別の分析結果カード
+  private func dataSetCard(for setIndex: Int) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      // データセットヘッダー
+      HStack {
+        Text("回答データ \(setIndex + 1)")
+          .font(.largeTitle)
+          .bold()
+          .foregroundColor(.primary)
+
+        Spacer()
+
+        // データセットの信頼度
+        if let confidenceScores = allConfidenceScores,
+          setIndex < confidenceScores.count,
+          !confidenceScores[setIndex].isEmpty
+        {
+          let avgConfidence =
+            confidenceScores[setIndex].reduce(0, +) / Float(confidenceScores[setIndex].count)
+          VStack(alignment: .trailing, spacing: 2) {
+            Text("平均信頼度")
+              .font(.caption)
+              .foregroundColor(.secondary)
+            Text("\(String(format: "%.1f", avgConfidence))%")
+              .font(.headline)
+              .bold()
+              .foregroundColor(confidenceColor(Double(avgConfidence)))
+          }
+        }
+      }
+
+      // このデータセットの各設問
+      if setIndex < allParsedAnswersSets.count {
+        let answerSet = allParsedAnswersSets[setIndex]
+        let confidenceSet =
+          (allConfidenceScores != nil && setIndex < allConfidenceScores!.count)
+          ? allConfidenceScores![setIndex] : []
+
+        ForEach(0..<answerSet.count, id: \.self) { questionIndex in
+          questionCard(
+            questionIndex: questionIndex,
+            answer: answerSet[questionIndex],
+            confidence: questionIndex < confidenceSet.count ? confidenceSet[questionIndex] : 0.0,
+            imageSet: setIndex < allCroppedImageSets.count ? allCroppedImageSets[setIndex] : []
+          )
+        }
+      }
+    }
+    .padding()
+    .background(Color(UIColor.secondarySystemBackground))
+    .cornerRadius(16)
+  }
+
+  // MARK: - Question Card
+  /// 設問別の詳細カード
+  private func questionCard(
+    questionIndex: Int,
+    answer: String,
+    confidence: Float,
+    imageSet: [UIImage]
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      // 設問ヘッダー
+      HStack {
+        Text("設問 \(questionIndex + 1)")
+          .font(.headline)
+          .foregroundColor(.primary)
+
+        Spacer()
+
+        // 設問タイプアイコン（もしQuestionTypeが取得できるなら）
+        if questionIndex < item.questionTypes.count {
+          questionTypeIcon(item.questionTypes[questionIndex])
+        }
+      }
+
+      // 設問文
+      if questionIndex < item.questionTypes.count {
+        Text(getQuestionText(from: item.questionTypes[questionIndex]))
+          .font(.subheadline)
+          .foregroundColor(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      // 検出画像（ある場合）
+      if questionIndex < imageSet.count {
+        Image(uiImage: imageSet[questionIndex])
+          .resizable()
+          .scaledToFit()
+          .frame(maxHeight: 150)
+          .cornerRadius(8)
+          .shadow(radius: 2)
+      }
+
+      // 回答結果
+      VStack(alignment: .leading, spacing: 8) {
+        Text("検出結果:")
+          .font(.subheadline)
+          .bold()
+          .foregroundColor(.primary)
+
+        HStack {
+          Text(answer.isEmpty || answer == "-1" ? "未検出" : answer)
+            .font(.body)
+            .foregroundColor(answer.isEmpty || answer == "-1" ? .secondary : .primary)
+            .fixedSize(horizontal: false, vertical: true)
+
+          Spacer()
+
+          if !answer.isEmpty && answer != "-1" {
+            Text("\(String(format: "%.1f", confidence))%")
+              .font(.caption)
+              .bold()
+              .foregroundColor(confidenceColor(Double(confidence)))
+          }
+        }
+        .padding(.vertical, 4)
+      }
+    }
+    .padding()
+    .background(Color(UIColor.tertiarySystemBackground))
     .cornerRadius(12)
   }
 
@@ -230,6 +400,58 @@ struct AnalysisView: View {
     formatter.locale = Locale(identifier: "ja_JP_POSIX")
     formatter.dateFormat = "yyyy/M/d H:mm"
     return formatter.string(from: date)
+  }
+
+  /// QuestionTypeから設問文を取得
+  private func getQuestionText(from questionType: QuestionType) -> String {
+    switch questionType {
+    case .single(let question, _), .multiple(let question, _), .text(let question),
+      .info(let question, _):
+      return question
+    }
+  }
+
+  /// 全体の信頼度を計算
+  private func calculateOverallConfidence() -> Double {
+    guard let confidenceScores = allConfidenceScores, !confidenceScores.isEmpty else {
+      return viewModel.overallConfidenceScore
+    }
+
+    var totalConfidence: Float = 0
+    var totalCount = 0
+
+    for setScores in confidenceScores {
+      totalConfidence += setScores.reduce(0, +)
+      totalCount += setScores.count
+    }
+
+    return totalCount > 0 ? Double(totalConfidence) / Double(totalCount) : 0.0
+  }
+
+  /// 有効回答数を計算
+  private func calculateValidAnswerCount() -> Int {
+    guard !allParsedAnswersSets.isEmpty else {
+      return viewModel.validAnswerCount
+    }
+
+    var validCount = 0
+    for answerSet in allParsedAnswersSets {
+      validCount += answerSet.filter { !$0.isEmpty && $0 != "-1" }.count
+    }
+    return validCount
+  }
+
+  /// 総回答数を計算
+  private func calculateTotalAnswerCount() -> Int {
+    guard !allParsedAnswersSets.isEmpty else {
+      return viewModel.totalAnswerCount
+    }
+
+    var totalCount = 0
+    for answerSet in allParsedAnswersSets {
+      totalCount += answerSet.count
+    }
+    return totalCount
   }
 }
 

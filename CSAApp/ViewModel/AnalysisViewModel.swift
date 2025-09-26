@@ -58,17 +58,87 @@ class AnalysisViewModel: ObservableObject {
 
   /// Itemを設定し、分析を開始する
   /// - Parameter item: 分析対象のItem
+  /// - Parameter allCroppedImageSets: 全ての切り抜き画像セット
+  /// - Parameter allParsedAnswersSets: 全ての解析済み回答セット
+  /// - Parameter allConfidenceScores: 全ての信頼度スコアセット
+  func setItem(
+    _ item: Item,
+    allCroppedImageSets: [[Any]] = [],
+    allParsedAnswersSets: [[String]] = [],
+    allConfidenceScores: [[Float]]? = nil
+  ) {
+    self.item = item
+    performAnalysis(
+      allCroppedImageSets: allCroppedImageSets,
+      allParsedAnswersSets: allParsedAnswersSets,
+      allConfidenceScores: allConfidenceScores
+    )
+  }
+
+  /// 従来の互換性のためのメソッド
   func setItem(_ item: Item) {
     self.item = item
     performAnalysis()
   }
 
-  /// 分析を実行する
-  private func performAnalysis() {
+  /// 分析を実行する（全データセット対応版）
+  private func performAnalysis(
+    allCroppedImageSets: [[Any]] = [],
+    allParsedAnswersSets: [[String]] = [],
+    allConfidenceScores: [[Float]]? = nil
+  ) {
     guard let item = item else { return }
 
     isLoading = true
     analysisResults = []
+
+    // 全データセットがある場合は、それを使用
+    if !allParsedAnswersSets.isEmpty {
+      // 各設問について、全データセットを集約した分析結果を作成
+      for (questionIndex, questionType) in item.questionTypes.enumerated() {
+        var allAnswersForQuestion: [String] = []
+        var allConfidenceForQuestion: [Float] = []
+
+        // 全データセットから当該設問の回答を集める
+        for setIndex in 0..<allParsedAnswersSets.count {
+          let answerSet = allParsedAnswersSets[setIndex]
+          if questionIndex < answerSet.count {
+            allAnswersForQuestion.append(answerSet[questionIndex])
+          }
+
+          if let confidenceScores = allConfidenceScores,
+            setIndex < confidenceScores.count,
+            questionIndex < confidenceScores[setIndex].count
+          {
+            allConfidenceForQuestion.append(confidenceScores[setIndex][questionIndex])
+          }
+        }
+
+        let result = AnalysisResult(
+          questionIndex: questionIndex,
+          questionText: getQuestionText(from: questionType),
+          questionType: questionType,
+          answers: allAnswersForQuestion,
+          confidenceScores: allConfidenceForQuestion,
+          analysisScore: calculateAnalysisScore(
+            for: questionType, answers: allAnswersForQuestion, confidence: allConfidenceForQuestion),
+          recommendations: generateRecommendations(
+            for: questionType, answers: allAnswersForQuestion, confidence: allConfidenceForQuestion)
+        )
+
+        analysisResults.append(result)
+      }
+    } else {
+      // 従来通りの単一データセット分析
+      performLegacyAnalysis()
+    }
+
+    isLoading = false
+  }
+
+  /// 従来の分析処理（後方互換性のため）
+  private func performLegacyAnalysis() {
+    guard let item = item else { return }
 
     // 最新のスキャン結果を取得
     let scanResult = item.getLatestScanResult()
@@ -94,8 +164,13 @@ class AnalysisViewModel: ObservableObject {
 
       analysisResults.append(result)
     }
+  }
 
-    isLoading = false
+  /// 従来の分析を実行する（後方互換性のため）
+  private func performAnalysis() {
+    performAnalysis(
+      allCroppedImageSets: [] as [[Any]], allParsedAnswersSets: [],
+      allConfidenceScores: [] as [[Float]]?)
   }
 
   /// QuestionTypeから設問文を取得
