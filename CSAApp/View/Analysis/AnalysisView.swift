@@ -202,6 +202,10 @@ struct AnalysisView: View {
     // 設問タイプに応じて適切なコンポーネントを返す
     switch questionType {
     case .single(let question, let options):
+      // 該当設問の要約状態を ViewModel から取得して渡す
+      let summarizationState = viewModel.analysisResults.first(where: {
+        $0.questionIndex == questionIndex
+      })
       return AnyView(
         SingleQuestionAnalysisView(
           questionIndex: questionIndex,
@@ -209,7 +213,9 @@ struct AnalysisView: View {
           answers: allAnswersForQuestion,
           confidenceScores: allConfidenceForQuestion,
           images: allImagesForQuestion,
-          options: options
+          options: options,
+          isSummarizing: summarizationState?.isSummarizing ?? false,
+          otherSummary: summarizationState?.otherSummary
         )
       )
 

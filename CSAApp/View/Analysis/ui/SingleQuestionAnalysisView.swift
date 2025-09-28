@@ -8,6 +8,9 @@ struct SingleQuestionAnalysisView: View {
   let confidenceScores: [Float]
   let images: [Data]  // UIImageの代わりにDataを使用
   let options: [String]
+  // 要約状態（ViewModel の analysisResults から設定される想定）
+  var isSummarizing: Bool = false
+  var otherSummary: String? = nil
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -30,156 +33,95 @@ struct SingleQuestionAnalysisView: View {
         .foregroundColor(.primary)
         .fixedSize(horizontal: false, vertical: true)
 
-      // 選択肢の表示
-      if !options.isEmpty {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("選択肢:")
-            .font(.caption)
-            .bold()
-            .foregroundColor(.secondary)
+      // 集計ロジックは ViewModel に移譲
+      let agg = AnalysisViewModel.aggregateSingleChoice(answers: answers, options: options)
+      let otherTexts = agg.otherTexts
+      let total = agg.total
 
-          ForEach(options.indices, id: \.self) { index in
-            Text("• \(options[index])")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
+      // 円グラフ（回答がある場合のみ表示）
+      if total > 0 {
+        HStack(alignment: .center, spacing: 16) {
+          // ViewModel から返された entries を PieChartEntry にマッピング（色はインデックスで割当）
+          PieChartView(
+            entries: agg.entries.enumerated().map { (i, e) in
+              PieChartEntry(
+                label: e.label,
+                value: e.value,
+                color: Color(
+                  hue: Double(i) / Double(max(1, agg.entries.count)), saturation: 0.6,
+                  brightness: 0.9),
+                percent: e.percent
+              )
+            }
+          )
+          .frame(width: 140, height: 140)
+
+          Spacer()
         }
+      } else {
+        Text("選択された回答がありません")
+          .font(.caption)
+          .foregroundColor(.secondary)
       }
 
-      // 検出画像がある場合は表示
-      if !images.isEmpty {
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 8) {
-            ForEach(images.indices, id: \.self) { index in
-              VStack {
-                // 画像プレースホルダー
-                Rectangle()
-                  .fill(Color.gray.opacity(0.3))
-                  .overlay(
-                    Image(systemName: "photo")
-                      .foregroundColor(.gray)
-                  )
-                  .frame(maxHeight: 100)
-                  .cornerRadius(8)
-                  .shadow(radius: 2)
+      // 有効回答数：円グラフの下、選択肢リストの上に表示
+      Text("有効回答: \(total)")
+        .font(.subheadline)
+        .foregroundColor(.secondary)
 
-                Text("回答 \(index + 1)")
-                  .font(.caption2)
-                  .foregroundColor(.secondary)
+      // 回答されている各選択肢をパーセントで表示（未選択の選択肢は除外）
+      let percentages = agg.entries
+      if !percentages.isEmpty {
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(percentages.indices, id: \.self) { idx in
+            let item = percentages[idx]
+
+            HStack {
+              Circle()
+                .fill(
+                  Color(
+                    hue: Double(idx) / Double(max(1, percentages.count)), saturation: 0.6,
+                    brightness: 0.9)
+                )
+                .frame(width: 10, height: 10)
+              // 表示フォーマット: 選択肢：xx.x%（n件）
+              Text("\(item.label)： \(String(format: "%.1f", item.percent))%（\(Int(item.value))件）")
+                .font(.caption)
+                .foregroundColor(.primary)
+              Spacer()
+            }
+          }
+
+          // "その他" の自由記述を抜粋して表示（LLM要約は別処理）
+          if !otherTexts.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+              // 要約中はインジケータを表示、完了したら要約テキストを表示
+              if isSummarizing {
+                HStack(spacing: 8) {
+                  ProgressView()
+                    .scaleEffect(0.6, anchor: .center)
+                  Text("要約を生成中...")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                }
+              } else if let summary = otherSummary {
+                VStack(alignment: .leading, spacing: 6) {
+                  Text("要約:")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                  Text(summary)
+                    .font(.caption2)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
               }
             }
           }
-          .padding(.horizontal)
-        }
-      }
-
-      // 検出結果の表示
-      VStack(alignment: .leading, spacing: 8) {
-        Text("検出結果:")
-          .font(.subheadline)
-          .bold()
-          .foregroundColor(.primary)
-
-        ForEach(answers.indices, id: \.self) { index in
-          let answer = answers[index]
-          let confidence = index < confidenceScores.count ? confidenceScores[index] : 0.0
-
-          HStack {
-            // データセット番号
-            Text("データ\(index + 1):")
-              .font(.caption)
-              .foregroundColor(.secondary)
-              .frame(minWidth: 60, alignment: .leading)
-
-            // 回答内容
-            Text(answer.isEmpty || answer == "-1" ? "未検出" : answer)
-              .font(.body)
-              .foregroundColor(answer.isEmpty || answer == "-1" ? .secondary : .primary)
-
-            Spacer()
-
-            // 信頼度
-            if !answer.isEmpty && answer != "-1" {
-              Text("\(String(format: "%.1f", confidence))%")
-                .font(.caption)
-                .bold()
-                .foregroundColor(confidenceColor(Double(confidence)))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(confidenceColor(Double(confidence)).opacity(0.1))
-                .cornerRadius(4)
-            }
-          }
-          .padding(.vertical, 2)
-        }
-
-        // 統計情報
-        if answers.count > 1 {
-          statisticsView
         }
       }
     }
     .padding()
     .background(Color.secondary.opacity(0.1))
     .cornerRadius(12)
-  }
-
-  /// 統計情報表示
-  private var statisticsView: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("統計:")
-        .font(.caption)
-        .bold()
-        .foregroundColor(.secondary)
-
-      HStack {
-        // 検出率
-        let detectionRate =
-          Double(answers.filter { !$0.isEmpty && $0 != "-1" }.count) / Double(answers.count) * 100
-        Text("検出率: \(String(format: "%.1f", detectionRate))%")
-          .font(.caption)
-          .foregroundColor(.secondary)
-
-        Spacer()
-
-        // 平均信頼度
-        if !confidenceScores.isEmpty {
-          let avgConfidence = confidenceScores.reduce(0, +) / Float(confidenceScores.count)
-          Text("平均信頼度: \(String(format: "%.1f", avgConfidence))%")
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-      }
-    }
-    .padding(.top, 4)
-  }
-
-  /// 信頼度に応じた色を返す
-  private func confidenceColor(_ confidence: Double) -> Color {
-    switch confidence {
-    case 80...:
-      return .green
-    case 60..<80:
-      return .yellow
-    case 40..<60:
-      return .orange
-    default:
-      return .red
-    }
-  }
-}
-
-/// プレビュー
-struct SingleQuestionAnalysisView_Previews: PreviewProvider {
-  static var previews: some View {
-    SingleQuestionAnalysisView(
-      questionIndex: 0,
-      questionText: "好きな色は何ですか？",
-      answers: ["赤", "青", "未検出"],
-      confidenceScores: [85.0, 92.0, 0.0],
-      images: [],
-      options: ["赤", "青", "緑", "黄"]
-    )
-    .padding()
   }
 }

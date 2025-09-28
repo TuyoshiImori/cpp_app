@@ -2,6 +2,10 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+#if canImport(FoundationModels)
+  import FoundationModels
+#endif
+
 // Itemモデルをimport
 // 同じプロジェクト内なので直接参照可能
 
@@ -24,6 +28,10 @@ class AnalysisViewModel: ObservableObject {
     let confidenceScores: [Float]
     let analysisScore: Double
     let recommendations: [String]
+    // "その他" の LLM 要約結果（存在する場合）
+    var otherSummary: String? = nil
+    // 設問単位の要約処理中フラグ
+    var isSummarizing: Bool = false
   }
 
   // MARK: - Computed Properties
@@ -134,6 +142,46 @@ class AnalysisViewModel: ObservableObject {
     }
 
     isLoading = false
+    // 分析が終わったら、必要に応じて各設問の "その他" を順番に要約する
+    Task { @MainActor in
+      await startLLMSummarizations()
+    }
+  }
+
+  /// 全設問に対して、"その他" 自由記述がある場合は順番に要約を実行する
+  /// 同一の要約処理が同時に走らないよう、actor ベースのキューで直列実行する
+  func startLLMSummarizations() async {
+    for idx in analysisResults.indices {
+      let result = analysisResults[idx]
+      switch result.questionType {
+      case .single(_, let options):
+        let agg = Self.aggregateSingleChoice(answers: result.answers, options: options)
+        if !agg.otherTexts.isEmpty {
+          // FoundationModels が利用できない環境では何もしない
+          #if !canImport(FoundationModels)
+            continue
+          #else
+            // 表示用にフラグを立てる
+            analysisResults[idx].isSummarizing = true
+
+            // actor 経由で順次要約を実行（質問インデックスと設問文を渡してログ出力させる）
+            let summary = await SummarizationQueue.shared.summarize(
+              otherTexts: agg.otherTexts,
+              questionIndex: idx,
+              questionText: result.questionText
+            )
+
+            // nil が返った場合は何も表示しない（FoundationModels が使えない or エラー）
+            if let s = summary {
+              analysisResults[idx].otherSummary = s
+            }
+            analysisResults[idx].isSummarizing = false
+          #endif
+        }
+      default:
+        continue
+      }
+    }
   }
 
   /// 従来の分析処理（後方互換性のため）
@@ -235,5 +283,118 @@ class AnalysisViewModel: ObservableObject {
     item = nil
     analysisResults = []
     isLoading = false
+  }
+
+  // MARK: - 単一選択設問のロジック
+  // 使用対象: 単一選択設問 (.single)、および拡張として単純な集計を必要とする他の設問タイプ
+  /// 単一選択設問の回答を集計し、円グラフ描画用のエントリを返す
+  /// - Parameters:
+  ///   - answers: 生の回答文字列配列（各回答セットから抽出した当該設問の値）
+  ///   - options: 設問の選択肢ラベル配列
+  /// - Returns: counts（ラベル->件数）, otherTexts（選択肢に一致しない自由記述）, entries（円グラフ用エントリ）, total（有効回答数）
+  // ローカルの円グラフ用データ表現（UIに依存しない）
+  struct PieChartData: Identifiable {
+    let id = UUID()
+    let label: String
+    var value: Double
+    var percent: Double
+  }
+
+  // MARK: - LLMの要約処理
+  // AnalysisViewModel 内に actor を持ち、要約処理はここで直列実行される
+  actor SummarizationQueue {
+    static let shared = SummarizationQueue()
+    private init() {}
+
+    /// otherTexts を受け取り要約文字列を返す（直列実行が保証される）
+    nonisolated func summarize(otherTexts: [String], questionIndex: Int, questionText: String) async
+      -> String?
+    {
+      // FoundationModels が利用可能でない場合は nil を返して何もしない
+      #if !canImport(FoundationModels)
+        return nil
+      #endif
+
+      // FoundationModels が利用可能な場合のみ実行（ランタイムの OS バージョンも確認）
+      if #available(iOS 17.0, macOS 14.0, *) {
+        do {
+          // プロンプトの組み立て: 設問情報と自由記述を番号付きリストで渡す
+          let promptHeader =
+            "設問 \(questionIndex + 1): \(questionText)\n単一選択肢を選択する設問のその他の選択肢で回答された以下の自由記述回答を日本語で短く要約してください。主要なポイントを1〜2文でまとめてください。\n\n"
+          var bodyLines: [String] = []
+          for (i, text) in otherTexts.enumerated() {
+            let sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let line = "[\(i+1)] \(sanitized)"
+            bodyLines.append(line)
+          }
+          let inputs = bodyLines.joined(separator: "\n")
+          let prompt = promptHeader + inputs
+
+          // ログ出力: 実際に投げるプロンプトをログに出す
+          print("[LLM] Prompt for questionIndex=\(questionIndex): \n\(prompt)")
+
+          let session = LanguageModelSession()
+          let response = try await session.respond(to: prompt)
+          let content = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+          // ログ出力: 応答の抜粋をログに出す
+          print("[LLM] Response for questionIndex=\(questionIndex): \n\(content)")
+
+          if content.isEmpty { return nil }
+          return content
+        } catch {
+          print("[LLM] Error summarizing for questionIndex=\(questionIndex): \(error)")
+          return nil
+        }
+      } else {
+        return nil
+      }
+    }
+  }
+
+  static func aggregateSingleChoice(answers: [String], options: [String]) -> (
+    counts: [String: Int], otherTexts: [String], entries: [PieChartData], total: Int
+  ) {
+    var dict: [String: Int] = [:]
+    var otherTexts: [String] = []
+
+    for raw in answers {
+      let a = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+      if a.isEmpty || a == "-1" { continue }
+
+      if let idx = Int(a), idx >= 0, idx < options.count {
+        let label = options[idx]
+        dict[label, default: 0] += 1
+        continue
+      }
+
+      if let match = options.first(where: {
+        $0.trimmingCharacters(in: .whitespacesAndNewlines) == a
+      }) {
+        dict[match, default: 0] += 1
+        continue
+      }
+
+      // 選択肢に一致しないものは "その他"
+      dict["その他", default: 0] += 1
+      otherTexts.append(a)
+    }
+
+    let total = dict.values.reduce(0, +)
+
+    // 円グラフ用エントリ作成
+    let pairs = dict.sorted { $0.key < $1.key }
+    var entries: [PieChartData] = []
+    for (_, p) in pairs.enumerated() {
+      entries.append(PieChartData(label: p.key, value: Double(p.value), percent: 0.0))
+    }
+
+    if total > 0 {
+      for i in entries.indices {
+        entries[i].percent = entries[i].value / Double(total) * 100.0
+      }
+    }
+
+    return (counts: dict, otherTexts: otherTexts, entries: entries, total: total)
   }
 }
