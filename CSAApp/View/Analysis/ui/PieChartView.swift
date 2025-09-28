@@ -1,8 +1,6 @@
 import SwiftUI
 
 // 共通円グラフコンポーネント
-// 再利用性のために Analysis/ui に配置
-// 入力: entries - ラベル・値・色・任意でパーセントを持つエントリ配列
 struct PieChartEntry: Identifiable {
   let id = UUID()
   let label: String
