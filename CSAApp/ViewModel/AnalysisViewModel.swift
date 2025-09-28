@@ -301,7 +301,6 @@ class AnalysisViewModel: ObservableObject {
   }
 
   // MARK: - LLMの要約処理
-  // AnalysisViewModel 内に actor を持ち、要約処理はここで直列実行される
   actor SummarizationQueue {
     static let shared = SummarizationQueue()
     private init() {}
