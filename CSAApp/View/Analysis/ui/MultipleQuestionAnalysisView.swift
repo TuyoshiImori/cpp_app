@@ -16,23 +16,26 @@ struct MultipleQuestionAnalysisView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       // 設問ヘッダー
-      HStack {
+      HStack(alignment: .top, spacing: 12) {
         Image(systemName: "list.bullet")
           .foregroundColor(.green)
-          .font(.title3)
+          .font(.title2)
 
-        Text("設問 \(questionIndex + 1) (複数選択)")
-          .font(.headline)
-          .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 6) {
+          Text("設問 \(questionIndex + 1) (複数選択)")
+            .font(.title3)
+            .fontWeight(.semibold)
+            .foregroundColor(.primary)
+
+          // 設問文
+          Text(questionText)
+            .font(.body)
+            .foregroundColor(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
 
         Spacer()
       }
-
-      // 設問文
-      Text(questionText)
-        .font(.subheadline)
-        .foregroundColor(.primary)
-        .fixedSize(horizontal: false, vertical: true)
 
       // 集計は ViewModel に統一
       let agg = AnalysisViewModel.aggregateMultipleChoice(answers: answers, options: options)
@@ -66,7 +69,7 @@ struct MultipleQuestionAnalysisView: View {
 
       // 有効回答数：円グラフの下、選択肢リストの上に表示
       Text("有効回答: \(total)")
-        .font(.subheadline)
+        .font(.caption)
         .foregroundColor(.secondary)
 
       // 回答されている各選択肢をパーセントで表示（未選択の選択肢は除外）
@@ -85,9 +88,20 @@ struct MultipleQuestionAnalysisView: View {
                 )
                 .frame(width: 10, height: 10)
               // 表示フォーマット: 選択肢：xx.x%（n件）
-              Text("\(item.label)： \(String(format: "%.1f", item.percent))%（\(Int(item.value))件）")
-                .font(.caption)
-                .foregroundColor(.primary)
+              VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                  Text(item.label)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                  Spacer()
+                  Text("\(String(format: "%.1f", item.percent))%")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                }
+                Text("\(Int(item.value))件")
+                  .font(.caption2)
+                  .foregroundColor(.secondary)
+              }
               Spacer()
             }
           }
@@ -101,16 +115,16 @@ struct MultipleQuestionAnalysisView: View {
                   ProgressView()
                     .scaleEffect(0.6, anchor: .center)
                   Text("要約を生成中...")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundColor(.secondary)
                 }
               } else if let summary = otherSummary {
                 VStack(alignment: .leading, spacing: 6) {
                   Text("要約:")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundColor(.secondary)
                   Text(summary)
-                    .font(.caption2)
+                    .font(.body)
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 }
@@ -120,13 +134,13 @@ struct MultipleQuestionAnalysisView: View {
         }
       }
     }
-  .padding()
-#if canImport(UIKit)
-  .background(Color(UIColor.secondarySystemBackground))
-#else
-  .background(Color.secondary.opacity(0.1))
-#endif
-  .cornerRadius(12)
+    .padding()
+    #if canImport(UIKit)
+      .background(Color(UIColor.secondarySystemBackground))
+    #else
+      .background(Color.secondary.opacity(0.1))
+    #endif
+    .cornerRadius(12)
   }
 }
 

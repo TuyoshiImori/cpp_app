@@ -1,6 +1,7 @@
 import SwiftUI
+
 #if canImport(UIKit)
-import UIKit
+  import UIKit
 #endif
 
 /// テキスト入力設問の分析結果を表示するコンポーネント
@@ -18,15 +19,17 @@ struct TextQuestionAnalysisView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       // 設問ヘッダー
-      HStack {
+      HStack(alignment: .top, spacing: 12) {
         Image(systemName: "textformat")
           .foregroundColor(.orange)
-          .font(.title3)
+          .font(.title2)
 
-        Text("設問 \(questionIndex + 1) (自由記述)")
-          .font(.headline)
-          .foregroundColor(.primary)
-
+        VStack(alignment: .leading, spacing: 6) {
+          Text("設問 \(questionIndex + 1) (自由記述)")
+            .font(.title3)
+            .fontWeight(.semibold)
+            .foregroundColor(.primary)
+        }
         Spacer()
       }
 
@@ -42,23 +45,28 @@ struct TextQuestionAnalysisView: View {
           ProgressView()
             .scaleEffect(0.9)
           Text("要約を取得中...")
-            .font(.caption)
+            .font(.subheadline)
             .foregroundColor(.secondary)
         }
       } else if let s = otherSummary {
-        Text(s)
-          .font(.body)
-          .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 6) {
+          Text("要約:")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+          Text(s)
+            .font(.subheadline)
+            .foregroundColor(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
     }
-  .padding()
-  // summaryCard と同じ見た目に統一（ダークモード対応）
-#if canImport(UIKit)
-  .background(Color(UIColor.secondarySystemBackground))
-#else
-  .background(Color.secondary.opacity(0.1))
-#endif
-  .cornerRadius(12)
+    .padding()
+    // summaryCard と同じ見た目に統一（ダークモード対応）
+    #if canImport(UIKit)
+      .background(Color(UIColor.secondarySystemBackground))
+    #else
+      .background(Color.secondary.opacity(0.1))
+    #endif
+    .cornerRadius(12)
   }
 }
