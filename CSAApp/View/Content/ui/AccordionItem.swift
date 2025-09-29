@@ -17,6 +17,16 @@ struct AccordionItem: View {
   let onTap: () -> Void
   let onEdit: (Item, String) -> Void
 
+  @Environment(\.colorScheme) private var colorScheme
+
+  private var cardBackground: Color {
+    if colorScheme == .dark {
+      return Color(white: 0.08)
+    } else {
+      return Color(UIColor.systemBackground)
+    }
+  }
+
   // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)
   private var vm: ContentViewModel.AccordionItemVM {
     ContentViewModel.AccordionItemVM(item: item, rowID: rowID)
@@ -47,9 +57,10 @@ struct AccordionItem: View {
           suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
           value: slideOffset)
     }
-    // 背景はシステムの背景色を使う（ダークモード対応）
-    .background(Color(.systemBackground))
-    .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
+  // カード背景：ダークモード時は薄い黒、ライトはシステム背景
+  .background(cardBackground)
+  .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
+  .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
     // 設定アプリ風の区切り線を各アイテム下部に表示（左にインセットを入れる）
     .overlay(
       VStack {
@@ -197,7 +208,7 @@ struct AccordionItem: View {
       headerView(isExpanded: isExpanded)
       expandedContentView(isExpanded: isExpanded)
     }
-    .background(.background)
+  .background(cardBackground)
     .animation(.easeInOut(duration: 0.25), value: isExpanded)
     // 編集モード中はタップによる画面遷移を無効化
     .onTapGesture {
@@ -229,7 +240,7 @@ struct AccordionItem: View {
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.background)
+  .background(cardBackground)
     .zIndex(2)
     .animation(nil, value: isExpanded)
   }
