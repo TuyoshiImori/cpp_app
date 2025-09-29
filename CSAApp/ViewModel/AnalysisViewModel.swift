@@ -122,7 +122,7 @@ class AnalysisViewModel: ObservableObject {
           }
         }
 
-        let result = AnalysisResult(
+        var result = AnalysisResult(
           questionIndex: questionIndex,
           questionText: getQuestionText(from: questionType),
           questionType: questionType,
@@ -134,6 +134,22 @@ class AnalysisViewModel: ObservableObject {
             for: questionType, answers: allAnswersForQuestion, confidence: allConfidenceForQuestion)
         )
 
+        // 作成時点で "その他" が存在する設問は、画面表示時点でローディングを表示するために事前にフラグを立てる
+        switch questionType {
+        case .single(_, let options):
+          let agg = Self.aggregateSingleChoice(answers: allAnswersForQuestion, options: options)
+          if !agg.otherTexts.isEmpty {
+            result.isSummarizing = true
+          }
+        case .multiple(_, let options):
+          let agg = Self.aggregateMultipleChoice(answers: allAnswersForQuestion, options: options)
+          if !agg.otherTexts.isEmpty {
+            result.isSummarizing = true
+          }
+        default:
+          break
+        }
+
         analysisResults.append(result)
       }
     } else {
@@ -142,6 +158,38 @@ class AnalysisViewModel: ObservableObject {
     }
 
     isLoading = false
+
+    // 画面表示時点で、要約が行われる予定の設問（"その他" が存在するもの）については
+    // UI 上で要約欄にローディングを表示するために事前にフラグを立てておく。
+    // 実際の要約は従来通り順次実行される。
+    for idx in analysisResults.indices {
+      let res = analysisResults[idx]
+      switch res.questionType {
+      case .single(_, let options):
+        let agg = Self.aggregateSingleChoice(answers: res.answers, options: options)
+        if !agg.otherTexts.isEmpty {
+          var m = analysisResults[idx]
+          m.isSummarizing = true
+          analysisResults[idx] = m
+          print(
+            "[AnalysisViewModel] Pre-marking isSummarizing for questionIndex=\(idx) (single), otherTextsCount=\(agg.otherTexts.count)"
+          )
+        }
+      case .multiple(_, let options):
+        let agg = Self.aggregateMultipleChoice(answers: res.answers, options: options)
+        if !agg.otherTexts.isEmpty {
+          var m = analysisResults[idx]
+          m.isSummarizing = true
+          analysisResults[idx] = m
+          print(
+            "[AnalysisViewModel] Pre-marking isSummarizing for questionIndex=\(idx) (multiple), otherTextsCount=\(agg.otherTexts.count)"
+          )
+        }
+      default:
+        break
+      }
+    }
+
     // 分析が終わったら、必要に応じて各設問の "その他" を順番に要約する
     Task { @MainActor in
       await startLLMSummarizations()
@@ -161,8 +209,10 @@ class AnalysisViewModel: ObservableObject {
           #if !canImport(FoundationModels)
             continue
           #else
-            // 表示用にフラグを立てる
-            analysisResults[idx].isSummarizing = true
+            // 表示用にフラグを立てる（配列要素を取り出して変更→再代入）
+            var m = analysisResults[idx]
+            m.isSummarizing = true
+            analysisResults[idx] = m
 
             // actor 経由で順次要約を実行（質問インデックスと設問文を渡してログ出力させる）
             let summary = await SummarizationQueue.shared.summarize(
@@ -174,9 +224,14 @@ class AnalysisViewModel: ObservableObject {
 
             // nil が返った場合は何も表示しない（FoundationModels が使えない or エラー）
             if let s = summary {
-              analysisResults[idx].otherSummary = s
+              var mm = analysisResults[idx]
+              mm.otherSummary = s
+              analysisResults[idx] = mm
             }
-            analysisResults[idx].isSummarizing = false
+
+            var cleared = analysisResults[idx]
+            cleared.isSummarizing = false
+            analysisResults[idx] = cleared
           #endif
         }
       case .multiple(_, let options):
@@ -185,7 +240,10 @@ class AnalysisViewModel: ObservableObject {
           #if !canImport(FoundationModels)
             continue
           #else
-            analysisResults[idx].isSummarizing = true
+            var m = analysisResults[idx]
+            m.isSummarizing = true
+            analysisResults[idx] = m
+
             let summary = await SummarizationQueue.shared.summarize(
               otherTexts: agg.otherTexts,
               questionIndex: idx,
@@ -193,9 +251,14 @@ class AnalysisViewModel: ObservableObject {
               questionKind: "multiple"
             )
             if let s = summary {
-              analysisResults[idx].otherSummary = s
+              var mm = analysisResults[idx]
+              mm.otherSummary = s
+              analysisResults[idx] = mm
             }
-            analysisResults[idx].isSummarizing = false
+
+            var cleared = analysisResults[idx]
+            cleared.isSummarizing = false
+            analysisResults[idx] = cleared
           #endif
         }
       default:
@@ -218,7 +281,7 @@ class AnalysisViewModel: ObservableObject {
       let questionAnswers = index < answers.count ? [answers[index]] : []
       let questionConfidence = index < confidenceScores.count ? [confidenceScores[index]] : []
 
-      let result = AnalysisResult(
+      var result = AnalysisResult(
         questionIndex: index,
         questionText: getQuestionText(from: questionType),
         questionType: questionType,
@@ -229,6 +292,18 @@ class AnalysisViewModel: ObservableObject {
         recommendations: generateRecommendations(
           for: questionType, answers: questionAnswers, confidence: questionConfidence)
       )
+
+      // レガシー経路でも "その他" があれば画面表示時点でローディングを出す
+      switch questionType {
+      case .single(_, let options):
+        let agg = Self.aggregateSingleChoice(answers: questionAnswers, options: options)
+        if !agg.otherTexts.isEmpty { result.isSummarizing = true }
+      case .multiple(_, let options):
+        let agg = Self.aggregateMultipleChoice(answers: questionAnswers, options: options)
+        if !agg.otherTexts.isEmpty { result.isSummarizing = true }
+      default:
+        break
+      }
 
       analysisResults.append(result)
     }

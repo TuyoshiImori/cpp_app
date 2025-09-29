@@ -206,6 +206,10 @@ struct AnalysisView: View {
       let summarizationState = viewModel.analysisResults.first(where: {
         $0.questionIndex == questionIndex
       })
+      // デバッグログ: カード生成時点の isSummarizing を出力
+      print(
+        "[AnalysisView] questionIndex=\(questionIndex) summarizationState.isSummarizing=\(summarizationState?.isSummarizing ?? false) otherSummaryPresent=\(summarizationState?.otherSummary != nil)"
+      )
       return AnyView(
         SingleQuestionAnalysisView(
           questionIndex: questionIndex,
@@ -224,6 +228,10 @@ struct AnalysisView: View {
       let summarizationState = viewModel.analysisResults.first(where: {
         $0.questionIndex == questionIndex
       })
+      // デバッグログ: カード生成時点の isSummarizing を出力
+      print(
+        "[AnalysisView] questionIndex=\(questionIndex) summarizationState.isSummarizing=\(summarizationState?.isSummarizing ?? false) otherSummaryPresent=\(summarizationState?.otherSummary != nil)"
+      )
       return AnyView(
         MultipleQuestionAnalysisView(
           questionIndex: questionIndex,
