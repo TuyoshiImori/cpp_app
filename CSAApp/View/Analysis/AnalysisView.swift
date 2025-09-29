@@ -90,7 +90,7 @@ struct AnalysisView: View {
                 questionTitles.append(question)
               case .text(let question):
                 questionTitles.append(question)
-              case .info(let question, let options):
+              case .info(_, let options):
                 // info の場合は個人情報フィールドを設問ごとに列として展開
                 for opt in options {
                   questionTitles.append(opt.displayName)
@@ -102,7 +102,7 @@ struct AnalysisView: View {
             if !allParsedAnswersSets.isEmpty {
               // 外部データが渡される場合、info 設問が1セルにまとまっている可能性があるため、
               // item.questionTypes に合わせて展開する
-              answerSets = allParsedAnswersSets.map { expandAnswerSetForInfo($0) }
+              answerSets = allParsedAnswersSets.map { debugExpandInfo($0) }
             } else {
               // viewModel.analysisResults を行ベースに変換
               answerSets = reconstructRows(from: viewModel.analysisResults)
@@ -110,6 +110,7 @@ struct AnalysisView: View {
 
             let res = try CSVExporter.exportResponses(
               surveyTimestamp: item.timestamp,
+              surveyTitle: item.title,
               questionTitles: questionTitles,
               allParsedAnswersSets: answerSets
             )
@@ -218,15 +219,12 @@ struct AnalysisView: View {
           allConfidenceForQuestion.append(confidenceScores[setIndex][questionIndex])
         }
 
-        // 画像データがある場合
+        // 画像データがある場合（allCroppedImageSets は UIImage の配列なので直接扱う）
         if setIndex < allCroppedImageSets.count,
           questionIndex < allCroppedImageSets[setIndex].count
         {
-          if let imageData = allCroppedImageSets[setIndex][questionIndex] as? UIImage {
-            if let data = imageData.pngData() {
-              allImagesForQuestion.append(data)
-            }
-          } else if let data = allCroppedImageSets[setIndex][questionIndex] as? Data {
+          let image = allCroppedImageSets[setIndex][questionIndex]
+          if let data = image.pngData() {
             allImagesForQuestion.append(data)
           }
         }
@@ -434,9 +432,20 @@ struct AnalysisView: View {
         switch qt {
         case .info(_, let options):
           // info の回答は、1つの answers 要素に複数フィールドが入っている可能性がある
-          // ここではカンマ等で分割されている想定で、options 数に合わせて分解する
+          // トップレベルのカンマのみで分割するユーティリティを使い、括弧や引用符内部のカンマを無視する
           let raw = rowIndex < result.answers.count ? result.answers[rowIndex] : ""
-          let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map { String($0) }
+          let parts: [String]
+          if raw.contains("\n") {
+            // OpenCV/CameraViewModel が改行で返している場合は改行で分割する（PreviewFullScreenView と同様）
+            parts = raw.components(separatedBy: "\n").map {
+              $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+          } else {
+            parts = StringUtils.splitTopLevel(
+              raw, separators: Set([",", "、", "，", ";"]), omitEmptySubsequences: false
+            )
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+          }
           for i in 0..<options.count {
             if i < parts.count {
               row.append(parts[i])
@@ -462,18 +471,40 @@ struct AnalysisView: View {
     for qt in item.questionTypes {
       switch qt {
       case .info(_, let options):
-        // 外部データでは info の複数フィールドが 1 セルにまとまっている場合がある
-        // その場合はカンマで分割して options の数だけ展開する
-        let raw = idx < answerSet.count ? answerSet[idx] : ""
-        let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map { String($0) }
-        for i in 0..<options.count {
-          if i < parts.count {
-            expanded.append(parts[i])
-          } else {
-            expanded.append("")
+        // 外部データでは 2 パターンある:
+        // 1) info の複数フィールドが 1 セルにまとまっている（カンマ等で区切られている）
+        // 2) 既に設問ごとに分割されて複数列になっている
+        // 後者の可能性を優先的に検出して取り出す
+        if idx + options.count <= answerSet.count {
+          // 既に分割済みの列が存在する場合はそのまま取り出す
+          for j in 0..<options.count {
+            let raw = answerSet[idx + j]
+            expanded.append(raw.trimmingCharacters(in: .whitespacesAndNewlines))
           }
+          idx += options.count
+        } else {
+          // 単一セルにまとまっている場合はトップレベル分割を行う
+          let raw = idx < answerSet.count ? answerSet[idx] : ""
+          let parts: [String]
+          if raw.contains("\n") {
+            parts = raw.components(separatedBy: "\n").map {
+              $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+          } else {
+            parts = StringUtils.splitTopLevel(
+              raw, separators: Set([",", "、", "，", ";"]), omitEmptySubsequences: false
+            )
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+          }
+          for i in 0..<options.count {
+            if i < parts.count {
+              expanded.append(parts[i])
+            } else {
+              expanded.append("")
+            }
+          }
+          idx += 1
         }
-        idx += 1
       default:
         // 通常の設問は 1 列
         let raw = idx < answerSet.count ? answerSet[idx] : ""
@@ -481,6 +512,14 @@ struct AnalysisView: View {
         idx += 1
       }
     }
+    return expanded
+  }
+
+  /// デバッグ用: info 展開結果をログ出力して返す
+  private func debugExpandInfo(_ answerSet: [String]) -> [String] {
+    let expanded = expandAnswerSetForInfo(answerSet)
+    print("[Debug] expandAnswerSetForInfo input=\(answerSet)")
+    print("[Debug] expandAnswerSetForInfo output=\(expanded)")
     return expanded
   }
 }

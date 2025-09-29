@@ -3,7 +3,14 @@ import Foundation
 /// 文字列分割ユーティリティ
 /// トップレベルの区切り文字のみで分割する（括弧やクォート内部の区切りは無視する）
 public enum StringUtils {
-  public static func splitTopLevel(_ s: String, separators: Set<Character>) -> [String] {
+  /// トップレベルで分割します。
+  /// - Parameters:
+  ///   - s: 入力文字列
+  ///   - separators: 区切り文字集合
+  ///   - omitEmptySubsequences: true の場合は空文字列を結果に含めません（既存の挙動）。false の場合は連続した区切りで生じる空要素も返します。
+  public static func splitTopLevel(
+    _ s: String, separators: Set<Character>, omitEmptySubsequences: Bool = true
+  ) -> [String] {
     var results: [String] = []
     var current = ""
     var depth = 0
@@ -36,7 +43,12 @@ public enum StringUtils {
 
       if depth == 0 && separators.contains(ch) {
         let token = current.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !token.isEmpty { results.append(token) }
+        if omitEmptySubsequences {
+          if !token.isEmpty { results.append(token) }
+        } else {
+          // 空トークンも許容する
+          results.append(token)
+        }
         current = ""
       } else {
         current.append(ch)
@@ -44,7 +56,11 @@ public enum StringUtils {
     }
 
     let last = current.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !last.isEmpty { results.append(last) }
+    if omitEmptySubsequences {
+      if !last.isEmpty { results.append(last) }
+    } else {
+      results.append(last)
+    }
     return results
   }
 

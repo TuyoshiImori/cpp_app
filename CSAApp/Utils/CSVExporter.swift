@@ -15,6 +15,7 @@ struct CSVExporter {
   /// - Returns: ExportResult (ファイル URL) または nil
   static func exportResponses(
     surveyTimestamp: Date,
+    surveyTitle: String,
     questionTitles: [String],
     allParsedAnswersSets: [[String]]
   ) throws -> ExportResult {
@@ -32,8 +33,10 @@ struct CSVExporter {
       row.append("\(rowIndex + 1)")
       // タイムスタンプは共通の surveyTimestamp を採用（将来的に行ごとのタイムスタンプ対応も可能）
       let formatter = DateFormatter()
+      // CSV 内のタイムスタンプは要求に合わせて連続した数字列にします（yyyyMMddhhmmss）。
+      // ユーザー指定のフォーマットに合わせるため 'hh' を使用します。
       formatter.locale = Locale(identifier: "ja_JP_POSIX")
-      formatter.dateFormat = "yyyy/MM/dd hh:mm:ss"
+      formatter.dateFormat = "yyyyMMddhhmmss"
       row.append(formatter.string(from: surveyTimestamp))
 
       for qIndex in 0..<questionTitles.count {
@@ -53,7 +56,26 @@ struct CSVExporter {
 
     // 一時ファイルに書き出す
     let tmpDir = FileManager.default.temporaryDirectory
-    let fileName = "CSAApp_responses_\(Int(Date().timeIntervalSince1970)).csv"
+    // ファイル名に使うタイトルは surveyTitle を優先して利用。
+    // surveyTitle にファイル名に使えない文字（/, :, \\ など）が含まれる可能性があるため
+    // セーフ化する: スラッシュとコロンは視認性を保つため全角に置換する。また不要な空白は '_' に置換。
+    var safeTitle = surveyTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    if safeTitle.isEmpty { safeTitle = "Survey" }
+    safeTitle = safeTitle.replacingOccurrences(of: "/", with: "／")
+    safeTitle = safeTitle.replacingOccurrences(of: ":", with: "：")
+    safeTitle = safeTitle.replacingOccurrences(of: "\\", with: "_")
+    safeTitle = safeTitle.replacingOccurrences(of: "\n", with: "_")
+    // ファイル名に含める日付文字列
+    let now = Date()
+    let fileDateFormatter = DateFormatter()
+    fileDateFormatter.locale = Locale(identifier: "ja_JP_POSIX")
+    // ファイル名用の日付はyyyyMMddhhmmss
+    fileDateFormatter.dateFormat = "yyyyMMddhhmmss"
+    let fileDateRaw = fileDateFormatter.string(from: now)
+    // 半角の '/' と ':' をファイル名に安全な全角に置換
+    let fileDateSafe = fileDateRaw.replacingOccurrences(of: "/", with: "／").replacingOccurrences(
+      of: ":", with: "：")
+    let fileName = "\(safeTitle)_\(fileDateSafe).csv"
     let fileURL = tmpDir.appendingPathComponent(fileName)
 
     try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
