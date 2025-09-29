@@ -39,41 +39,39 @@ struct AnalysisView: View {
 
   // MARK: - Body
   var body: some View {
-    NavigationView {
-      ZStack {
-        // 背景色: ダーク/ライトに追随するシステムカラーを使用
-        Color(.systemBackground)
-          .ignoresSafeArea()
+    ZStack {
+      // 背景色: ダーク/ライトに追随するシステムカラーを使用
+      Color(.systemBackground)
+        .ignoresSafeArea()
 
-        if viewModel.isLoading {
-          // ローディング表示
-          VStack {
-            ProgressView()
-              .scaleEffect(1.5)
-            Text("分析中...")
-              .font(.headline)
-              .padding(.top)
-              .foregroundColor(Color.primary)
-          }
-        } else {
-          // メインコンテンツ
-          ScrollView {
-            VStack(spacing: 20) {
-              // サマリーカード
-              summaryCard
+      if viewModel.isLoading {
+        // ローディング表示
+        VStack {
+          ProgressView()
+            .scaleEffect(1.5)
+          Text("分析中...")
+            .font(.headline)
+            .padding(.top)
+            .foregroundColor(Color.primary)
+        }
+      } else {
+        // メインコンテンツ
+        ScrollView {
+          VStack(spacing: 20) {
+            // サマリーカード
+            summaryCard
 
-              // 設問ごとの分析結果を表示
-              ForEach(0..<item.questionTypes.count, id: \.self) { questionIndex in
-                questionAnalysisCard(for: questionIndex)
-              }
+            // 設問ごとの分析結果を表示
+            ForEach(0..<item.questionTypes.count, id: \.self) { questionIndex in
+              questionAnalysisCard(for: questionIndex)
             }
-            .padding()
           }
+          .padding()
         }
       }
-      .navigationTitle("分析結果")
-      .navigationBarTitleDisplayMode(.large)
     }
+    .navigationTitle("分析結果")
+    .navigationBarTitleDisplayMode(.large)
     .onAppear {
       // Viewが表示されたときにItemと全ての回答データを設定して分析開始
       viewModel.setItem(
@@ -366,6 +364,8 @@ struct AnalysisView_Previews: PreviewProvider {
       title: "サンプルアンケート"
     )
 
-    AnalysisView(item: dummyItem)
+    NavigationStack {
+      AnalysisView(item: dummyItem)
+    }
   }
 }
