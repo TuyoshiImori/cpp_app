@@ -68,7 +68,6 @@ struct PreviewFullScreenDeleteButtonView: View {
           isPreviewPresented = false
         }
       }
-      Button("キャンセル", role: .cancel) {}
     }
   }
 }
