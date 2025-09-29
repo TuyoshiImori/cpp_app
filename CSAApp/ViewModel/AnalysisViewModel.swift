@@ -168,10 +168,30 @@ class AnalysisViewModel: ObservableObject {
             let summary = await SummarizationQueue.shared.summarize(
               otherTexts: agg.otherTexts,
               questionIndex: idx,
-              questionText: result.questionText
+              questionText: result.questionText,
+              questionKind: "single"
             )
 
             // nil が返った場合は何も表示しない（FoundationModels が使えない or エラー）
+            if let s = summary {
+              analysisResults[idx].otherSummary = s
+            }
+            analysisResults[idx].isSummarizing = false
+          #endif
+        }
+      case .multiple(_, let options):
+        let agg = Self.aggregateMultipleChoice(answers: result.answers, options: options)
+        if !agg.otherTexts.isEmpty {
+          #if !canImport(FoundationModels)
+            continue
+          #else
+            analysisResults[idx].isSummarizing = true
+            let summary = await SummarizationQueue.shared.summarize(
+              otherTexts: agg.otherTexts,
+              questionIndex: idx,
+              questionText: result.questionText,
+              questionKind: "multiple"
+            )
             if let s = summary {
               analysisResults[idx].otherSummary = s
             }
@@ -306,9 +326,12 @@ class AnalysisViewModel: ObservableObject {
     private init() {}
 
     /// otherTexts を受け取り要約文字列を返す（直列実行が保証される）
-    nonisolated func summarize(otherTexts: [String], questionIndex: Int, questionText: String) async
-      -> String?
-    {
+    nonisolated func summarize(
+      otherTexts: [String],
+      questionIndex: Int,
+      questionText: String,
+      questionKind: String = "single"
+    ) async -> String? {
       // FoundationModels が利用可能でない場合は nil を返して何もしない
       #if !canImport(FoundationModels)
         return nil
@@ -319,8 +342,18 @@ class AnalysisViewModel: ObservableObject {
         do {
           // プロンプトの組み立て: 設問情報と自由記述を番号付きリストで渡す
           // 要求: 出力を安定化するため、必ず固定の前置文で始め、その直後に1〜2文の要約を続けるよう指示する
-          let promptHeader =
-            "設問 \(questionIndex + 1): \(questionText)\n以下に示す“その他”に含まれる自由記述の主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「その他の選択肢に記述された内容を要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
+          let promptHeaderBodySingle =
+            "以下に示す“その他”に含まれる自由記述の主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「その他の選択肢に記述された内容を要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
+          let promptHeaderBodyMultiple =
+            "以下に示す複数選択設問の“その他”に含まれる自由記述の主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「その他の選択肢に記述された内容を要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。複数のトピックがある場合は、最も頻出の観点を中心にまとめてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
+
+          let headerIntro = "設問 \(questionIndex + 1): \(questionText)\n"
+          let promptHeader: String
+          if questionKind.lowercased() == "multiple" {
+            promptHeader = headerIntro + promptHeaderBodyMultiple
+          } else {
+            promptHeader = headerIntro + promptHeaderBodySingle
+          }
           var bodyLines: [String] = []
           for (i, text) in otherTexts.enumerated() {
             let sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -411,7 +444,7 @@ class AnalysisViewModel: ObservableObject {
 
       // 分割: トップレベルのカンマ/スラッシュ/セミコロンで分割（括弧内は無視）
       let separators: Set<Character> = [Character(","), Character("/"), Character(";")]
-      let parts = StringUtils.splitTopLevel(a, separators: separators)
+      let parts = Self.splitTopLevel(a, separators: separators)
       let tokens = parts.isEmpty ? [a] : parts
 
       for token in tokens {
@@ -450,6 +483,55 @@ class AnalysisViewModel: ObservableObject {
     }
 
     return (counts: dict, otherTexts: otherTexts, entries: entries, total: total)
+  }
+
+  // トップレベル分割のフォールバック実装。
+  // 外部のユーティリティ（StringUtils）が存在すればそちらを使っても良いが、
+  // ターゲット設定やコンパイル順序の問題で参照できない場合に備えて内部実装を提供する。
+  nonisolated static func splitTopLevel(_ s: String, separators: Set<Character>) -> [String] {
+    // ここでは単純に括弧/ブラケットのネストとクォートを無視する実装を行う
+    var results: [String] = []
+    var current = ""
+    var depth = 0
+    var inQuote: Character? = nil
+
+    for ch in s {
+      if let q = inQuote {
+        current.append(ch)
+        if ch == q { inQuote = nil }
+        continue
+      }
+
+      if ch == "\"" || ch == "'" {
+        inQuote = ch
+        current.append(ch)
+        continue
+      }
+
+      if ch == "(" || ch == "[" || ch == "{" {
+        depth += 1
+        current.append(ch)
+        continue
+      }
+
+      if ch == ")" || ch == "]" || ch == "}" {
+        if depth > 0 { depth -= 1 }
+        current.append(ch)
+        continue
+      }
+
+      if depth == 0 && separators.contains(ch) {
+        let token = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !token.isEmpty { results.append(token) }
+        current = ""
+      } else {
+        current.append(ch)
+      }
+    }
+
+    let last = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !last.isEmpty { results.append(last) }
+    return results
   }
 }
 
