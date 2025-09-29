@@ -10,6 +10,7 @@ public struct CameraView: View {
   @Binding public var image: UIImage?
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.colorScheme) private var colorScheme
 
   // セーフエリア取得
   private var safeAreaInsets: UIEdgeInsets {
@@ -49,7 +50,7 @@ public struct CameraView: View {
 
         VStack(spacing: 12) {
           ProgressView()
-            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            .progressViewStyle(CircularProgressViewStyle(tint: Color.white))
             .scaleEffect(1.5)
           Text("スキャン中...")
             .foregroundColor(.white)
@@ -105,28 +106,28 @@ public struct CameraView: View {
             case .possible:
               Text("スキャン可能")
                 .font(.headline)
-                .foregroundColor(.black)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(24)
+                .foregroundColor(ButtonForeground.color(for: colorScheme))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .allowsHitTesting(false)  // タップを無効化
+                .glassEffect()
 
             case .scanning:
               HStack(spacing: 10) {
                 Text("スキャン中")
                   .font(.headline)
-                  .foregroundColor(.black)
+                  .foregroundColor(ButtonForeground.color(for: colorScheme))
                 ProgressView()  // インジケーター
-                  .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                  .progressViewStyle(
+                    CircularProgressViewStyle(tint: ButtonForeground.color(for: colorScheme))
+                  )
                   .scaleEffect(0.8)
                   .frame(width: 16, height: 16)
               }
-              .padding(.horizontal, 20)
-              .padding(.vertical, 12)
-              .background(Color.white.opacity(0.9))
-              .cornerRadius(24)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 10)
               .allowsHitTesting(false)  // タップを無効化
+              .glassEffect()
 
             case .paused:
               Button(action: {
@@ -134,11 +135,9 @@ public struct CameraView: View {
               }) {
                 Text("スキャン再開")
                   .font(.headline)
-                  .foregroundColor(.black)
-                  .padding(.horizontal, 24)
-                  .padding(.vertical, 12)
-                  .background(Color.white.opacity(0.9))
-                  .cornerRadius(24)
+                  .foregroundColor(ButtonForeground.color(for: colorScheme))
+                  .padding(.horizontal, 16)
+                  .padding(.vertical, 10)
               }
               // パルスアニメーション
               .scaleEffect(viewModel.isPulseActive ? 1.12 : 1.0)
@@ -149,7 +148,9 @@ public struct CameraView: View {
               )
               .animation(
                 .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
-                value: viewModel.isPulseActive)
+                value: viewModel.isPulseActive
+              )
+              .glassEffect(.regular.interactive())
             }
           }
           .padding(.bottom, 24 + safeAreaInsets.bottom)

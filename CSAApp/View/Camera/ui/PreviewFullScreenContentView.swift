@@ -60,11 +60,7 @@ struct PreviewFullScreenContentView: View {
               .font(.system(size: 20))
               .padding(.horizontal, 12)
               .padding(.vertical, 12)
-              #if canImport(UIKit)
-                .foregroundColor(Color(UIColor.label))
-              #else
-                .foregroundColor(.primary)
-              #endif
+              .foregroundColor(ButtonForeground.color(for: colorScheme))
           }
           .glassEffect(.regular.interactive())
 
@@ -82,11 +78,7 @@ struct PreviewFullScreenContentView: View {
                 Text("分析")
                   .font(.headline)
               }
-              #if canImport(UIKit)
-                .foregroundColor(Color(UIColor.label))
-              #else
-                .foregroundColor(.primary)
-              #endif
+              .foregroundColor(ButtonForeground.color(for: colorScheme))
               .padding(.horizontal, 16)
               .padding(.vertical, 10)
             }

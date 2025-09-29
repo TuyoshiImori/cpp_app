@@ -35,6 +35,7 @@ struct PreviewFullScreenDeleteButtonView: View {
   }
 
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.colorScheme) private var colorScheme
   @State private var showConfirm = false
 
   var body: some View {
@@ -46,11 +47,7 @@ struct PreviewFullScreenDeleteButtonView: View {
         Text("削除")
           .font(.headline)
       }
-      #if canImport(UIKit)
-        .foregroundColor(Color(UIColor.label))
-      #else
-        .foregroundColor(.primary)
-      #endif
+      .foregroundColor(ButtonForeground.color(for: colorScheme))
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
     }
