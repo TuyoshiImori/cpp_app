@@ -6,6 +6,10 @@ import SwiftUI
   import FoundationModels
 #endif
 
+#if canImport(UIKit)
+  import UIKit
+#endif
+
 // Itemモデルをimport
 // 同じプロジェクト内なので直接参照可能
 
@@ -17,6 +21,10 @@ class AnalysisViewModel: ObservableObject {
   @Published var item: Item?
   @Published var isLoading: Bool = false
   @Published var analysisResults: [AnalysisResult] = []
+  // 全データセット（UI から渡される可能性のあるデータ）を保存
+  @Published var allCroppedImageSets: [[Any]] = []
+  @Published var allParsedAnswersSets: [[String]] = []
+  @Published var allConfidenceScores: [[Float]]? = nil
 
   // MARK: - Analysis Result Model
   struct AnalysisResult: Identifiable {
@@ -76,6 +84,10 @@ class AnalysisViewModel: ObservableObject {
     allConfidenceScores: [[Float]]? = nil
   ) {
     self.item = item
+    // 受け取った全データセットを保持しておく
+    self.allCroppedImageSets = allCroppedImageSets
+    self.allParsedAnswersSets = allParsedAnswersSets
+    self.allConfidenceScores = allConfidenceScores
     performAnalysis(
       allCroppedImageSets: allCroppedImageSets,
       allParsedAnswersSets: allParsedAnswersSets,
@@ -691,6 +703,216 @@ class AnalysisViewModel: ObservableObject {
     let last = current.trimmingCharacters(in: .whitespacesAndNewlines)
     if !last.isEmpty { results.append(last) }
     return results
+  }
+
+  // MARK: - View-facing helpers moved from AnalysisView
+
+  /// 全体の信頼度（外部データが存在する場合はそれを優先）
+  func overallConfidenceUsingStored() -> Double {
+    if let confidenceScores = allConfidenceScores, !confidenceScores.isEmpty {
+      var totalConfidence: Float = 0
+      var totalCount = 0
+      for set in confidenceScores {
+        totalConfidence += set.reduce(0, +)
+        totalCount += set.count
+      }
+      return totalCount > 0 ? Double(totalConfidence) / Double(totalCount) : 0.0
+    }
+    return overallConfidenceScore
+  }
+
+  /// 有効回答数（外部データが存在する場合はそれを優先）
+  func validAnswerCountUsingStored() -> Int {
+    if !allParsedAnswersSets.isEmpty {
+      var valid = 0
+      for answerSet in allParsedAnswersSets {
+        valid += answerSet.filter { !$0.isEmpty && $0 != "-1" }.count
+      }
+      return valid
+    }
+    return validAnswerCount
+  }
+
+  /// 総回答数（外部データが存在する場合はそれを優先）
+  func totalAnswerCountUsingStored() -> Int {
+    if !allParsedAnswersSets.isEmpty {
+      var total = 0
+      for answerSet in allParsedAnswersSets { total += answerSet.count }
+      return total
+    }
+    return totalAnswerCount
+  }
+
+  /// 指定設問の回答リストを返す（外部データがある場合はそちらを優先して抽出）
+  func answersForQuestion(_ questionIndex: Int) -> [String] {
+    var answers: [String] = []
+    if !allParsedAnswersSets.isEmpty {
+      for set in allParsedAnswersSets {
+        if questionIndex < set.count {
+          answers.append(set[questionIndex])
+        } else {
+          answers.append("")
+        }
+      }
+      return answers
+    }
+
+    if let r = analysisResults.first(where: { $0.questionIndex == questionIndex }) {
+      return r.answers
+    }
+    return []
+  }
+
+  /// 指定設問の信頼度リストを返す
+  func confidencesForQuestion(_ questionIndex: Int) -> [Float] {
+    var confidences: [Float] = []
+    if let all = allConfidenceScores, !all.isEmpty {
+      for set in all {
+        if questionIndex < set.count {
+          confidences.append(set[questionIndex])
+        }
+      }
+      return confidences
+    }
+
+    if let r = analysisResults.first(where: { $0.questionIndex == questionIndex }) {
+      return r.confidenceScores
+    }
+    return []
+  }
+
+  /// 指定設問の画像データ（PNG）配列を返す
+  func imagesDataForQuestion(_ questionIndex: Int) -> [Data] {
+    var images: [Data] = []
+    if !allCroppedImageSets.isEmpty {
+      for set in allCroppedImageSets {
+        if questionIndex < set.count {
+          if let img = set[questionIndex] as? UIImage, let d = img.pngData() {
+            images.append(d)
+          }
+        }
+      }
+      return images
+    }
+
+    // レガシーパスでは analysisResults に UIImage は含まれていないため空を返す
+    return images
+  }
+
+  /// AnalysisResult 配列から行ベースの回答セットを再構築する（View で使う）
+  func reconstructRowsFromAnalysisResults() -> [[String]] {
+    guard let item = item else { return [] }
+
+    var expandedColumnsCount = 0
+    for qt in item.questionTypes {
+      switch qt {
+      case .info(_, let options): expandedColumnsCount += options.count
+      default: expandedColumnsCount += 1
+      }
+    }
+
+    var maxRows = 0
+    for r in analysisResults { maxRows = max(maxRows, r.answers.count) }
+
+    var rows: [[String]] = []
+    for rowIndex in 0..<maxRows {
+      var row: [String] = []
+      var resultIndex = 0
+      for qt in item.questionTypes {
+        let result = analysisResults[resultIndex]
+        switch qt {
+        case .info(_, let options):
+          let raw = rowIndex < result.answers.count ? result.answers[rowIndex] : ""
+          let parts: [String]
+          if raw.contains("\n") {
+            parts = raw.components(separatedBy: "\n").map {
+              $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+          } else {
+            parts = Self.splitTopLevel(raw, separators: Set([",", "、", "，", ";"]))
+              .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+          }
+          for i in 0..<options.count {
+            if i < parts.count { row.append(parts[i]) } else { row.append("") }
+          }
+        default:
+          let raw = rowIndex < result.answers.count ? result.answers[rowIndex] : ""
+          row.append(raw)
+        }
+        resultIndex += 1
+      }
+      rows.append(row)
+    }
+    return rows
+  }
+
+  /// 外部から渡された answerSet（1行）を item.questionTypes に合わせて展開する
+  func expandAnswerSetForInfo(_ answerSet: [String]) -> [String] {
+    guard let item = item else { return answerSet }
+    var expanded: [String] = []
+    var idx = 0
+    for qt in item.questionTypes {
+      switch qt {
+      case .info(_, let options):
+        if idx + options.count <= answerSet.count {
+          for j in 0..<options.count {
+            let raw = answerSet[idx + j]
+            expanded.append(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+          }
+          idx += options.count
+        } else {
+          let raw = idx < answerSet.count ? answerSet[idx] : ""
+          let parts: [String]
+          if raw.contains("\n") {
+            parts = raw.components(separatedBy: "\n").map {
+              $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+          } else {
+            parts = Self.splitTopLevel(raw, separators: Set([",", "、", "，", ";"]))
+              .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+          }
+          for i in 0..<options.count {
+            if i < parts.count { expanded.append(parts[i]) } else { expanded.append("") }
+          }
+          idx += 1
+        }
+      default:
+        let raw = idx < answerSet.count ? answerSet[idx] : ""
+        expanded.append(raw)
+        idx += 1
+      }
+    }
+    return expanded
+  }
+
+  /// CSV 出力ラッパー: item を用いて CSV を生成しファイル URL を返す
+  func exportResponsesCSV(for item: Item) throws -> URL {
+    // questionTitles の作成
+    var questionTitles: [String] = []
+    for qt in item.questionTypes {
+      switch qt {
+      case .single(let question, _): questionTitles.append(question)
+      case .multiple(let question, _): questionTitles.append(question)
+      case .text(let question): questionTitles.append(question)
+      case .info(_, let options): for opt in options { questionTitles.append(opt.displayName) }
+      }
+    }
+
+    let answerSets: [[String]]
+    if !allParsedAnswersSets.isEmpty {
+      // 展開が必要な info を展開
+      answerSets = allParsedAnswersSets.map { expandAnswerSetForInfo($0) }
+    } else {
+      answerSets = reconstructRowsFromAnalysisResults()
+    }
+
+    let res = try CSVExporter.exportResponses(
+      surveyTimestamp: item.timestamp,
+      surveyTitle: item.title,
+      questionTitles: questionTitles,
+      allParsedAnswersSets: answerSets
+    )
+    return res.url
   }
 }
 
