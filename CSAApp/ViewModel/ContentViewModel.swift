@@ -124,20 +124,14 @@ final class ContentViewModel: ObservableObject {
           }
         } else {
           // 従来のカンマ区切り形式（後方互換性）
-          options =
-            optionsPart
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .map { String($0) }
+          let parts = StringUtils.splitTopLevelCommas(optionsPart)
+          options = parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         }
       } else {
         // '|' が無ければ旧フォーマット扱い: 値全体をカンマ区切りの選択肢リストとして扱う
-        options =
-          decodedValue
-          .split(separator: ",")
-          .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-          .map { String($0) }
+        let parts = StringUtils.splitTopLevelCommas(decodedValue)
+        options = parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
           .filter { !$0.isEmpty }
       }
 

@@ -352,7 +352,7 @@ class AnalysisViewModel: ObservableObject {
     }
   }
 
-  static func aggregateSingleChoice(answers: [String], options: [String]) -> (
+  nonisolated static func aggregateSingleChoice(answers: [String], options: [String]) -> (
     counts: [String: Int], otherTexts: [String], entries: [PieChartData], total: Int
   ) {
     var dict: [String: Int] = [:]
@@ -397,4 +397,61 @@ class AnalysisViewModel: ObservableObject {
 
     return (counts: dict, otherTexts: otherTexts, entries: entries, total: total)
   }
+
+  /// 複数選択設問の回答を集計する（各回答文字列に複数の選択肢が含まれる場合を想定）
+  nonisolated static func aggregateMultipleChoice(answers: [String], options: [String]) -> (
+    counts: [String: Int], otherTexts: [String], entries: [PieChartData], total: Int
+  ) {
+    var dict: [String: Int] = [:]
+    var otherTexts: [String] = []
+
+    for raw in answers {
+      let a = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+      if a.isEmpty || a == "-1" { continue }
+
+      // 分割: トップレベルのカンマ/スラッシュ/セミコロンで分割（括弧内は無視）
+      let separators: Set<Character> = [Character(","), Character("/"), Character(";")]
+      let parts = StringUtils.splitTopLevel(a, separators: separators)
+      let tokens = parts.isEmpty ? [a] : parts
+
+      for token in tokens {
+        if token.isEmpty { continue }
+
+        if let idx = Int(token), idx >= 0, idx < options.count {
+          let label = options[idx]
+          dict[label, default: 0] += 1
+          continue
+        }
+
+        if let match = options.first(where: {
+          $0.trimmingCharacters(in: .whitespacesAndNewlines) == token
+        }) {
+          dict[match, default: 0] += 1
+          continue
+        }
+
+        dict["その他", default: 0] += 1
+        otherTexts.append(token)
+      }
+    }
+
+    let total = dict.values.reduce(0, +)
+
+    let pairs = dict.sorted { $0.key < $1.key }
+    var entries: [PieChartData] = []
+    for (_, p) in pairs.enumerated() {
+      entries.append(PieChartData(label: p.key, value: Double(p.value), percent: 0.0))
+    }
+
+    if total > 0 {
+      for i in entries.indices {
+        entries[i].percent = entries[i].value / Double(total) * 100.0
+      }
+    }
+
+    return (counts: dict, otherTexts: otherTexts, entries: entries, total: total)
+  }
 }
+
+// NOTE: 集計ロジックは AnalysisViewModel に実装しているため、ビューは
+// AnalysisViewModel.aggregateSingleChoice / aggregateMultipleChoice を直接呼んでください。

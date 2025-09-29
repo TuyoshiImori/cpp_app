@@ -220,6 +220,10 @@ struct AnalysisView: View {
       )
 
     case .multiple(let question, let options):
+      // 該当設問の要約状態を ViewModel から取得して渡す
+      let summarizationState = viewModel.analysisResults.first(where: {
+        $0.questionIndex == questionIndex
+      })
       return AnyView(
         MultipleQuestionAnalysisView(
           questionIndex: questionIndex,
@@ -227,7 +231,9 @@ struct AnalysisView: View {
           answers: allAnswersForQuestion,
           confidenceScores: allConfidenceForQuestion,
           images: allImagesForQuestion,
-          options: options
+          options: options,
+          isSummarizing: summarizationState?.isSummarizing ?? false,
+          otherSummary: summarizationState?.otherSummary
         )
       )
 
