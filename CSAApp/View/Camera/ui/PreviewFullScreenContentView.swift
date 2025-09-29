@@ -45,6 +45,7 @@ struct PreviewFullScreenContentView: View {
     ZStack {
       previewScreenBackground
 
+      // 画像が存在する場合に TabView を表示
       if !croppedImageSets.isEmpty {
         PreviewFullScreenImagesTabView(
           previewIndex: $previewIndex, croppedImageSets: croppedImageSets,
@@ -67,14 +68,14 @@ struct PreviewFullScreenContentView: View {
           Spacer()
 
           if item != nil {
-            Button(action: {
+            Button {
+              // アクションを先に書く形式に変更（UI は元のまま）
               if let vm = viewModel {
                 vm.isAnalysisActive = true
               }
-            }) {
-              HStack(spacing: 8) {
+            } label: {
+              HStack {
                 Image(systemName: "chart.bar.doc.horizontal")
-                  .font(.system(size: 20))
                 Text("分析")
                   .font(.headline)
               }
@@ -108,6 +109,7 @@ struct PreviewFullScreenContentView: View {
         Spacer()
         HStack {
           Spacer()
+          // 削除ボタン
           PreviewFullScreenDeleteButtonView(
             previewIndex: $previewIndex,
             croppedImageSets: croppedImageSets,
@@ -118,9 +120,9 @@ struct PreviewFullScreenContentView: View {
             onDelete: onDelete
           )
         }
-  // 削除ボタンがコンテンツに被らないように、少し上にずらす
-  .padding(.bottom, 44)
-  .padding(.trailing, 20)
+        // 削除ボタンがコンテンツに被らないように、少し上にずらす
+        .padding(.bottom, 44)
+        .padding(.trailing, 20)
       }
     }
   }
