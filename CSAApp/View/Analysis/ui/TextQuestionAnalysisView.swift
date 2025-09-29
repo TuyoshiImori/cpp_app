@@ -33,11 +33,15 @@ struct TextQuestionAnalysisView: View {
         Spacer()
       }
 
-      // 設問文
-      Text(questionText)
-        .font(.subheadline)
-        .foregroundColor(.primary)
-        .fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 6) {
+        Text("設問文:")
+          .font(.subheadline)
+          .foregroundColor(.secondary)
+        Text(questionText)
+          .font(.body)
+          .foregroundColor(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
 
       // 要約表示領域（single/multiple と同様にカード内に含める）
       if isSummarizing {
@@ -58,6 +62,16 @@ struct TextQuestionAnalysisView: View {
             .foregroundColor(.primary)
             .fixedSize(horizontal: false, vertical: true)
         }
+      }
+      // 回答率（右下表示）
+      HStack {
+        Spacer()
+        let validCount = answers.filter {
+          !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0 != "-1"
+        }.count
+        Text("回答率: \(validCount)/\(answers.count)")
+          .font(.caption2)
+          .foregroundColor(.secondary)
       }
     }
     .padding()

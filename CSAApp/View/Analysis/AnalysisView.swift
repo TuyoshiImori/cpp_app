@@ -116,16 +116,6 @@ struct AnalysisView: View {
         }
 
         Spacer()
-
-        VStack(alignment: .trailing, spacing: 4) {
-          Text("有効回答")
-            .font(.caption)
-            .foregroundColor(.secondary)
-          Text("\(calculateValidAnswerCount())/\(calculateTotalAnswerCount())")
-            .font(.title2)
-            .bold()
-            .foregroundColor(.primary)
-        }
       }
 
       // アンケート情報
@@ -135,11 +125,7 @@ struct AnalysisView: View {
             .font(.subheadline)
             .foregroundColor(.secondary)
         }
-        if !item.surveyID.isEmpty {
-          Text("ID: \(item.surveyID)")
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-        }
+
         Text("スキャン日時: \(formattedDate(item.timestamp))")
           .font(.subheadline)
           .foregroundColor(.secondary)

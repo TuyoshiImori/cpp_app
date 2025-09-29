@@ -25,15 +25,18 @@ struct SingleQuestionAnalysisView: View {
             .font(.title3)
             .fontWeight(.semibold)
             .foregroundColor(.primary)
-
-          // 設問文
-          Text(questionText)
-            .font(.body)
-            .foregroundColor(.primary)
-            .fixedSize(horizontal: false, vertical: true)
         }
-
         Spacer()
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text("設問文:")
+          .font(.subheadline)
+          .foregroundColor(.secondary)
+        Text(questionText)
+          .font(.body)
+          .foregroundColor(.primary)
+          .fixedSize(horizontal: false, vertical: true)
       }
 
       // 集計ロジックは ViewModel に移譲
@@ -71,6 +74,17 @@ struct SingleQuestionAnalysisView: View {
       Text("有効回答: \(total)")
         .font(.caption)
         .foregroundColor(.secondary)
+
+      // 回答率（右下表示）
+      HStack {
+        Spacer()
+        let validCount = answers.filter {
+          !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0 != "-1"
+        }.count
+        Text("回答率: \(validCount)/\(answers.count)")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+      }
 
       // 回答されている各選択肢をパーセントで表示（未選択の選択肢は除外）
       let percentages = agg.entries

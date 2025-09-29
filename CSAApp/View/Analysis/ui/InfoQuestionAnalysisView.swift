@@ -22,37 +22,46 @@ struct InfoQuestionAnalysisView: View {
             .font(.title3)
             .fontWeight(.semibold)
             .foregroundColor(.primary)
-
-          // 設問文
-          Text(questionText)
-            .font(.body)
-            .foregroundColor(.primary)
-            .fixedSize(horizontal: false, vertical: true)
-
-          // 選択肢がある場合は表示（年代選択など）
-          if !options.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-              Text("選択肢:")
-                .font(.caption)
-                .bold()
-                .foregroundColor(.secondary)
-
-              ForEach(options.indices, id: \.self) { index in
-                Text("• \(options[index])")
-                  .font(.caption)
-                  .foregroundColor(.secondary)
-              }
-            }
-          }
         }
 
         Spacer()
       }
-      // 設問文
-      Text(questionText)
-        .font(.subheadline)
-        .foregroundColor(.primary)
-        .fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 6) {
+        Text("設問文:")
+          .font(.subheadline)
+          .foregroundColor(.secondary)
+        Text(questionText)
+          .font(.body)
+          .foregroundColor(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      // 選択肢がある場合は表示（年代選択など）
+      if !options.isEmpty {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("選択肢:")
+            .font(.caption)
+            .bold()
+            .foregroundColor(.secondary)
+
+          ForEach(options.indices, id: \.self) { index in
+            Text("• \(options[index])")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+      }
+
+      // 回答率（右下表示）
+      HStack {
+        Spacer()
+        let validCount = answers.filter {
+          !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0 != "-1"
+        }.count
+        Text("回答率: \(validCount)/\(answers.count)")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+      }
     }
     .padding()
     #if canImport(UIKit)
