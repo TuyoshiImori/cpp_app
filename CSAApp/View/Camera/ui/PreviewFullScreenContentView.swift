@@ -24,15 +24,7 @@ struct PreviewFullScreenContentView: View {
   @Environment(\.modelContext) private var modelContext
 
   private var previewCardBackground: Color {
-    if colorScheme == .dark {
-      return Color(white: 0.09)
-    } else {
-      #if canImport(UIKit)
-        return Color(UIColor.systemBackground)
-      #else
-        return Color.white
-      #endif
-    }
+    CardBackground.color(for: colorScheme)
   }
 
   private var previewScreenBackground: some View {

@@ -136,11 +136,8 @@ struct PreviewFullScreenImagesTabView: View {
                   }
                 }
                 .padding()
-                #if canImport(UIKit)
-                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
-                #else
-                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
-                #endif
+                // 共通のカード背景ユーティリティを利用
+                .background(CardBackground.color(for: colorScheme))
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
                 .padding(.horizontal, 14)

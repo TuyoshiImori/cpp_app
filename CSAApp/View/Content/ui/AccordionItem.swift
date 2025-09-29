@@ -20,11 +20,8 @@ struct AccordionItem: View {
   @Environment(\.colorScheme) private var colorScheme
 
   private var cardBackground: Color {
-    if colorScheme == .dark {
-      return Color(white: 0.08)
-    } else {
-      return Color(UIColor.systemBackground)
-    }
+    // 共通のカード背景ユーティリティを利用
+    CardBackground.color(for: colorScheme)
   }
 
   // ViewModel にロジックを委譲 (ContentViewModel に統合した AccordionItem 用 VM を利用)

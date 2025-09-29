@@ -100,12 +100,8 @@ struct AnalysisView: View {
             ForEach(0..<item.questionTypes.count, id: \.self) { questionIndex in
               questionAnalysisCard(for: questionIndex)
                 .padding()
-                // 設問カードの背景: ライトモードは白、ダークモードは薄い黒
-                #if canImport(UIKit)
-                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
-                #else
-                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
-                #endif
+                // 設問カードの背景を共通ユーティリティから取得
+                .background(CardBackground.color(for: colorScheme))
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
                 .padding(.horizontal, 4)
@@ -202,12 +198,8 @@ struct AnalysisView: View {
       }
     }
     .padding()
-    // カード背景：ダークモードでは secondarySystemBackground を使い、ライトモードでは白にする
-    #if canImport(UIKit)
-      .background(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.white)
-    #else
-      .background(Color.white)
-    #endif
+    // カード背景：共通ユーティリティを使用してダーク/ライトに対応
+    .background(CardBackground.color(for: colorScheme))
     .cornerRadius(12)
     .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
   }
