@@ -416,10 +416,32 @@ class AnalysisViewModel: ObservableObject {
     let total = dict.values.reduce(0, +)
 
     // 円グラフ用エントリ作成
-    let pairs = dict.sorted { $0.key < $1.key }
+    // 並び順: 件数の多い順。件数が同じ場合は設問の選択肢の順番を保持する。
+    // options に含まれるラベルの順序を優先し、含まれないキーは検出順を維持する。
+    var optionPosition: [String: Int] = [:]
+    for (i, opt) in options.enumerated() { optionPosition[opt] = i }
+
+    // dict は挿入順を保持するので、それを検出順として使う
+    var encounterOrder: [String] = []
+    for k in dict.keys { encounterOrder.append(k) }
+
+    func positionForKey(_ key: String) -> Int {
+      if let p = optionPosition[key] { return p }
+      if let idx = encounterOrder.firstIndex(of: key) { return options.count + idx }
+      return options.count + encounterOrder.count
+    }
+
+    let sortedKeys = dict.keys.sorted { a, b in
+      let ca = dict[a] ?? 0
+      let cb = dict[b] ?? 0
+      if ca != cb { return ca > cb }  // 件数多い順
+      return positionForKey(a) < positionForKey(b)  // 同数は選択肢順
+    }
+
     var entries: [PieChartData] = []
-    for (_, p) in pairs.enumerated() {
-      entries.append(PieChartData(label: p.key, value: Double(p.value), percent: 0.0))
+    for key in sortedKeys {
+      let value = Double(dict[key] ?? 0)
+      entries.append(PieChartData(label: key, value: value, percent: 0.0))
     }
 
     if total > 0 {
@@ -470,10 +492,29 @@ class AnalysisViewModel: ObservableObject {
 
     let total = dict.values.reduce(0, +)
 
-    let pairs = dict.sorted { $0.key < $1.key }
+    // 並び順: 件数の多い順。件数が同じ場合は設問の選択肢の順番を保持する。
+    var optionPosition: [String: Int] = [:]
+    for (i, opt) in options.enumerated() { optionPosition[opt] = i }
+    var encounterOrder: [String] = []
+    for k in dict.keys { encounterOrder.append(k) }
+
+    func positionForKey(_ key: String) -> Int {
+      if let p = optionPosition[key] { return p }
+      if let idx = encounterOrder.firstIndex(of: key) { return options.count + idx }
+      return options.count + encounterOrder.count
+    }
+
+    let sortedKeys = dict.keys.sorted { a, b in
+      let ca = dict[a] ?? 0
+      let cb = dict[b] ?? 0
+      if ca != cb { return ca > cb }
+      return positionForKey(a) < positionForKey(b)
+    }
+
     var entries: [PieChartData] = []
-    for (_, p) in pairs.enumerated() {
-      entries.append(PieChartData(label: p.key, value: Double(p.value), percent: 0.0))
+    for key in sortedKeys {
+      let value = Double(dict[key] ?? 0)
+      entries.append(PieChartData(label: key, value: value, percent: 0.0))
     }
 
     if total > 0 {
