@@ -33,7 +33,7 @@ struct CSVExporter {
       row.append("\(rowIndex + 1)")
       // タイムスタンプは共通の surveyTimestamp を採用（将来的に行ごとのタイムスタンプ対応も可能）
       let formatter = DateFormatter()
-      // CSV 内のタイムスタンプは要求に合わせて連続した数字列にします（yyyyMMddhhmmss）。
+      // CSV 内のタイムスタンプはyyyyMMddhhmmss
       // ユーザー指定のフォーマットに合わせるため 'hh' を使用します。
       formatter.locale = Locale(identifier: "ja_JP_POSIX")
       formatter.dateFormat = "yyyyMMddhhmmss"

@@ -55,7 +55,8 @@ struct PreviewFullScreenView: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        Color.black.ignoresSafeArea()
+        // 全体背景は薄いグレーにしてカードを際立たせる（ContentView に合わせた雰囲気）
+        Color(UIColor.systemGray6).ignoresSafeArea()
         if !croppedImageSets.isEmpty {
           imagesTab()
         }
@@ -67,8 +68,9 @@ struct PreviewFullScreenView: View {
             Button(action: { isPreviewPresented = false }) {
               Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundColor(.white)
-                .background(Color.black.opacity(0.3))
+                // アイコンはシステムラベル色を使い、背景は薄いグレーで覆う
+                .foregroundColor(Color(UIColor.label))
+                .background(Color(UIColor.systemGray4).opacity(0.35))
                 .clipShape(Circle())
             }
 
@@ -86,6 +88,7 @@ struct PreviewFullScreenView: View {
                   Text("分析")
                     .font(.headline)
                 }
+                // ボタンラベルはセマンティックな色にしてダークモード対応
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -197,9 +200,10 @@ struct PreviewFullScreenView: View {
             VStack(alignment: .leading, spacing: 10) {
               ForEach(0..<imageSet.count, id: \.self) { imgIdx in
                 let img = imageSet[imgIdx]
+                // 各設問ブロックは白いカードとして見せる
                 VStack {
                   Text("設問 \(imgIdx + 1)")
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .font(.headline)
                     .padding(.top, 10)
 
@@ -215,7 +219,7 @@ struct PreviewFullScreenView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                       Text("検出結果:")
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .font(.subheadline)
                         .bold()
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,7 +238,7 @@ struct PreviewFullScreenView: View {
                           let confidence = confidenceScores[setIdx][imgIdx]
                           HStack {
                             Text("信頼度:")
-                              .foregroundColor(.white.opacity(0.8))
+                              .foregroundColor(.secondary)
                               .font(.caption)
                             Text("\(String(format: "%.1f", confidence))%")
                               .foregroundColor(confidenceColor(for: confidence))
@@ -245,10 +249,10 @@ struct PreviewFullScreenView: View {
                           // 信頼度データが存在しない、またはインデックスが範囲外の場合のフォールバック表示
                           HStack {
                             Text("信頼度:")
-                              .foregroundColor(.white.opacity(0.8))
+                              .foregroundColor(.secondary)
                               .font(.caption)
                             Text("信頼度なし")
-                              .foregroundColor(.gray)
+                              .foregroundColor(.secondary)
                               .font(.caption)
                               .italic()
                           }
@@ -265,7 +269,7 @@ struct PreviewFullScreenView: View {
                             ?? []
                           ForEach(lines.indices, id: \.self) { idx in
                             Text(lines[idx])
-                              .foregroundColor(.white)
+                              .foregroundColor(.primary)
                               .font(.subheadline)
                               .frame(maxWidth: .infinity, alignment: .leading)
                               .multilineTextAlignment(.leading)
@@ -297,7 +301,7 @@ struct PreviewFullScreenView: View {
                         }
                       } else {
                         Text("設問情報なし")
-                          .foregroundColor(.gray)
+                          .foregroundColor(.secondary)
                           .font(.subheadline)
                       }
                     }
@@ -305,6 +309,11 @@ struct PreviewFullScreenView: View {
                     .padding(.bottom, 10)
                   }
                 }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+                .padding(.horizontal, 14)
               }
             }
             .padding(.top, 50)
