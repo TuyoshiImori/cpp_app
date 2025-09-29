@@ -31,6 +31,9 @@ final class CameraViewModel: NSObject, ObservableObject {
   /// 画像解析中かどうか（UI 側でローディングを表示するために使用）
   @Published var isProcessing: Bool = false
 
+  /// Analysis 用の NavigationLink をトリガーするためのフラグ
+  @Published var isAnalysisActive: Bool = false
+
   // MARK: - Data Management Properties
   /// キャプチャされた画像の配列
   @Published var capturedImages: [UIImage] = []
