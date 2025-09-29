@@ -57,10 +57,10 @@ struct AccordionItem: View {
           suppressSlideAnimation ? nil : .spring(response: 0.4, dampingFraction: 0.8),
           value: slideOffset)
     }
-  // カード背景：ダークモード時は薄い黒、ライトはシステム背景
-  .background(cardBackground)
-  .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
-  .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+    // カード背景：ダークモード時は薄い黒、ライトはシステム背景
+    .background(cardBackground)
+    .clipShape(RoundedCorners(radius: 10, corners: cornersToRound()))
+    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
     // 設定アプリ風の区切り線を各アイテム下部に表示（左にインセットを入れる）
     .overlay(
       VStack {
@@ -208,7 +208,7 @@ struct AccordionItem: View {
       headerView(isExpanded: isExpanded)
       expandedContentView(isExpanded: isExpanded)
     }
-  .background(cardBackground)
+    .background(cardBackground)
     .animation(.easeInOut(duration: 0.25), value: isExpanded)
     // 編集モード中はタップによる画面遷移を無効化
     .onTapGesture {
@@ -240,7 +240,7 @@ struct AccordionItem: View {
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
-  .background(cardBackground)
+    .background(cardBackground)
     .zIndex(2)
     .animation(nil, value: isExpanded)
   }
