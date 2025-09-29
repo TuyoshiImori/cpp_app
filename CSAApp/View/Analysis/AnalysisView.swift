@@ -14,6 +14,9 @@ struct AnalysisView: View {
   let allCroppedImageSets: [[UIImage]]
   let allParsedAnswersSets: [[String]]
   let allConfidenceScores: [[Float]]?
+  // CSV 共有 state
+  @State private var isShowingShare: Bool = false
+  @State private var exportedFileURL: URL? = nil
 
   // MARK: - Initializer
   /// 新しいイニシャライザ：全ての回答データを受け取る
@@ -72,6 +75,61 @@ struct AnalysisView: View {
     }
     .navigationTitle("分析結果")
     .navigationBarTitleDisplayMode(.large)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button(action: {
+          // CSV を生成して共有シートを表示
+          do {
+            // questionTitles を item.questionTypes に基づき作成する
+            var questionTitles: [String] = []
+            for qt in item.questionTypes {
+              switch qt {
+              case .single(let question, _):
+                questionTitles.append(question)
+              case .multiple(let question, _):
+                questionTitles.append(question)
+              case .text(let question):
+                questionTitles.append(question)
+              case .info(let question, let options):
+                // info の場合は個人情報フィールドを設問ごとに列として展開
+                for opt in options {
+                  questionTitles.append(opt.displayName)
+                }
+              }
+            }
+            // 答えデータ: 既に外部から渡された全回答セットがあればそれを使用
+            let answerSets: [[String]]
+            if !allParsedAnswersSets.isEmpty {
+              // 外部データが渡される場合、info 設問が1セルにまとまっている可能性があるため、
+              // item.questionTypes に合わせて展開する
+              answerSets = allParsedAnswersSets.map { expandAnswerSetForInfo($0) }
+            } else {
+              // viewModel.analysisResults を行ベースに変換
+              answerSets = reconstructRows(from: viewModel.analysisResults)
+            }
+
+            let res = try CSVExporter.exportResponses(
+              surveyTimestamp: item.timestamp,
+              questionTitles: questionTitles,
+              allParsedAnswersSets: answerSets
+            )
+            exportedFileURL = res.url
+            isShowingShare = true
+          } catch {
+            print("CSV export failed: \(error)")
+          }
+        }) {
+          Image(systemName: "square.and.arrow.up")
+        }
+      }
+    }
+    .sheet(isPresented: $isShowingShare, onDismiss: { exportedFileURL = nil }) {
+      if let url = exportedFileURL {
+        ActivityView(activityItems: [url])
+      } else {
+        EmptyView()
+      }
+    }
     .onAppear {
       // Viewが表示されたときにItemと全ての回答データを設定して分析開始
       viewModel.setItem(
@@ -347,6 +405,83 @@ struct AnalysisView: View {
       totalCount += answerSet.count
     }
     return totalCount
+  }
+
+  // MARK: - CSV Export Helpers
+  /// AnalysisResult 配列から行ベースの回答セットを再構築する
+  private func reconstructRows(from results: [AnalysisViewModel.AnalysisResult]) -> [[String]] {
+    // item.questionTypes に合わせて列を展開する
+    var expandedColumnsCount = 0
+    for qt in item.questionTypes {
+      switch qt {
+      case .info(_, let options):
+        expandedColumnsCount += options.count
+      default:
+        expandedColumnsCount += 1
+      }
+    }
+
+    // 各設問ごとの最大行数を取得
+    var maxRows = 0
+    for r in results { maxRows = max(maxRows, r.answers.count) }
+
+    var rows: [[String]] = []
+    for rowIndex in 0..<maxRows {
+      var row: [String] = []
+      var resultIndex = 0
+      for qt in item.questionTypes {
+        let result = results[resultIndex]
+        switch qt {
+        case .info(_, let options):
+          // info の回答は、1つの answers 要素に複数フィールドが入っている可能性がある
+          // ここではカンマ等で分割されている想定で、options 数に合わせて分解する
+          let raw = rowIndex < result.answers.count ? result.answers[rowIndex] : ""
+          let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map { String($0) }
+          for i in 0..<options.count {
+            if i < parts.count {
+              row.append(parts[i])
+            } else {
+              row.append("")
+            }
+          }
+        default:
+          let raw = rowIndex < result.answers.count ? result.answers[rowIndex] : ""
+          row.append(raw)
+        }
+        resultIndex += 1
+      }
+      rows.append(row)
+    }
+    return rows
+  }
+
+  /// 外部から渡された answerSet（1行）を item.questionTypes に合わせて展開する
+  private func expandAnswerSetForInfo(_ answerSet: [String]) -> [String] {
+    var expanded: [String] = []
+    var idx = 0
+    for qt in item.questionTypes {
+      switch qt {
+      case .info(_, let options):
+        // 外部データでは info の複数フィールドが 1 セルにまとまっている場合がある
+        // その場合はカンマで分割して options の数だけ展開する
+        let raw = idx < answerSet.count ? answerSet[idx] : ""
+        let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map { String($0) }
+        for i in 0..<options.count {
+          if i < parts.count {
+            expanded.append(parts[i])
+          } else {
+            expanded.append("")
+          }
+        }
+        idx += 1
+      default:
+        // 通常の設問は 1 列
+        let raw = idx < answerSet.count ? answerSet[idx] : ""
+        expanded.append(raw)
+        idx += 1
+      }
+    }
+    return expanded
   }
 }
 
