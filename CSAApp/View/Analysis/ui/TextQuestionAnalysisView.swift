@@ -75,12 +75,5 @@ struct TextQuestionAnalysisView: View {
       }
     }
     .padding()
-    // summaryCard と同じ見た目に統一（ダークモード対応）
-    #if canImport(UIKit)
-      .background(Color(UIColor.secondarySystemBackground))
-    #else
-      .background(Color.secondary.opacity(0.1))
-    #endif
-    .cornerRadius(12)
   }
 }

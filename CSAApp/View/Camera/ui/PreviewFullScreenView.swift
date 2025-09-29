@@ -1,8 +1,11 @@
 import Foundation
 import SwiftData
 import SwiftUI
-import UIKit
 import Vision
+
+#if canImport(UIKit)
+  import UIKit
+#endif
 
 /// プレビュー全画面表示用のコンポーネント
 /// CameraViewから切り出して、信頼度表示機能も追加
@@ -52,11 +55,39 @@ struct PreviewFullScreenView: View {
   }
 
   // MARK: - Body
+  @Environment(\.colorScheme) private var colorScheme
+
+  private var previewCardBackground: Color {
+    if colorScheme == .dark {
+      return Color(white: 0.09)
+    } else {
+      #if canImport(UIKit)
+        return Color(UIColor.systemBackground)
+      #else
+        return Color.white
+      #endif
+    }
+  }
+
+  private var previewScreenBackground: some View {
+    Group {
+      if colorScheme == .dark {
+        Color.black.ignoresSafeArea()
+      } else {
+        #if canImport(UIKit)
+          Color(UIColor.systemGray6).ignoresSafeArea()
+        #else
+          Color(.init(white: 0.95, alpha: 1.0)).ignoresSafeArea()
+        #endif
+      }
+    }
+  }
+
   var body: some View {
     NavigationStack {
       ZStack {
-        // 全体背景は薄いグレーにしてカードを際立たせる（ContentView に合わせた雰囲気）
-        Color(UIColor.systemGray6).ignoresSafeArea()
+        // 背景（ダーク時は黒、ライトは薄いグレー）
+        previewScreenBackground
         if !croppedImageSets.isEmpty {
           imagesTab()
         }
@@ -69,8 +100,13 @@ struct PreviewFullScreenView: View {
               Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 36))
                 // アイコンはシステムラベル色を使い、背景は薄いグレーで覆う
-                .foregroundColor(Color(UIColor.label))
-                .background(Color(UIColor.systemGray4).opacity(0.35))
+                #if canImport(UIKit)
+                  .foregroundColor(Color(UIColor.label))
+                  .background(Color(UIColor.systemGray4).opacity(0.35))
+                #else
+                  .foregroundColor(.primary)
+                  .background(Color.gray.opacity(0.35))
+                #endif
                 .clipShape(Circle())
             }
 
@@ -310,7 +346,7 @@ struct PreviewFullScreenView: View {
                   }
                 }
                 .padding()
-                .background(Color.white)
+                .background(previewCardBackground)
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
                 .padding(.horizontal, 14)
@@ -346,18 +382,20 @@ struct PreviewFullScreenView: View {
 }
 
 // MARK: - Preview
-struct PreviewFullScreenView_Previews: PreviewProvider {
-  @State static var isPresented = true
-  @State static var previewIndex = 0
+#if canImport(UIKit)
+  struct PreviewFullScreenView_Previews: PreviewProvider {
+    @State static var isPresented = true
+    @State static var previewIndex = 0
 
-  static var previews: some View {
-    // プレビューでは実際の画像は不要なので空配列で簡素化
-    PreviewFullScreenView(
-      isPreviewPresented: $isPresented,
-      previewIndex: $previewIndex,
-      croppedImageSets: [],
-      parsedAnswersSets: [],
-      item: nil
-    )
+    static var previews: some View {
+      // プレビューでは実際の画像は不要なので空配列で簡素化
+      PreviewFullScreenView(
+        isPreviewPresented: $isPresented,
+        previewIndex: $previewIndex,
+        croppedImageSets: [],
+        parsedAnswersSets: [],
+        item: nil
+      )
+    }
   }
-}
+#endif

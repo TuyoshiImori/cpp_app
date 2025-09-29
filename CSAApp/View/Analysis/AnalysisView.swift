@@ -1,6 +1,9 @@
 import SwiftData
 import SwiftUI
-import UIKit
+
+#if canImport(UIKit)
+  import UIKit
+#endif
 
 /// 分析画面のView
 /// Itemのスキャン結果を分析して表示します
@@ -41,11 +44,40 @@ struct AnalysisView: View {
   }
 
   // MARK: - Body
+  @Environment(\.colorScheme) private var colorScheme
+
+  // カードおよび背景の色を動的に決定する
+  private var cardBackgroundColor: Color {
+    if colorScheme == .dark {
+      // ダークモード時は薄い黒のカード背景
+      return Color(white: 0.08)
+    } else {
+      #if canImport(UIKit)
+        return Color(UIColor.systemBackground)
+      #else
+        return Color.white
+      #endif
+    }
+  }
+
+  private var screenBackground: some View {
+    Group {
+      if colorScheme == .dark {
+        Color.black.ignoresSafeArea()
+      } else {
+        #if canImport(UIKit)
+          Color(UIColor.systemGray6).ignoresSafeArea()
+        #else
+          Color.gray.opacity(0.06).ignoresSafeArea()
+        #endif
+      }
+    }
+  }
+
   var body: some View {
     ZStack {
-      // 背景色: ダーク/ライトに追随するシステムカラーを使用
-      Color(.systemBackground)
-        .ignoresSafeArea()
+      // 背景（ダークモードは黒、ライトは薄グレー）
+      screenBackground
 
       if viewModel.isLoading {
         // ローディング表示
@@ -64,9 +96,19 @@ struct AnalysisView: View {
             // サマリーカード
             summaryCard
 
-            // 設問ごとの分析結果を表示
+            // 設問ごとの分析結果を表示（親側で白カードを付与）
             ForEach(0..<item.questionTypes.count, id: \.self) { questionIndex in
               questionAnalysisCard(for: questionIndex)
+                .padding()
+                // 設問カードの背景: ライトモードは白、ダークモードは薄い黒
+                #if canImport(UIKit)
+                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
+                #else
+                  .background(colorScheme == .dark ? Color(white: 0.08) : Color.white)
+                #endif
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+                .padding(.horizontal, 4)
             }
           }
           .padding()
@@ -189,8 +231,12 @@ struct AnalysisView: View {
       }
     }
     .padding()
-    // カードは secondarySystemBackground を使ってダーク/ライトに適応
-    .background(Color(UIColor.secondarySystemBackground))
+    // カード背景：ダークモードでは secondarySystemBackground を使い、ライトモードでは白にする
+    #if canImport(UIKit)
+      .background(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.white)
+    #else
+      .background(Color.white)
+    #endif
     .cornerRadius(12)
   }
 
