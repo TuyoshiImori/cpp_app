@@ -233,7 +233,7 @@ struct PreviewFullScreenView: View {
         let imageSet = croppedImageSets[setIdx]
         GeometryReader { geo in
           ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 20) {
               ForEach(0..<imageSet.count, id: \.self) { imgIdx in
                 let img = imageSet[imgIdx]
                 // 各設問ブロックは白いカードとして見せる
