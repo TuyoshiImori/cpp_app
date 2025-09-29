@@ -46,8 +46,12 @@ struct InfoQuestionAnalysisView: View {
         }
       }
     }
-    .padding()
-    .background(Color.secondary.opacity(0.1))
-    .cornerRadius(12)
+  .padding()
+#if canImport(UIKit)
+  .background(Color(UIColor.secondarySystemBackground))
+#else
+  .background(Color.secondary.opacity(0.1))
+#endif
+  .cornerRadius(12)
   }
 }

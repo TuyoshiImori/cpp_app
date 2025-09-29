@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// テキスト入力設問の分析結果を表示するコンポーネント
 struct TextQuestionAnalysisView: View {
@@ -32,14 +35,15 @@ struct TextQuestionAnalysisView: View {
         .font(.subheadline)
         .foregroundColor(.primary)
         .fixedSize(horizontal: false, vertical: true)
-    }
 
-    // 要約表示領域
-    VStack(alignment: .leading, spacing: 8) {
+      // 要約表示領域（single/multiple と同様にカード内に含める）
       if isSummarizing {
         HStack {
-          ProgressView().scaleEffect(0.9)
+          ProgressView()
+            .scaleEffect(0.9)
           Text("要約を取得中...")
+            .font(.caption)
+            .foregroundColor(.secondary)
         }
       } else if let s = otherSummary {
         Text(s)
@@ -48,10 +52,13 @@ struct TextQuestionAnalysisView: View {
           .fixedSize(horizontal: false, vertical: true)
       }
     }
-    .padding([.leading, .trailing, .bottom])
-
-    .padding()
-    .background(Color.secondary.opacity(0.1))
-    .cornerRadius(12)
+  .padding()
+  // summaryCard と同じ見た目に統一（ダークモード対応）
+#if canImport(UIKit)
+  .background(Color(UIColor.secondarySystemBackground))
+#else
+  .background(Color.secondary.opacity(0.1))
+#endif
+  .cornerRadius(12)
   }
 }
