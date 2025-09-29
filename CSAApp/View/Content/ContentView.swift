@@ -72,7 +72,6 @@ struct ContentView: View {
             viewModel.toggleEditMode()
             if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
           }) { Text(viewModel.isEditing ? "Done" : "Edit") }
-          .tint(.blue)
         }
       }
     }

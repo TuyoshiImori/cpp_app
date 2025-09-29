@@ -95,20 +95,21 @@ struct PreviewFullScreenView: View {
         // 上部のボタンオーバーレイ
         VStack {
           HStack {
-            // 左上の閉じるボタン
+            // 左上の閉じるボタン（Label を使うことでアクセシビリティラベルを保持）
             Button(action: { isPreviewPresented = false }) {
-              Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 36))
-                // アイコンはシステムラベル色を使い、背景は薄いグレーで覆う
+              // システムの塗りつぶしサークルアイコンではなく、単純な × を使う
+              Label("閉じる", systemImage: "xmark")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 20))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
                 #if canImport(UIKit)
                   .foregroundColor(Color(UIColor.label))
-                  .background(Color(UIColor.systemGray4).opacity(0.35))
                 #else
                   .foregroundColor(.primary)
-                  .background(Color.gray.opacity(0.35))
                 #endif
-                .clipShape(Circle())
             }
+            .glassEffect(.regular.interactive())
 
             Spacer()
 
