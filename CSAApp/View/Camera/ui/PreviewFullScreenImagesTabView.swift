@@ -36,10 +36,21 @@ struct PreviewFullScreenImagesTabView: View {
               ForEach(0..<imageSet.count, id: \.self) { imgIdx in
                 let img = imageSet[imgIdx]
                 VStack {
-                  Text("設問 \(imgIdx + 1)")
-                    .foregroundColor(.primary)
-                    .font(.headline)
-                    .padding(.top, 10)
+                  // 設問ヘッダーを分析画面のカードに合わせる
+                  HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "dot.circle")
+                      .foregroundColor(.blue)
+                      .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                      Text("設問 \(imgIdx + 1)")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    }
+                    Spacer()
+                  }
+                  .padding(.top, 10)
 
                   Image(uiImage: img)
                     .resizable()
@@ -58,35 +69,7 @@ struct PreviewFullScreenImagesTabView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .multilineTextAlignment(.leading)
 
-                      let shouldShowOverallConfidence = !answerIndex.contains("\n")
-
-                      if shouldShowOverallConfidence {
-                        if let confidenceScores = confidenceScores,
-                          setIdx < confidenceScores.count,
-                          imgIdx < confidenceScores[setIdx].count
-                        {
-                          let confidence = confidenceScores[setIdx][imgIdx]
-                          HStack {
-                            Text("信頼度:")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                            Text("\(String(format: "%.1f", confidence))%")
-                              .foregroundColor(confidenceColor(for: confidence))
-                              .font(.caption)
-                              .bold()
-                          }
-                        } else {
-                          HStack {
-                            Text("信頼度:")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                            Text("信頼度なし")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                              .italic()
-                          }
-                        }
-                      }
+                      // 信頼度表示は UI から削除（データは引き続き viewModel に残す）
 
                       if let qtypes = viewModel?.initialQuestionTypes, imgIdx < qtypes.count {
                         switch qtypes[imgIdx] {
@@ -96,8 +79,9 @@ struct PreviewFullScreenImagesTabView: View {
                             ?? []
                           ForEach(lines.indices, id: \.self) { idx in
                             Text(lines[idx])
-                              .foregroundColor(.primary)
+                              .foregroundColor(.green)
                               .font(.subheadline)
+                              .bold()
                               .frame(maxWidth: .infinity, alignment: .leading)
                               .multilineTextAlignment(.leading)
                               .fixedSize(horizontal: false, vertical: true)
@@ -144,6 +128,8 @@ struct PreviewFullScreenImagesTabView: View {
               }
             }
             .padding(.top, 50)
+            // 下部に余白を追加して、ページインジケータや端末のホームバーと被らないようにする
+            .padding(.bottom, 80)
           }
         }
         .tag(setIdx)

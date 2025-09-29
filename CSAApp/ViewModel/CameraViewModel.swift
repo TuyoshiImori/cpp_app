@@ -310,20 +310,7 @@ final class CameraViewModel: NSObject, ObservableObject {
       var out: [String] = []
       for (i, field) in infoFields.enumerated() {
         let answer = i < lines.count ? lines[i].trimmingCharacters(in: .whitespacesAndNewlines) : ""
-        // 信頼度は confidenceScores2D に入っている可能性がある
-        var confText = "信頼度: N/A"
-        if index < confidenceScores2D.count {
-          let row = confidenceScores2D[index]
-          if i < row.count {
-            confText = String(format: "信頼度: %.0f%%", row[i])
-          }
-        } else if index < confidenceScores.count {
-          // フラットなスコアから代替でパーセント表示
-          let v = confidenceScores[index]
-          confText = String(format: "信頼度: %.0f%%", v)
-        }
-
-        let line = "\(field.displayName)：\(answer)（\(confText)）"
+        let line = "\(field.displayName)：\(answer)"
         out.append(line)
       }
       return out

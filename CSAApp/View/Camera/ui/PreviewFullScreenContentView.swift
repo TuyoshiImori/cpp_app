@@ -118,8 +118,9 @@ struct PreviewFullScreenContentView: View {
             onDelete: onDelete
           )
         }
-        .padding(.bottom, 30)
-        .padding(.trailing, 20)
+  // 削除ボタンがコンテンツに被らないように、少し上にずらす
+  .padding(.bottom, 44)
+  .padding(.trailing, 20)
       }
     }
   }
