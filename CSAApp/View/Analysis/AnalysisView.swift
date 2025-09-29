@@ -209,6 +209,7 @@ struct AnalysisView: View {
       .background(Color.white)
     #endif
     .cornerRadius(12)
+    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
   }
 
   // MARK: - Question Analysis Card
