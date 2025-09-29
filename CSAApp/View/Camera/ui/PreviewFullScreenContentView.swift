@@ -16,6 +16,8 @@ struct PreviewFullScreenContentView: View {
   var viewModel: CameraViewModel? = nil
   let item: Item?
   var onDelete: ((Int) -> Bool)? = nil
+
+  // 信頼度情報を格納するための配列（将来の実装用）
   let confidenceScores: [[Float]]?
 
   @Environment(\.colorScheme) private var colorScheme
@@ -52,7 +54,10 @@ struct PreviewFullScreenContentView: View {
       previewScreenBackground
 
       if !croppedImageSets.isEmpty {
-        imagesTab()
+        PreviewFullScreenImagesTabView(
+          previewIndex: $previewIndex, croppedImageSets: croppedImageSets,
+          parsedAnswersSets: parsedAnswersSets, viewModel: viewModel,
+          confidenceScores: confidenceScores)
       }
 
       VStack {
@@ -75,7 +80,6 @@ struct PreviewFullScreenContentView: View {
 
           if item != nil {
             Button(action: {
-              // ViewModel が提供されていればそれを更新、なければローカルで処理
               if let vm = viewModel {
                 vm.isAnalysisActive = true
               }
@@ -101,7 +105,6 @@ struct PreviewFullScreenContentView: View {
         Spacer()
       }
 
-      // NavigationLink for analysis
       if let it = item {
         NavigationLink(
           destination: AnalysisView(
@@ -121,7 +124,7 @@ struct PreviewFullScreenContentView: View {
         Spacer()
         HStack {
           Spacer()
-          DeleteButtonView(
+          PreviewFullScreenDeleteButtonView(
             previewIndex: $previewIndex,
             croppedImageSets: croppedImageSets,
             parsedAnswersSets: parsedAnswersSets,
@@ -142,11 +145,11 @@ struct PreviewFullScreenContentView: View {
     if let vm = viewModel {
       return Binding(get: { vm.isAnalysisActive }, set: { vm.isAnalysisActive = $0 })
     } else {
-      // Fallback: closed binding (unused if no vm provided)
       return .constant(false)
     }
   }
 
+  /// 信頼度に応じた色を返す
   private func confidenceColor(for confidence: Float) -> Color {
     switch confidence {
     case 80...:
@@ -158,188 +161,6 @@ struct PreviewFullScreenContentView: View {
     default:
       return .red
     }
-  }
-
-  // MARK: - Delete Button Subview
-  private struct DeleteButtonView: View {
-    @Binding var previewIndex: Int
-    let croppedImageSets: [[UIImage]]
-    let parsedAnswersSets: [[String]]
-    let item: Item?
-    var viewModel: CameraViewModel?
-    @Binding var isPreviewPresented: Bool
-    var onDelete: ((Int) -> Bool)?
-
-    @Environment(\.modelContext) private var modelContext
-    @State private var showConfirm = false
-
-    var body: some View {
-      Button(role: .destructive) {
-        showConfirm = true
-      } label: {
-        HStack {
-          Image(systemName: "trash")
-          Text("削除")
-            .font(.headline)
-        }
-        #if canImport(UIKit)
-          .foregroundColor(Color(UIColor.label))
-        #else
-          .foregroundColor(.primary)
-        #endif
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-      }
-      .glassEffect(.regular.tint(Color.red.opacity(0.7)).interactive())
-      .confirmationDialog("この回答を削除しますか？", isPresented: $showConfirm, titleVisibility: .visible) {
-        Button("削除", role: .destructive) {
-          var shouldClose = true
-          if let callback = onDelete {
-            shouldClose = callback(previewIndex)
-          } else if let vm = viewModel {
-            // use ViewModel's deleteDataSet to perform deletion and persistence
-            shouldClose = vm.deleteDataSet(at: previewIndex, item: item, modelContext: modelContext)
-          } else if let it = item {
-            // Fallback: delete whole item
-            modelContext.delete(it)
-            shouldClose = true
-          }
-
-          if shouldClose {
-            isPreviewPresented = false
-          }
-        }
-        Button("キャンセル", role: .cancel) {}
-      }
-    }
-  }
-
-  // MARK: - Images Tab
-  @ViewBuilder
-  private func imagesTab() -> some View {
-    TabView(selection: $previewIndex) {
-      ForEach(0..<croppedImageSets.count, id: \.self) { setIdx in
-        let imageSet = croppedImageSets[setIdx]
-        GeometryReader { geo in
-          ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 20) {
-              ForEach(0..<imageSet.count, id: \.self) { imgIdx in
-                let img = imageSet[imgIdx]
-                VStack {
-                  Text("設問 \(imgIdx + 1)")
-                    .foregroundColor(.primary)
-                    .font(.headline)
-                    .padding(.top, 10)
-
-                  Image(uiImage: img)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: geo.size.width - 20)
-                    .padding(.horizontal, 10)
-
-                  if setIdx < parsedAnswersSets.count, imgIdx < parsedAnswersSets[setIdx].count {
-                    let answerIndex = parsedAnswersSets[setIdx][imgIdx]
-
-                    VStack(alignment: .leading, spacing: 4) {
-                      Text("検出結果:")
-                        .foregroundColor(.primary)
-                        .font(.subheadline)
-                        .bold()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .multilineTextAlignment(.leading)
-
-                      let shouldShowOverallConfidence = !answerIndex.contains("\n")
-
-                      if shouldShowOverallConfidence {
-                        if let confidenceScores = confidenceScores,
-                          setIdx < confidenceScores.count,
-                          imgIdx < confidenceScores[setIdx].count
-                        {
-                          let confidence = confidenceScores[setIdx][imgIdx]
-                          HStack {
-                            Text("信頼度:")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                            Text("\(String(format: "%.1f", confidence))%")
-                              .foregroundColor(confidenceColor(for: confidence))
-                              .font(.caption)
-                              .bold()
-                          }
-                        } else {
-                          HStack {
-                            Text("信頼度:")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                            Text("信頼度なし")
-                              .foregroundColor(.secondary)
-                              .font(.caption)
-                              .italic()
-                          }
-                        }
-                      }
-
-                      if let qtypes = viewModel?.initialQuestionTypes, imgIdx < qtypes.count {
-                        switch qtypes[imgIdx] {
-                        case .info(_, _):
-                          let lines =
-                            viewModel?.formattedInfoLines(for: imgIdx, parsedAnswer: answerIndex)
-                            ?? []
-                          ForEach(lines.indices, id: \.self) { idx in
-                            Text(lines[idx])
-                              .foregroundColor(.primary)
-                              .font(.subheadline)
-                              .frame(maxWidth: .infinity, alignment: .leading)
-                              .multilineTextAlignment(.leading)
-                              .fixedSize(horizontal: false, vertical: true)
-                              .padding(.vertical, 2)
-                          }
-                        default:
-                          if answerIndex == "-1" {
-                            Text("回答: 未検出")
-                              .foregroundColor(.orange)
-                              .font(.subheadline)
-                              .frame(maxWidth: .infinity, alignment: .leading)
-                              .multilineTextAlignment(.leading)
-                          } else if !answerIndex.isEmpty {
-                            Text("回答: \(answerIndex)")
-                              .foregroundColor(.green)
-                              .font(.subheadline)
-                              .bold()
-                              .frame(maxWidth: .infinity, alignment: .leading)
-                              .multilineTextAlignment(.leading)
-                          } else {
-                            Text("回答: 検出エラー")
-                              .foregroundColor(.red)
-                              .font(.subheadline)
-                              .frame(maxWidth: .infinity, alignment: .leading)
-                              .multilineTextAlignment(.leading)
-                          }
-                        }
-                      } else {
-                        Text("設問情報なし")
-                          .foregroundColor(.secondary)
-                          .font(.subheadline)
-                      }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 10)
-                  }
-                }
-                .padding()
-                .background(previewCardBackground)
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
-                .padding(.horizontal, 14)
-              }
-            }
-            .padding(.top, 50)
-          }
-        }
-        .tag(setIdx)
-      }
-    }
-    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-    .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
   }
 }
 
