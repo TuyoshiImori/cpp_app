@@ -125,13 +125,15 @@ struct PreviewFullScreenView: View {
                   Text("分析")
                     .font(.headline)
                 }
-                // ボタンラベルはセマンティックな色にしてダークモード対応
-                .foregroundColor(.white)
+                #if canImport(UIKit)
+                  .foregroundColor(Color(UIColor.label))
+                #else
+                  .foregroundColor(.primary)
+                #endif
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color.blue.opacity(0.8))
-                .cornerRadius(20)
               }
+              .glassEffect(.regular.interactive())
             }
           }
           .padding(.horizontal, 20)
@@ -198,12 +200,15 @@ struct PreviewFullScreenView: View {
           Text("削除")
             .font(.headline)
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
-        .background(Color.red.opacity(0.85))
-        .cornerRadius(12)
+        #if canImport(UIKit)
+          .foregroundColor(Color(UIColor.label))
+        #else
+          .foregroundColor(.primary)
+        #endif
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
       }
+      .glassEffect(.regular.tint(.red.opacity(0.7)).interactive())
       .confirmationDialog("この回答を削除しますか？", isPresented: $showConfirm, titleVisibility: .visible) {
         Button("削除", role: .destructive) {
           // 削除処理: item 単体削除 or 特定セット削除のコールバック
