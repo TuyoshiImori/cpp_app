@@ -141,6 +141,12 @@ class AnalysisViewModel: ObservableObject {
           if !agg.otherTexts.isEmpty {
             result.isSummarizing = true
           }
+        case .text(_):
+          // 自由記述設問: 応答が存在する場合は画面表示時点で要約を走らせる想定なので事前マークする
+          let nonEmpty = allAnswersForQuestion.filter {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0 != "-1"
+          }
+          if !nonEmpty.isEmpty { result.isSummarizing = true }
         case .multiple(_, let options):
           let agg = Self.aggregateMultipleChoice(answers: allAnswersForQuestion, options: options)
           if !agg.otherTexts.isEmpty {
@@ -250,6 +256,37 @@ class AnalysisViewModel: ObservableObject {
               questionText: result.questionText,
               questionKind: "multiple"
             )
+            if let s = summary {
+              var mm = analysisResults[idx]
+              mm.otherSummary = s
+              analysisResults[idx] = mm
+            }
+
+            var cleared = analysisResults[idx]
+            cleared.isSummarizing = false
+            analysisResults[idx] = cleared
+          #endif
+        }
+      case .text(_):
+        // 自由記述設問: 回答が存在する場合は順次要約を実行
+        let nonEmpty = result.answers.filter {
+          !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0 != "-1"
+        }
+        if !nonEmpty.isEmpty {
+          #if !canImport(FoundationModels)
+            continue
+          #else
+            var m = analysisResults[idx]
+            m.isSummarizing = true
+            analysisResults[idx] = m
+
+            let summary = await SummarizationQueue.shared.summarize(
+              otherTexts: nonEmpty,
+              questionIndex: idx,
+              questionText: result.questionText,
+              questionKind: "text"
+            )
+
             if let s = summary {
               var mm = analysisResults[idx]
               mm.otherSummary = s
@@ -419,13 +456,20 @@ class AnalysisViewModel: ObservableObject {
           // 要求: 出力を安定化するため、必ず固定の前置文で始め、その直後に1〜2文の要約を続けるよう指示する
           let promptHeaderBodySingle =
             "以下に示す“その他”に含まれる自由記述の主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「その他の選択肢に記述された内容を要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
+
           let promptHeaderBodyMultiple =
             "以下に示す複数選択設問の“その他”に含まれる自由記述の主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「その他の選択肢に記述された内容を要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。複数のトピックがある場合は、最も頻出の観点を中心にまとめてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
 
+          let promptHeaderBodyText =
+            "以下に示す自由記述設問の回答（長文の意見や感想など）から主要なポイントを日本語で簡潔に要約してください。必ず応答文の先頭を次の文で始めてください：「印象に残った曲や出演者へのメッセージなど、主要なポイントを完結に要約しました。」その文の直後に要約を続け、全体で1〜2文に収めてください。複数のトピックがある場合は、最も頻出の観点を中心にまとめてください。冗長な前置きや余計な説明はせず、要点だけを書いてください。\n\n"
+
           let headerIntro = "設問 \(questionIndex + 1): \(questionText)\n"
+          let kind = questionKind.lowercased()
           let promptHeader: String
-          if questionKind.lowercased() == "multiple" {
+          if kind == "multiple" {
             promptHeader = headerIntro + promptHeaderBodyMultiple
+          } else if kind == "text" {
+            promptHeader = headerIntro + promptHeaderBodyText
           } else {
             promptHeader = headerIntro + promptHeaderBodySingle
           }

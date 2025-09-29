@@ -206,10 +206,6 @@ struct AnalysisView: View {
       let summarizationState = viewModel.analysisResults.first(where: {
         $0.questionIndex == questionIndex
       })
-      // デバッグログ: カード生成時点の isSummarizing を出力
-      print(
-        "[AnalysisView] questionIndex=\(questionIndex) summarizationState.isSummarizing=\(summarizationState?.isSummarizing ?? false) otherSummaryPresent=\(summarizationState?.otherSummary != nil)"
-      )
       return AnyView(
         SingleQuestionAnalysisView(
           questionIndex: questionIndex,
@@ -228,10 +224,6 @@ struct AnalysisView: View {
       let summarizationState = viewModel.analysisResults.first(where: {
         $0.questionIndex == questionIndex
       })
-      // デバッグログ: カード生成時点の isSummarizing を出力
-      print(
-        "[AnalysisView] questionIndex=\(questionIndex) summarizationState.isSummarizing=\(summarizationState?.isSummarizing ?? false) otherSummaryPresent=\(summarizationState?.otherSummary != nil)"
-      )
       return AnyView(
         MultipleQuestionAnalysisView(
           questionIndex: questionIndex,
@@ -246,13 +238,19 @@ struct AnalysisView: View {
       )
 
     case .text(let question):
+      // 該当設問の要約状態を ViewModel から取得して渡す
+      let summarizationState = viewModel.analysisResults.first(where: {
+        $0.questionIndex == questionIndex
+      })
       return AnyView(
         TextQuestionAnalysisView(
           questionIndex: questionIndex,
           questionText: question,
           answers: allAnswersForQuestion,
           confidenceScores: allConfidenceForQuestion,
-          images: allImagesForQuestion
+          images: allImagesForQuestion,
+          isSummarizing: summarizationState?.isSummarizing ?? false,
+          otherSummary: summarizationState?.otherSummary
         )
       )
 
