@@ -217,12 +217,12 @@ struct AccordionItem: View {
   @ViewBuilder
   private func headerView(isExpanded: Bool) -> some View {
     VStack(alignment: .leading, spacing: 6) {
-      // ID
-      if !item.surveyID.isEmpty {
-        Text("ID: \(item.surveyID)")
-          .font(.caption)
-          .foregroundColor(.secondary)
-      }
+      // ID 一旦コメントアウトして非表示
+      // if !item.surveyID.isEmpty {
+      //   Text("ID: \(item.surveyID)")
+      //     .font(.caption)
+      //     .foregroundColor(.secondary)
+      // }
 
       // タイトル
       if !item.title.isEmpty {

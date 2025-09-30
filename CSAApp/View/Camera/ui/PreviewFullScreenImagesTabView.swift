@@ -89,20 +89,20 @@ struct PreviewFullScreenImagesTabView: View {
                           }
                         default:
                           if answerIndex == "-1" {
-                            Text("回答: 未検出")
+                            Text("未検出")
                               .foregroundColor(.orange)
                               .font(.subheadline)
                               .frame(maxWidth: .infinity, alignment: .leading)
                               .multilineTextAlignment(.leading)
                           } else if !answerIndex.isEmpty {
-                            Text("回答: \(answerIndex)")
-                              .foregroundColor(.green)
+                            Text(answerIndex)
+                              .foregroundColor(.primary)
                               .font(.subheadline)
                               .bold()
                               .frame(maxWidth: .infinity, alignment: .leading)
                               .multilineTextAlignment(.leading)
                           } else {
-                            Text("回答: 検出エラー")
+                            Text("検出エラー")
                               .foregroundColor(.red)
                               .font(.subheadline)
                               .frame(maxWidth: .infinity, alignment: .leading)

@@ -160,36 +160,36 @@ public struct CameraView: View {
       .edgesIgnoringSafeArea(.bottom)
 
       // サンプル読み込みボタンは下中央に配置
-      VStack {
-        Spacer()
-        HStack {
-          Spacer()
-          Button(action: {
-            viewModel.loadSampleImage()
-          }) {
-            HStack(spacing: 8) {
-              if viewModel.isProcessingSample {
-                ProgressView()
-                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                  .frame(width: 20, height: 20)
-              } else {
-                Image(systemName: "photo.on.rectangle")
-              }
-              Text(viewModel.isProcessingSample ? "読み込み中..." : "サンプル読み込み")
-            }
-            .font(.headline)
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.blue.opacity(0.9))
-            .cornerRadius(20)
-            .shadow(radius: 6)
-          }
-          .disabled(viewModel.isProcessingSample)
-          Spacer()
-        }
-        .padding(.bottom, 12 + safeAreaInsets.bottom)
-      }
+      // VStack {
+      //   Spacer()
+      //   HStack {
+      //     Spacer()
+      //     Button(action: {
+      //       viewModel.loadSampleImage()
+      //     }) {
+      //       HStack(spacing: 8) {
+      //         if viewModel.isProcessingSample {
+      //           ProgressView()
+      //             .progressViewStyle(CircularProgressViewStyle(tint: .white))
+      //             .frame(width: 20, height: 20)
+      //         } else {
+      //           Image(systemName: "photo.on.rectangle")
+      //         }
+      //         Text(viewModel.isProcessingSample ? "読み込み中..." : "サンプル読み込み")
+      //       }
+      //       .font(.headline)
+      //       .foregroundColor(.white)
+      //       .padding(.horizontal, 16)
+      //       .padding(.vertical, 12)
+      //       .background(Color.blue.opacity(0.9))
+      //       .cornerRadius(20)
+      //       .shadow(radius: 6)
+      //     }
+      //     .disabled(viewModel.isProcessingSample)
+      //     Spacer()
+      //   }
+      //   .padding(.bottom, 12 + safeAreaInsets.bottom)
+      // }
 
       .alert(isPresented: $viewModel.isCircleDetectionFailed) {
         Alert(

@@ -113,27 +113,6 @@ struct AnalysisView: View {
     }
     .navigationTitle("分析結果")
     .navigationBarTitleDisplayMode(.large)
-    .toolbar {
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Button(action: {
-          // CSV を生成して共有シートを表示
-          do {
-            // ViewModel 経由で CSV を生成
-            // ViewModel に item をセットしていない場合は先にセット
-            viewModel.setItem(
-              item, allCroppedImageSets: allCroppedImageSets as [[Any]],
-              allParsedAnswersSets: allParsedAnswersSets, allConfidenceScores: allConfidenceScores)
-            let url = try viewModel.exportResponsesCSV(for: item)
-            exportedFileURL = url
-            isShowingShare = true
-          } catch {
-            print("CSV export failed: \(error)")
-          }
-        }) {
-          Image(systemName: "square.and.arrow.up")
-        }
-      }
-    }
     .sheet(isPresented: $isShowingShare, onDismiss: { exportedFileURL = nil }) {
       if let url = exportedFileURL {
         ActivityView(activityItems: [url])
@@ -152,22 +131,18 @@ struct AnalysisView: View {
   // MARK: - Summary Card
   private var summaryCard: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("分析サマリー")
-        .font(.headline)
-        .foregroundColor(.primary)
-
       HStack {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("全体信頼度")
-            .font(.caption)
-            .foregroundColor(.secondary)
-          Text("\(String(format: "%.1f", viewModel.overallConfidenceUsingStored()))%")
-            .font(.title2)
-            .bold()
-            .foregroundColor(confidenceColor(viewModel.overallConfidenceUsingStored()))
-        }
+        // VStack(alignment: .leading, spacing: 4) {
+        //   Text("全体信頼度")
+        //     .font(.caption)
+        //     .foregroundColor(.secondary)
+        //   Text("\(String(format: "%.1f", viewModel.overallConfidenceUsingStored()))%")
+        //     .font(.title2)
+        //     .bold()
+        //     .foregroundColor(confidenceColor(viewModel.overallConfidenceUsingStored()))
+        // }
 
-        Spacer()
+        // Spacer()
 
         VStack(alignment: .trailing, spacing: 4) {
           Text("回答データセット")
@@ -182,6 +157,28 @@ struct AnalysisView: View {
         }
 
         Spacer()
+        Button(action: {
+          // CSV を生成して共有シートを表示
+          do {
+            // ViewModel 経由で CSV を生成
+            // ViewModel に item をセットしていない場合は先にセット
+            viewModel.setItem(
+              item, allCroppedImageSets: allCroppedImageSets as [[Any]],
+              allParsedAnswersSets: allParsedAnswersSets, allConfidenceScores: allConfidenceScores)
+            let url = try viewModel.exportResponsesCSV(for: item)
+            exportedFileURL = url
+            isShowingShare = true
+          } catch {
+            print("CSV export failed: \(error)")
+          }
+        }) {
+          Text("CSV出力")
+            .font(.headline)
+            .foregroundColor(ButtonForeground.color(for: colorScheme))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .glassEffect(.regular.interactive())
       }
 
       // アンケート情報

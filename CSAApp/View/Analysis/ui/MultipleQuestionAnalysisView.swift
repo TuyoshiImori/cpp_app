@@ -112,16 +112,16 @@ struct MultipleQuestionAnalysisView: View {
                 ProgressView()
                   .scaleEffect(0.6, anchor: .center)
                 Text("要約を生成中...")
-                  .font(.caption)
+                  .font(.subheadline)
                   .foregroundColor(.secondary)
               }
             } else if let summary = otherSummary {
               VStack(alignment: .leading, spacing: 6) {
                 Text("要約:")
-                  .font(.caption)
+                  .font(.subheadline)
                   .foregroundColor(.secondary)
                 Text(summary)
-                  .font(.body)
+                  .font(.subheadline)
                   .foregroundColor(.primary)
                   .fixedSize(horizontal: false, vertical: true)
               }

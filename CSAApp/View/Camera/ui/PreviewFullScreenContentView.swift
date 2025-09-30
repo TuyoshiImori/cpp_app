@@ -68,15 +68,15 @@ struct PreviewFullScreenContentView: View {
           Spacer()
 
           if item != nil {
-            Button {
+            Button(action: {
               // アクションを先に書く形式に変更（UI は元のまま）
               if let vm = viewModel {
                 vm.isAnalysisActive = true
               }
-            } label: {
+            }) {
               HStack {
                 Image(systemName: "chart.bar.doc.horizontal")
-                Text("分析")
+                Text("分析実行")
                   .font(.headline)
               }
               .foregroundColor(ButtonForeground.color(for: colorScheme))
