@@ -88,59 +88,42 @@ struct MultipleQuestionAnalysisView: View {
       // 回答されている各選択肢をパーセントで表示（未選択の選択肢は除外）
       let percentages = agg.entries
       if !percentages.isEmpty {
-        VStack(alignment: .leading, spacing: 6) {
-          ForEach(percentages.indices, id: \.self) { idx in
-            let item = percentages[idx]
+        // データ駆動（配列を enumerate して使用）に切り替え、LazyVStack で描画する。
+        // 見た目は以前と同じ（Circle + ラベル + パーセント + 件数のレイアウト）を維持する。
+        LazyVStack(alignment: .leading, spacing: 6) {
+          ForEach(Array(percentages.enumerated()), id: \.0) { pair in
+            let idx = pair.0
+            let entry = pair.1
+            ChoicePercentageRow(
+              index: idx, totalItems: percentages.count, label: entry.label, percent: entry.percent,
+              count: Int(entry.value))
+          }
+        }
+      }
 
-            HStack {
-              Circle()
-                .fill(
-                  Color(
-                    hue: Double(idx) / Double(max(1, percentages.count)), saturation: 0.6,
-                    brightness: 0.9)
-                )
-                .frame(width: 10, height: 10)
-              // 表示フォーマット: 選択肢：xx.x%（n件）
-              VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                  Text(item.label)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                  Spacer()
-                  Text("\(String(format: "%.1f", item.percent))%")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                }
-                Text("\(Int(item.value))件")
-                  .font(.caption2)
+      // (implementation detail: percentageRow is defined as a private method below)
+      VStack(alignment: .leading, spacing: 6) {
+        // "その他" の自由記述を抜粋して表示（LLM要約は別処理）
+        if !otherTexts.isEmpty {
+          VStack(alignment: .leading, spacing: 4) {
+            // 要約中はインジケータを表示、完了したら要約テキストを表示
+            if isSummarizing {
+              HStack(spacing: 8) {
+                ProgressView()
+                  .scaleEffect(0.6, anchor: .center)
+                Text("要約を生成中...")
+                  .font(.caption)
                   .foregroundColor(.secondary)
               }
-              Spacer()
-            }
-          }
-
-          // "その他" の自由記述を抜粋して表示（LLM要約は別処理）
-          if !otherTexts.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-              // 要約中はインジケータを表示、完了したら要約テキストを表示
-              if isSummarizing {
-                HStack(spacing: 8) {
-                  ProgressView()
-                    .scaleEffect(0.6, anchor: .center)
-                  Text("要約を生成中...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                }
-              } else if let summary = otherSummary {
-                VStack(alignment: .leading, spacing: 6) {
-                  Text("要約:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                  Text(summary)
-                    .font(.body)
-                    .foregroundColor(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+            } else if let summary = otherSummary {
+              VStack(alignment: .leading, spacing: 6) {
+                Text("要約:")
+                  .font(.caption)
+                  .foregroundColor(.secondary)
+                Text(summary)
+                  .font(.body)
+                  .foregroundColor(.primary)
+                  .fixedSize(horizontal: false, vertical: true)
               }
             }
           }
@@ -150,5 +133,3 @@ struct MultipleQuestionAnalysisView: View {
     .padding()
   }
 }
-
-// 集計ロジックは AnalysisViewModel に移動済み

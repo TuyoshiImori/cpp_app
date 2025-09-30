@@ -92,56 +92,34 @@ struct SingleQuestionAnalysisView: View {
         VStack(alignment: .leading, spacing: 6) {
           ForEach(percentages.indices, id: \.self) { idx in
             let item = percentages[idx]
-
-            HStack {
-              Circle()
-                .fill(
-                  Color(
-                    hue: Double(idx) / Double(max(1, percentages.count)), saturation: 0.6,
-                    brightness: 0.9)
-                )
-                .frame(width: 10, height: 10)
-              // 表示フォーマット: 選択肢：xx.x%（n件）
-              VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                  Text(item.label)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                  Spacer()
-                  Text("\(String(format: "%.1f", item.percent))%")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                }
-                Text("\(Int(item.value))件")
-                  .font(.caption2)
+            ChoicePercentageRow(
+              index: idx, totalItems: percentages.count, label: item.label, percent: item.percent,
+              count: Int(item.value))
+          }
+        }
+      }
+      VStack(alignment: .leading, spacing: 6) {
+        // "その他" の自由記述を抜粋して表示（LLM要約は別処理）
+        if !otherTexts.isEmpty {
+          VStack(alignment: .leading, spacing: 4) {
+            // 要約中はインジケータを表示、完了したら要約テキストを表示
+            if isSummarizing {
+              HStack(spacing: 8) {
+                ProgressView()
+                  .scaleEffect(0.6, anchor: .center)
+                Text("要約を生成中...")
+                  .font(.subheadline)
                   .foregroundColor(.secondary)
               }
-              Spacer()
-            }
-          }
-
-          // "その他" の自由記述を抜粋して表示（LLM要約は別処理）
-          if !otherTexts.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-              // 要約中はインジケータを表示、完了したら要約テキストを表示
-              if isSummarizing {
-                HStack(spacing: 8) {
-                  ProgressView()
-                    .scaleEffect(0.6, anchor: .center)
-                  Text("要約を生成中...")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                }
-              } else if let summary = otherSummary {
-                VStack(alignment: .leading, spacing: 6) {
-                  Text("要約:")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                  Text(summary)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+            } else if let summary = otherSummary {
+              VStack(alignment: .leading, spacing: 6) {
+                Text("要約:")
+                  .font(.subheadline)
+                  .foregroundColor(.secondary)
+                Text(summary)
+                  .font(.subheadline)
+                  .foregroundColor(.primary)
+                  .fixedSize(horizontal: false, vertical: true)
               }
             }
           }
