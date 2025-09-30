@@ -5,25 +5,14 @@ struct ContentView: View {
   @StateObject private var viewModel = ContentViewModel()
   @Environment(\.modelContext) private var modelContext
   @Environment(\.editMode) private var editMode
+  @Environment(\.scenePhase) private var scenePhase
   @Query private var items: [Item]
-  // 新規追加を示すための一時的な rowID 集合（NEW バッジ表示用）
-  @State private var newRowIDs: Set<String> = []
-  // 各行の設問表示を折りたたむ/展開するための状態
-  @State private var expandedRowIDs: Set<String> = []
-  // Banner の表示は ViewModel 側で管理する（URL 追加など外部イベントに反応するため）
-  @State private var navigationPath = NavigationPath()
-  @State private var image: UIImage?
-  @State private var currentItem: Item?
+  // View 側で local に持っていた状態は ViewModel に移動済み
 
   // (手動での設問設定は廃止) ダイアログ関連の状態を削除
 
-  // 選択されたアイテムの画像を保持する状態
-  @State private var selectedImage: UIImage?
-  // 編集ダイアログ用の状態
-  @State private var isShowingEditDialog: Bool = false
-  @State private var editTargetItem: Item? = nil
-  @State private var editTargetRowID: String = ""
-  @State private var editTitleText: String = ""
+  // View は ViewModel の公開プロパティを参照・バインドする
+  // 例: viewModel.selectedImage, viewModel.isShowingEditDialog などを使用
 
   // タイムスタンプを安定して表示するための DateFormatter
   private static let timestampFormatter: DateFormatter = {
@@ -35,34 +24,37 @@ struct ContentView: View {
   }()
 
   var body: some View {
-    NavigationStack(path: $navigationPath) {
+    NavigationStack(path: Binding(
+      get: { viewModel.navigationPath },
+      set: { viewModel.navigationPath = $0 }
+    )) {
       // アイテム一覧部分を分割したサブビューへ移譲
       ItemsListView(
         viewModel: viewModel,
         items: items,
-        expandedRowIDs: $expandedRowIDs,
+  expandedRowIDs: Binding(get: { viewModel.expandedRowIDs }, set: { viewModel.expandedRowIDs = $0 }),
         modelContext: modelContext,
         onTap: { item, rowID in
           // タップ時の動作は引き続き ContentView が保持
           viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
           // 選択されたアイテムを currentItem にセットして CameraView に遷移
-          currentItem = item
+          viewModel.currentItem = item
           // 直前の選択画像があればクリアしておく
-          selectedImage = nil
+          viewModel.selectedImage = nil
           // プッシュ遷移でCameraViewに移動
-          navigationPath.append("CameraView")
+          viewModel.navigationPath.append("CameraView")
         },
         onEdit: { item, rowID in
           // 編集ダイアログを表示する準備
-          editTargetItem = item
-          editTargetRowID = rowID
-          editTitleText = item.title
-          isShowingEditDialog = true
+          viewModel.editTargetItem = item
+          viewModel.editTargetRowID = rowID
+          viewModel.editTitleText = item.title
+          viewModel.isShowingEditDialog = true
         }
       )
       .navigationDestination(for: String.self) { destination in
         if destination == "CameraView" {
-          CameraView(image: $selectedImage, item: currentItem)
+          CameraView(image: Binding(get: { viewModel.selectedImage }, set: { viewModel.selectedImage = $0 }), item: viewModel.currentItem)
         }
       }
       // navigationPath の変更による副作用はここでは扱わない。
@@ -79,12 +71,23 @@ struct ContentView: View {
     .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
     // 編集タイトル用の中央ダイアログ（別ファイルに切り出し）
     .overlay {
-      EditTitleDialog(isPresented: $isShowingEditDialog, titleText: $editTitleText) { newTitle in
-        if let target = editTargetItem {
+      EditTitleDialog(isPresented: Binding(get: { viewModel.isShowingEditDialog }, set: { viewModel.isShowingEditDialog = $0 }), titleText: Binding(get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 })) { newTitle in
+        if let target = viewModel.editTargetItem {
           target.title = newTitle
           try? modelContext.save()
           viewModel.dataVersion = UUID()
         }
+      }
+    }
+    // アプリがフォアグラウンドから離れたときに編集状態を初期化
+    .onChange(of: scenePhase) { (newPhase: ScenePhase) in
+      if newPhase == .background || newPhase == .inactive {
+        // ViewModel 側で ViewModel 管理の状態を初期化
+        viewModel.clearEditingState()
+
+        // View 側に残す view-local 状態はなし。ViewModel のプロパティをクリアしているため
+        // ここでは EditMode の解放だけを行う
+        editMode?.wrappedValue = .inactive
       }
     }
   }

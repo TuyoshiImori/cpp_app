@@ -2,6 +2,10 @@ import Combine
 import Foundation
 import SwiftData
 import SwiftUI
+// UIKit is required for UIImage; import only when available (avoids macOS build issues)
+#if canImport(UIKit)
+import UIKit
+#endif
 
 final class ContentViewModel: ObservableObject {
   // アクションボタン（編集/削除）1つ分の幅（UI ロジックの一部だが View 側から参照されるため ViewModel に移動）
@@ -31,6 +35,21 @@ final class ContentViewModel: ObservableObject {
   @Published var isDraggingFlags: [String: Bool] = [:]  // 各アイテムのドラッグ中フラグ
   @Published var suppressSlideAnimationFlags: [String: Bool] = [:]  // スライドアニメーション抑制フラグ
   @Published var deleteAnimationOffsets: [String: CGFloat] = [:]  // 削除時の一時オフセット
+
+  // MARK: - Previously view-owned state moved here
+  // 折りたたみ展開など View が管理していた状態を ViewModel に移す
+  @Published var expandedRowIDs: Set<String> = []
+  // NavigationPath を ViewModel で保持して NavigationStack と連携する
+  @Published var navigationPath: NavigationPath = NavigationPath()
+  // カメラやプレビューで使う画像と現在選択中の Item
+  @Published var selectedImage: UIImage? = nil
+  @Published var currentItem: Item? = nil
+
+  // 編集ダイアログ関連の状態
+  @Published var isShowingEditDialog: Bool = false
+  @Published var editTargetItem: Item? = nil
+  @Published var editTargetRowID: String = ""
+  @Published var editTitleText: String = ""
 
   // スワイプの状態を表すenum
   enum SwipeState {
@@ -307,6 +326,23 @@ final class ContentViewModel: ObservableObject {
       self.slideOffsets.removeValue(forKey: rowID)
       self.swipeStates.removeValue(forKey: rowID)
     }
+  }
+
+  /// 編集状態や ViewModel 管理の一時 UI 状態を初期化する。
+  /// View 側の一時状態（モーダル表示や navigationPath、画像など）は View 側でクリアする。
+  func clearEditingState() {
+    // 編集フラグとスライド状態をリセット
+    isEditing = false
+    resetAllSlideStates()
+
+    // ViewModel が管理する一時 UI 状態をクリア
+    newRowIDs.removeAll()
+    pendingScrollTo = nil
+    // その他の一時フラグ/オフセットもクリア
+    dragOffsets.removeAll()
+    isDraggingFlags.removeAll()
+    suppressSlideAnimationFlags.removeAll()
+    deleteAnimationOffsets.removeAll()
   }
 
   // AccordionItem 用の軽量ヘルパーをこの ViewModel に統合
