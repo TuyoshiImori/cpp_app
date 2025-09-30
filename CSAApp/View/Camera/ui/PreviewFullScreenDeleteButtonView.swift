@@ -52,6 +52,7 @@ struct PreviewFullScreenDeleteButtonView: View {
       .padding(.vertical, 10)
     }
     .glassEffect(.regular.tint(Color.red.opacity(0.7)).interactive())
+    .shadow(color: Color.black.opacity(0.25), radius: 6, x: 0, y: 3)
     .confirmationDialog("この回答を削除しますか？", isPresented: $showConfirm, titleVisibility: .visible) {
       Button("削除", role: .destructive) {
         var shouldClose = true
