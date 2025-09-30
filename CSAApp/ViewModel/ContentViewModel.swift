@@ -2,9 +2,10 @@ import Combine
 import Foundation
 import SwiftData
 import SwiftUI
+
 // UIKit is required for UIImage; import only when available (avoids macOS build issues)
 #if canImport(UIKit)
-import UIKit
+  import UIKit
 #endif
 
 final class ContentViewModel: ObservableObject {

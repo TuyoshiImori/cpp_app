@@ -24,15 +24,18 @@ struct ContentView: View {
   }()
 
   var body: some View {
-    NavigationStack(path: Binding(
-      get: { viewModel.navigationPath },
-      set: { viewModel.navigationPath = $0 }
-    )) {
+    NavigationStack(
+      path: Binding(
+        get: { viewModel.navigationPath },
+        set: { viewModel.navigationPath = $0 }
+      )
+    ) {
       // アイテム一覧部分を分割したサブビューへ移譲
       ItemsListView(
         viewModel: viewModel,
         items: items,
-  expandedRowIDs: Binding(get: { viewModel.expandedRowIDs }, set: { viewModel.expandedRowIDs = $0 }),
+        expandedRowIDs: Binding(
+          get: { viewModel.expandedRowIDs }, set: { viewModel.expandedRowIDs = $0 }),
         modelContext: modelContext,
         onTap: { item, rowID in
           // タップ時の動作は引き続き ContentView が保持
@@ -54,7 +57,9 @@ struct ContentView: View {
       )
       .navigationDestination(for: String.self) { destination in
         if destination == "CameraView" {
-          CameraView(image: Binding(get: { viewModel.selectedImage }, set: { viewModel.selectedImage = $0 }), item: viewModel.currentItem)
+          CameraView(
+            image: Binding(get: { viewModel.selectedImage }, set: { viewModel.selectedImage = $0 }),
+            item: viewModel.currentItem)
         }
       }
       // navigationPath の変更による副作用はここでは扱わない。
@@ -71,7 +76,11 @@ struct ContentView: View {
     .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
     // 編集タイトル用の中央ダイアログ（別ファイルに切り出し）
     .overlay {
-      EditTitleDialog(isPresented: Binding(get: { viewModel.isShowingEditDialog }, set: { viewModel.isShowingEditDialog = $0 }), titleText: Binding(get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 })) { newTitle in
+      EditTitleDialog(
+        isPresented: Binding(
+          get: { viewModel.isShowingEditDialog }, set: { viewModel.isShowingEditDialog = $0 }),
+        titleText: Binding(get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 })
+      ) { newTitle in
         if let target = viewModel.editTargetItem {
           target.title = newTitle
           try? modelContext.save()
