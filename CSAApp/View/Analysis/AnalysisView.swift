@@ -133,14 +133,10 @@ struct AnalysisView: View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
         VStack(alignment: .trailing, spacing: 4) {
-          Text("回答データセット")
-            .font(.caption)
-            .foregroundColor(.secondary)
           Text(
-            "\(viewModel.allParsedAnswersSets.count > 0 ? viewModel.allParsedAnswersSets.count : 1)セット"
+            "回答総数：\(viewModel.allParsedAnswersSets.count > 0 ? viewModel.allParsedAnswersSets.count : 1)セット"
           )
-          .font(.title2)
-          .bold()
+          .font(.headline)
           .foregroundColor(.primary)
         }
 
