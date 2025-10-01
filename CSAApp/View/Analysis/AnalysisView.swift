@@ -280,27 +280,6 @@ struct AnalysisView: View {
 
   // MARK: - Helper Methods
 
-  /// 設問タイプのアイコンを返す
-  private func questionTypeIcon(_ questionType: QuestionType) -> some View {
-    Group {
-      switch questionType {
-      case .single(_, _):
-        Image(systemName: "dot.circle")
-          .foregroundColor(.blue)
-      case .multiple(_, _):
-        Image(systemName: "list.bullet")
-          .foregroundColor(.green)
-      case .text(_):
-        Image(systemName: "textformat")
-          .foregroundColor(.orange)
-      case .info(_, _):
-        Image(systemName: "person.crop.circle")
-          .foregroundColor(.purple)
-      }
-    }
-    .font(.title3)
-  }
-
   /// 信頼度に応じた色を返す
   private func confidenceColor(_ confidence: Double) -> Color {
     switch confidence {

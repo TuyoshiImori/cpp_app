@@ -38,9 +38,14 @@ struct PreviewFullScreenImagesTabView: View {
                 VStack {
                   // 設問ヘッダーを分析画面のカードに合わせる
                   HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "dot.circle")
-                      .foregroundColor(.blue)
-                      .font(.title2)
+                    // 設問タイプに応じたアイコンを表示
+                    Group {
+                      if let qtypes = viewModel?.initialQuestionTypes, imgIdx < qtypes.count {
+                        QuestionTypeIcon(questionType: qtypes[imgIdx])
+                      } else {
+                        QuestionTypeIcon(questionType: nil)
+                      }
+                    }
 
                     VStack(alignment: .leading, spacing: 6) {
                       Text("設問 \(imgIdx + 1)")

@@ -307,7 +307,7 @@ struct AccordionItem: View {
             Spacer().frame(width: 16)
             switch questionType {
             case .single(let question, let options):
-              Image(systemName: "checkmark.circle").foregroundColor(.blue)
+              QuestionTypeIcon(questionType: questionType)
               VStack(alignment: .leading) {
                 Text("\(question)")
                   .fixedSize(horizontal: false, vertical: true)
@@ -316,7 +316,7 @@ struct AccordionItem: View {
                   .lineLimit(1).truncationMode(.tail)
               }
             case .multiple(let question, let options):
-              Image(systemName: "list.bullet").foregroundColor(.green)
+              QuestionTypeIcon(questionType: questionType)
               VStack(alignment: .leading) {
                 Text("\(question)")
                   .fixedSize(horizontal: false, vertical: true)
@@ -325,11 +325,11 @@ struct AccordionItem: View {
                   .lineLimit(1).truncationMode(.tail)
               }
             case .text(let question):
-              Image(systemName: "textformat").foregroundColor(.orange)
+              QuestionTypeIcon(questionType: questionType)
               Text("\(question)")
                 .fixedSize(horizontal: false, vertical: true)
             case .info(let question, let fields):
-              Image(systemName: "person.crop.circle").foregroundColor(.purple)
+              QuestionTypeIcon(questionType: questionType)
               VStack(alignment: .leading) {
                 Text("\(question)")
                   .fixedSize(horizontal: false, vertical: true)
