@@ -58,7 +58,7 @@ public enum SliceColor {
       let r = component(from: hexStr.prefix(2))
       let g = component(from: hexStr.dropFirst(2).prefix(2))
       let b = component(from: hexStr.dropFirst(4).prefix(2))
-      
+
       // sRGB カラースペースを明示的に指定して Color を生成
       // これにより期待した 16 進カラーと表示される色が正確に一致する
       return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: 1.0)
@@ -70,7 +70,7 @@ public enum SliceColor {
       let r = component(from: hexStr.dropFirst(2).prefix(2))
       let g = component(from: hexStr.dropFirst(4).prefix(2))
       let b = component(from: hexStr.dropFirst(6).prefix(2))
-      
+
       // 同様に sRGB を明示して正確な色を返す
       return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: Double(a))
     }
