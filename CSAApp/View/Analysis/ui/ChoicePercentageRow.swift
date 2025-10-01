@@ -24,11 +24,7 @@ public struct ChoicePercentageRow: View {
   public var body: some View {
     HStack {
       Circle()
-        .fill(
-          Color(
-            hue: Double(index) / Double(max(1, totalItems)), saturation: 0.6,
-            brightness: 0.9)
-        )
+        .fill(SliceColor.sliceColor(index: index, total: totalItems))
         .frame(width: 10, height: 10)
 
       VStack(alignment: .leading, spacing: 2) {
@@ -50,3 +46,5 @@ public struct ChoicePercentageRow: View {
     }
   }
 }
+
+// legend color is provided by `SliceColor` util

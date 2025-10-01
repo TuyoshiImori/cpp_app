@@ -23,24 +23,10 @@ struct TextQuestionAnalysisView: View {
         Image(systemName: "textformat")
           .foregroundColor(.orange)
           .font(.title2)
-
-        VStack(alignment: .leading, spacing: 6) {
-          Text("設問 \(questionIndex + 1) (自由記述)")
-            .font(.title3)
-            .fontWeight(.semibold)
-            .foregroundColor(.primary)
-        }
-        Spacer()
-      }
-
-      VStack(alignment: .leading, spacing: 6) {
-        Text("設問文:")
-          .font(.subheadline)
-          .foregroundColor(.secondary)
         Text(questionText)
-          .font(.body)
+          .font(.headline)
+          .fontWeight(.semibold)
           .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
       }
       VStack(alignment: .leading, spacing: 6) {
         // 要約表示領域（single/multiple と同様にカード内に含める）

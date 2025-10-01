@@ -20,24 +20,10 @@ struct MultipleQuestionAnalysisView: View {
         Image(systemName: "list.bullet")
           .foregroundColor(.green)
           .font(.title2)
-
-        VStack(alignment: .leading, spacing: 6) {
-          Text("設問 \(questionIndex + 1) (複数選択)")
-            .font(.title3)
-            .fontWeight(.semibold)
-            .foregroundColor(.primary)
-        }
-
-        Spacer()
-      }
-      VStack(alignment: .leading, spacing: 6) {
-        Text("設問文:")
-          .font(.subheadline)
-          .foregroundColor(.secondary)
         Text(questionText)
-          .font(.body)
+          .font(.headline)
+          .fontWeight(.semibold)
           .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
       }
       // 集計は ViewModel に統一
       let agg = AnalysisViewModel.aggregateMultipleChoice(answers: answers, options: options)
@@ -52,9 +38,7 @@ struct MultipleQuestionAnalysisView: View {
               PieChartEntry(
                 label: e.label,
                 value: e.value,
-                color: Color(
-                  hue: Double(i) / Double(max(1, agg.entries.count)), saturation: 0.6,
-                  brightness: 0.9),
+                color: SliceColor.sliceColor(index: i, total: agg.entries.count),
                 percent: e.percent
               )
             }

@@ -16,26 +16,11 @@ struct InfoQuestionAnalysisView: View {
         Image(systemName: "person.crop.circle")
           .foregroundColor(.purple)
           .font(.title2)
-
-        VStack(alignment: .leading, spacing: 6) {
-          Text("設問 \(questionIndex + 1) (個人情報)")
-            .font(.title3)
-            .fontWeight(.semibold)
-            .foregroundColor(.primary)
-        }
-
-        Spacer()
-      }
-      VStack(alignment: .leading, spacing: 6) {
-        Text("設問文:")
-          .font(.subheadline)
-          .foregroundColor(.secondary)
         Text(questionText)
-          .font(.body)
+          .font(.headline)
+          .fontWeight(.semibold)
           .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
       }
-
       // 選択肢がある場合は表示（年代選択など）
       if !options.isEmpty {
         VStack(alignment: .leading, spacing: 4) {

@@ -19,26 +19,11 @@ struct SingleQuestionAnalysisView: View {
         Image(systemName: "dot.circle")
           .foregroundColor(.blue)
           .font(.title2)
-
-        VStack(alignment: .leading, spacing: 6) {
-          Text("設問 \(questionIndex + 1) (単一選択)")
-            .font(.title3)
-            .fontWeight(.semibold)
-            .foregroundColor(.primary)
-        }
-        Spacer()
-      }
-
-      VStack(alignment: .leading, spacing: 6) {
-        Text("設問文:")
-          .font(.subheadline)
-          .foregroundColor(.secondary)
         Text(questionText)
-          .font(.body)
+          .font(.headline)
+          .fontWeight(.semibold)
           .foregroundColor(.primary)
-          .fixedSize(horizontal: false, vertical: true)
       }
-
       // 集計ロジックは ViewModel に移譲
       let agg = AnalysisViewModel.aggregateSingleChoice(answers: answers, options: options)
       let otherTexts = agg.otherTexts
@@ -53,9 +38,8 @@ struct SingleQuestionAnalysisView: View {
               PieChartEntry(
                 label: e.label,
                 value: e.value,
-                color: Color(
-                  hue: Double(i) / Double(max(1, agg.entries.count)), saturation: 0.6,
-                  brightness: 0.9),
+                // 同系統の緑色から徐々に薄くなる色をユーティリティから取得
+                color: SliceColor.sliceColor(index: i, total: agg.entries.count),
                 percent: e.percent
               )
             }
