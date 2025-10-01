@@ -54,7 +54,7 @@ struct ContentView: View {
           Button(action: {
             viewModel.toggleEditMode()
             if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
-          }) { Text(viewModel.isEditing ? "Done" : "Edit") }
+          }) { Text(viewModel.isEditing ? "完了" : "編集") }
         }
       }
     }
