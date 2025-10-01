@@ -72,14 +72,3 @@ struct PreviewFullScreenDeleteButtonView: View {
     }
   }
 }
-
-struct PreviewFullScreenDeleteButtonView_Previews: PreviewProvider {
-  @State static var idx = 0
-  @State static var isPresented = true
-  static var previews: some View {
-    PreviewFullScreenDeleteButtonView(
-      previewIndex: $idx,
-      isPreviewPresented: $isPresented
-    )
-  }
-}

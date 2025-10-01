@@ -96,43 +96,4 @@ struct PreviewFullScreenView: View {
       )
     }
   }
-
-  // 画像表示部分は `PreviewFullScreenContentView` に移譲済み
-
-  // MARK: - Helper Methods
-
-  /// 信頼度に応じた色を返す
-  private func confidenceColor(for confidence: Float) -> Color {
-    switch confidence {
-    case 80...:
-      return .green  // 80%以上は緑色
-    case 60..<80:
-      return .yellow  // 60-80%は黄色
-    case 40..<60:
-      return .orange  // 40-60%はオレンジ色
-    default:
-      return .red  // 40%未満は赤色
-    }
-  }
-
-  // (複雑な helper は削除。情報は上で表示済み)
 }
-
-// MARK: - Preview
-#if canImport(UIKit)
-  struct PreviewFullScreenView_Previews: PreviewProvider {
-    @State static var isPresented = true
-    @State static var previewIndex = 0
-
-    static var previews: some View {
-      // プレビューでは実際の画像は不要なので空配列で簡素化
-      PreviewFullScreenView(
-        isPreviewPresented: $isPresented,
-        previewIndex: $previewIndex,
-        croppedImageSets: [],
-        parsedAnswersSets: [],
-        item: nil
-      )
-    }
-  }
-#endif

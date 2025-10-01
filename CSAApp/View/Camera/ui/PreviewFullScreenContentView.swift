@@ -135,38 +135,4 @@ struct PreviewFullScreenContentView: View {
       return .constant(false)
     }
   }
-
-  /// 信頼度に応じた色を返す
-  private func confidenceColor(for confidence: Float) -> Color {
-    switch confidence {
-    case 80...:
-      return .green
-    case 60..<80:
-      return .yellow
-    case 40..<60:
-      return .orange
-    default:
-      return .red
-    }
-  }
 }
-
-#if canImport(UIKit)
-  struct PreviewFullScreenContentView_Previews: PreviewProvider {
-    @State static var isPresented = true
-    @State static var previewIndex = 0
-
-    static var previews: some View {
-      PreviewFullScreenContentView(
-        isPreviewPresented: $isPresented,
-        previewIndex: $previewIndex,
-        croppedImageSets: [],
-        parsedAnswersSets: [],
-        viewModel: nil,
-        item: nil,
-        onDelete: nil,
-        confidenceScores: nil
-      )
-    }
-  }
-#endif

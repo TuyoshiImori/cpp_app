@@ -202,17 +202,3 @@ class ScannerDelegateProxy: NSObject, DocumentScannerDelegate {
     onRecognize(feature, image)
   }
 }
-
-// プレビュー例
-struct ScannerView_Previews: PreviewProvider {
-  static var previews: some View {
-    let scanner = AVDocumentScanner()
-    ScannerView(
-      scanner: scanner,
-      config: .all,
-      onCapture: { image in
-        print("画像取得: \(image)")
-      }
-    )
-  }
-}

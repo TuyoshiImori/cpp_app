@@ -50,15 +50,3 @@ struct VisualEffectBlur: UIViewRepresentable {
 
   func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
-
-// プレビュー
-struct TorchPickerView_Previews: PreviewProvider {
-  static var previews: some View {
-    TorchPickerView(
-      torchLevel: .constant(0.5),
-      hasTorch: true,
-      onLevelChange: { _ in },
-      onDismiss: {}
-    )
-  }
-}

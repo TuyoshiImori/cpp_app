@@ -132,18 +132,6 @@ struct AnalysisView: View {
   private var summaryCard: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
-        // VStack(alignment: .leading, spacing: 4) {
-        //   Text("全体信頼度")
-        //     .font(.caption)
-        //     .foregroundColor(.secondary)
-        //   Text("\(String(format: "%.1f", viewModel.overallConfidenceUsingStored()))%")
-        //     .font(.title2)
-        //     .bold()
-        //     .foregroundColor(confidenceColor(viewModel.overallConfidenceUsingStored()))
-        // }
-
-        // Spacer()
-
         VStack(alignment: .trailing, spacing: 4) {
           Text("回答データセット")
             .font(.caption)
@@ -277,23 +265,4 @@ struct AnalysisView: View {
       )
     }
   }
-
-  // MARK: - Helper Methods
-
-  /// 信頼度に応じた色を返す
-  private func confidenceColor(_ confidence: Double) -> Color {
-    switch confidence {
-    case 80...:
-      return .green
-    case 60..<80:
-      return .yellow
-    case 40..<60:
-      return .orange
-    default:
-      return .red
-    }
-  }
-
-  /// 日付をフォーマットして返す
-  // 日付整形は共通ユーティリティを利用
 }

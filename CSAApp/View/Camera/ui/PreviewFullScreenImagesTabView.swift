@@ -84,7 +84,7 @@ struct PreviewFullScreenImagesTabView: View {
                             ?? []
                           ForEach(lines.indices, id: \.self) { idx in
                             Text(lines[idx])
-                              .foregroundColor(.green)
+                              .foregroundColor(.primary)
                               .font(.subheadline)
                               .bold()
                               .frame(maxWidth: .infinity, alignment: .leading)
@@ -142,21 +142,5 @@ struct PreviewFullScreenImagesTabView: View {
     }
     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
     .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-  }
-
-  private func confidenceColor(for confidence: Float) -> Color {
-    switch confidence {
-    case 80...: return .green
-    case 60..<80: return .yellow
-    case 40..<60: return .orange
-    default: return .red
-    }
-  }
-}
-
-struct PreviewFullScreenImagesTabView_Previews: PreviewProvider {
-  @State static var idx = 0
-  static var previews: some View {
-    PreviewFullScreenImagesTabView(previewIndex: $idx)
   }
 }
