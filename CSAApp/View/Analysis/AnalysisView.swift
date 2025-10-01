@@ -190,7 +190,7 @@ struct AnalysisView: View {
             .foregroundColor(.secondary)
         }
 
-        Text("スキャン日時: \(formattedDate(item.timestamp))")
+        Text("スキャン日時: \(DateUtils.formattedDate(item.timestamp))")
           .font(.subheadline)
           .foregroundColor(.secondary)
       }
@@ -295,10 +295,5 @@ struct AnalysisView: View {
   }
 
   /// 日付をフォーマットして返す
-  private func formattedDate(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "ja_JP_POSIX")
-    formatter.dateFormat = "yyyy/M/d H:mm"
-    return formatter.string(from: date)
-  }
+  // 日付整形は共通ユーティリティを利用
 }

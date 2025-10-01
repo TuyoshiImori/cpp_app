@@ -51,16 +51,21 @@ struct TextQuestionAnalysisView: View {
             Text("要約を取得中...")
               .font(.subheadline)
               .foregroundColor(.secondary)
+              .multilineTextAlignment(.leading)
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
         } else if let s = otherSummary {
           VStack(alignment: .leading, spacing: 6) {
             Text("要約:")
               .font(.subheadline)
               .foregroundColor(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
             Text(s)
               .font(.subheadline)
               .foregroundColor(.primary)
               .fixedSize(horizontal: false, vertical: true)
+              .multilineTextAlignment(.leading)
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
         }
         // 回答率（右下表示）

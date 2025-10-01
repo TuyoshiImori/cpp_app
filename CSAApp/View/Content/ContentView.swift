@@ -9,20 +9,6 @@ struct ContentView: View {
   @Query private var items: [Item]
   // View 側で local に持っていた状態は ViewModel に移動済み
 
-  // (手動での設問設定は廃止) ダイアログ関連の状態を削除
-
-  // View は ViewModel の公開プロパティを参照・バインドする
-  // 例: viewModel.selectedImage, viewModel.isShowingEditDialog などを使用
-
-  // タイムスタンプを安定して表示するための DateFormatter
-  private static let timestampFormatter: DateFormatter = {
-    let f = DateFormatter()
-    // 日本表記を固定（再現性のあるフォーマット）
-    f.locale = Locale(identifier: "ja_JP_POSIX")
-    f.dateFormat = "yyyy/M/d H:mm"
-    return f
-  }()
-
   var body: some View {
     NavigationStack(
       path: Binding(

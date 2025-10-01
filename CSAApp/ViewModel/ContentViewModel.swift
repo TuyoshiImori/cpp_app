@@ -351,16 +351,9 @@ final class ContentViewModel: ObservableObject {
     let item: Item
     let rowID: String
 
-    private static let timestampFormatter: DateFormatter = {
-      let f = DateFormatter()
-      f.locale = Locale(identifier: "ja_JP_POSIX")
-      f.dateFormat = "yyyy/M/d H:mm"
-      return f
-    }()
-
     func isExpanded(in set: Set<String>) -> Bool { set.contains(rowID) }
     func isNew(in set: Set<String>) -> Bool { set.contains(rowID) || item.isNew }
-    func formattedTimestamp(_ date: Date) -> String { Self.timestampFormatter.string(from: date) }
+    func formattedTimestamp(_ date: Date) -> String { DateUtils.formattedDate(date) }
     func toggleExpanded(_ expandedRowIDs: inout Set<String>) {
       if isExpanded(in: expandedRowIDs) {
         expandedRowIDs.remove(rowID)
