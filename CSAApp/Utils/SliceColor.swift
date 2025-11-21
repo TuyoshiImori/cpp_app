@@ -8,12 +8,12 @@ public enum SliceColor {
 
     let baseHue: Double = 0.48  // 緑〜シアン寄りの色相 (0..1)
 
-    // 明度の範囲（濃い -> 薄い）
-    let darkBrightness: Double = 0.30
-    let lightBrightness: Double = 0.95
+    // 明度の範囲（濃い -> 薄い） — 全体的に明るめに調整
+    let darkBrightness: Double = 0.55
+    let lightBrightness: Double = 0.98
 
-    // saturation は視認性のために中〜強めに固定
-    let saturation: Double = 0.75
+    // saturation は視認性のために少し強めに固定
+    let saturation: Double = 0.78
 
     // safeIndex は 0..(n-1) の範囲にクランプ (循環は行わない)
     let clampedIndex = min(max(0, index), n - 1)
