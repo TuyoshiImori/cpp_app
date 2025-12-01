@@ -63,13 +63,13 @@ struct ContentView: View {
   }
 
   var body: some View {
-    ZStack {
-      NavigationStack(
-        path: Binding(
-          get: { viewModel.navigationPath },
-          set: { viewModel.navigationPath = $0 }
-        )
-      ) {
+    NavigationStack(
+      path: Binding(
+        get: { viewModel.navigationPath },
+        set: { viewModel.navigationPath = $0 }
+      )
+    ) {
+      ZStack {
         // アイテム一覧部分を分割したサブビューへ移譲
         ItemsListView(
           viewModel: viewModel,
@@ -95,22 +95,43 @@ struct ContentView: View {
             viewModel.isShowingEditDialog = true
           }
         )
-        .navigationDestination(for: String.self) { destination in
-          if destination == "CameraView" {
-            CameraView(
-              image: Binding(
-                get: { viewModel.selectedImage }, set: { viewModel.selectedImage = $0 }),
-              item: viewModel.currentItem)
+
+        // フローティングボタン（右下に配置）- ItemsListViewにのみ表示
+        VStack {
+          Spacer()
+          HStack {
+            Spacer()
+            Button(action: {
+              isShowingQrView = true
+            }) {
+              Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 56, height: 56)
+                .background(Color.blue)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 20)
           }
         }
-        // navigationPath の変更による副作用はここでは扱わない。
-        .toolbar {
-          ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: {
-              viewModel.toggleEditMode()
-              if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
-            }) { Text(viewModel.isEditing ? "完了" : "編集") }
-          }
+      }
+      .navigationDestination(for: String.self) { destination in
+        if destination == "CameraView" {
+          CameraView(
+            image: Binding(
+              get: { viewModel.selectedImage }, set: { viewModel.selectedImage = $0 }),
+            item: viewModel.currentItem)
+        }
+      }
+      // navigationPath の変更による副作用はここでは扱わない。
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button(action: {
+            viewModel.toggleEditMode()
+            if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
+          }) { Text(viewModel.isEditing ? "完了" : "編集") }
         }
       }
       // バナー表示を分離したコンポーネントで表示
@@ -128,27 +149,6 @@ struct ContentView: View {
             try? modelContext.save()
             viewModel.dataVersion = UUID()
           }
-        }
-      }
-
-      // フローティングボタン（右下に配置）
-      VStack {
-        Spacer()
-        HStack {
-          Spacer()
-          Button(action: {
-            isShowingQrView = true
-          }) {
-            Image(systemName: "qrcode.viewfinder")
-              .font(.system(size: 24, weight: .semibold))
-              .foregroundColor(.white)
-              .frame(width: 56, height: 56)
-              .background(Color.blue)
-              .clipShape(Circle())
-              .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
-          }
-          .padding(.trailing, 20)
-          .padding(.bottom, 20)
         }
       }
     }
