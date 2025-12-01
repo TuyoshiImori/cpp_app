@@ -1,0 +1,7 @@
+//
+// CSAApp.xcconfig
+// Firebase と OpenCV の zlib シンボル衝突を解決するための設定
+//
+
+// 重複シンボルを許可
+OTHER_LDFLAGS = $(inherited) -Xlinker -force_load -Xlinker $(BUILT_PRODUCTS_DIR)/opencv2.framework/opencv2

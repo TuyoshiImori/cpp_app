@@ -12,6 +12,54 @@ struct ContentView: View {
   // QR画面表示用の状態
   @State private var isShowingQrView: Bool = false
 
+  // MARK: - Helper Methods
+
+  /// FirestoreSurveyDocumentをItemに変換するヘルパー関数
+  private func convertFirestoreSurveyToItem(_ survey: FirestoreSurveyDocument) -> Item {
+    // FirestoreQuestionをQuestionTypeに変換
+    let questionTypes: [QuestionType] = survey.questions.map { question in
+      switch question.type {
+      case .single:
+        return .single("", question.options ?? [])
+      case .multiple:
+        return .multiple("", question.options ?? [])
+      case .text:
+        return .text("")
+      case .info:
+        // InfoFieldsをQuestionType.InfoFieldの配列に変換
+        var infoFields: [QuestionType.InfoField] = []
+        if let fields = question.infoFields {
+          if fields.furigana == true { infoFields.append(.furigana) }
+          if fields.name == true { infoFields.append(.name) }
+          if fields.nameWithFurigana == true { infoFields.append(.nameKana) }
+          if fields.email == true { infoFields.append(.email) }
+          if fields.phone == true { infoFields.append(.tel) }
+          if fields.postalCode == true { infoFields.append(.zip) }
+          if fields.address == true { infoFields.append(.address) }
+        }
+        return .info("", infoFields)
+      }
+    }
+
+    // optionTextsを構築（各設問の選択肢）
+    let optionTexts: [[String]] = survey.questions.map { question in
+      question.options ?? []
+    }
+
+    return Item(
+      timestamp: survey.createdAt ?? Date(),
+      questionTypes: questionTypes,
+      surveyID: survey.id,
+      title: survey.title,
+      isNew: true,  // Firestoreから取得したアイテムは新規扱い
+      optionTexts: optionTexts,
+      scanResults: [],
+      confidenceScores: [],
+      answerTexts: [],
+      questionImageData: []
+    )
+  }
+
   var body: some View {
     ZStack {
       NavigationStack(
@@ -104,7 +152,15 @@ struct ContentView: View {
     }
     // QR画面をフルスクリーンで表示
     .fullScreenCover(isPresented: $isShowingQrView) {
-      QrView()
+      QrView(onSurveyFetched: { survey in
+        // 取得したアンケート情報をItemに変換して保存
+        let newItem = convertFirestoreSurveyToItem(survey)
+        modelContext.insert(newItem)
+        try? modelContext.save()
+
+        // ViewModelにも保存して表示用に使用
+        viewModel.fetchedSurvey = survey
+      })
     }
     // アプリがフォアグラウンドから離れたときに編集状態を初期化
     .onChange(of: scenePhase) { (newPhase: ScenePhase) in

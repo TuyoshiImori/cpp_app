@@ -7,6 +7,9 @@ struct QrView: View {
   @StateObject private var viewModel = QrViewModel()
   @Environment(\.dismiss) private var dismiss
 
+  // ContentViewModelからアンケート情報を渡すためのバインディング
+  var onSurveyFetched: ((FirestoreSurveyDocument) -> Void)?
+
   var body: some View {
     ZStack {
       // カメラプレビュー
@@ -45,6 +48,26 @@ struct QrView: View {
             .padding()
             .background(Color.red.opacity(0.8))
             .cornerRadius(8)
+            .padding(.horizontal, 20)
+          Spacer()
+        }
+      }
+
+      // Firestore取得中のローディング表示
+      if viewModel.isFetchingSurvey {
+        VStack {
+          Spacer()
+          VStack(spacing: 16) {
+            ProgressView()
+              .scaleEffect(1.5)
+              .tint(.white)
+            Text("アンケート情報を取得中...")
+              .font(.headline)
+              .foregroundColor(.white)
+          }
+          .padding(30)
+          .background(Color.black.opacity(0.8))
+          .cornerRadius(16)
           Spacer()
         }
       }
@@ -78,6 +101,12 @@ struct QrView: View {
     }
     // QR読み取り結果のダイアログ
     .alert("QRコードを読み取りました", isPresented: $viewModel.showResultDialog) {
+      Button("取得する") {
+        if let code = viewModel.scannedCode {
+          // Firestoreからアンケート情報を取得
+          viewModel.fetchSurveyFromFirestore(documentId: code)
+        }
+      }
       Button("再スキャン") {
         viewModel.dismissDialogAndResume()
       }
@@ -86,7 +115,21 @@ struct QrView: View {
         dismiss()
       }
     } message: {
-      Text(viewModel.scannedCode ?? "")
+      if viewModel.isFetchingSurvey {
+        Text("アンケート情報を取得中...")
+      } else {
+        Text(viewModel.scannedCode ?? "")
+      }
+    }
+    // Firestore取得成功時の処理
+    .onChange(of: viewModel.fetchedSurvey) { newValue in
+      if let survey = newValue {
+        // ContentViewに取得したアンケート情報を渡す
+        onSurveyFetched?(survey)
+        // 画面を閉じる
+        viewModel.dismissDialog()
+        dismiss()
+      }
     }
   }
 }

@@ -22,6 +22,12 @@ final class QrViewModel: NSObject, ObservableObject {
   /// エラーメッセージ（カメラ権限がない場合など）
   @Published var errorMessage: String? = nil
 
+  /// 取得したアンケート情報
+  @Published var fetchedSurvey: FirestoreSurveyDocument? = nil
+
+  /// Firestore取得中かどうか
+  @Published var isFetchingSurvey: Bool = false
+
   // MARK: - AVFoundation Properties
 
   /// カメラセッション
@@ -32,6 +38,11 @@ final class QrViewModel: NSObject, ObservableObject {
 
   /// セッション用のキュー
   private let sessionQueue = DispatchQueue(label: "qr.session.queue")
+
+  // MARK: - Services
+
+  /// Firestoreサービス
+  private let firestoreService = FirestoreService.shared
 
   // MARK: - Lifecycle
 
@@ -85,6 +96,38 @@ final class QrViewModel: NSObject, ObservableObject {
   /// ダイアログを閉じる（スキャンは再開しない）
   func dismissDialog() {
     showResultDialog = false
+  }
+
+  /// QRコードから読み取ったFirestoreのドキュメントIDでアンケート情報を取得する
+  /// - Parameter documentId: FirestoreのドキュメントID
+  func fetchSurveyFromFirestore(documentId: String) {
+    // 既に取得中の場合は何もしない
+    guard !isFetchingSurvey else { return }
+
+    isFetchingSurvey = true
+    errorMessage = nil
+
+    Task {
+      do {
+        let survey = try await firestoreService.fetchSurvey(documentId: documentId)
+        await MainActor.run {
+          self.fetchedSurvey = survey
+          self.isFetchingSurvey = false
+        }
+      } catch let error as FirestoreServiceError {
+        await MainActor.run {
+          self.errorMessage = error.localizedDescription
+          self.isFetchingSurvey = false
+          self.fetchedSurvey = nil
+        }
+      } catch {
+        await MainActor.run {
+          self.errorMessage = "アンケートの取得に失敗しました"
+          self.isFetchingSurvey = false
+          self.fetchedSurvey = nil
+        }
+      }
+    }
   }
 
   // MARK: - Private Methods

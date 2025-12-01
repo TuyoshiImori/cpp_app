@@ -52,6 +52,9 @@ final class ContentViewModel: ObservableObject {
   @Published var editTargetRowID: String = ""
   @Published var editTitleText: String = ""
 
+  // QRコードから取得したFirestoreアンケート情報
+  @Published var fetchedSurvey: FirestoreSurveyDocument? = nil
+
   // スワイプの状態を表すenum
   enum SwipeState {
     case normal  // 通常状態

@@ -12,6 +12,8 @@
 		2D1E98442E266E91001B13E7 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D1E98432E266E91001B13E7 /* CoreImage.framework */; };
 		2D1E98462E266E99001B13E7 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D1E98452E266E99001B13E7 /* CoreGraphics.framework */; };
 		2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */; };
+		2D5B0B592EDD54F7006E0601 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5B0B582EDD54F7006E0601 /* FirebaseCore */; };
+		2D5B0B5B2EDD550B006E0601 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5B0B5A2EDD550B006E0601 /* FirebaseFirestore */; };
 		9D13808771CFA51272F8E5AD /* Pods_CSAAppTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCA567B1557FB0658F81CE6 /* Pods_CSAAppTests.framework */; };
 		B8A624244E84E59279520977 /* Pods_CSAApp_CSAAppUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BA3923D67B51D7E8445AEF5 /* Pods_CSAApp_CSAAppUITests.framework */; };
 /* End PBXBuildFile section */
@@ -87,7 +89,9 @@
 				2D1E98402E266E80001B13E7 /* libc++.tbd in Frameworks */,
 				2D1E98462E266E99001B13E7 /* CoreGraphics.framework in Frameworks */,
 				2D1E98442E266E91001B13E7 /* CoreImage.framework in Frameworks */,
+				2D5B0B592EDD54F7006E0601 /* FirebaseCore in Frameworks */,
 				2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */,
+				2D5B0B5B2EDD550B006E0601 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -269,6 +273,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */,
+				2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D50A1C02DF1B4230023643B /* Products */;
@@ -376,8 +381,10 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					"-all_load",
+					// "-all_load",
 					"$(inherited)",
+					"-Wl,-w",
+					"-Wl,-commons,use_dylibs",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.iiyotu.CSAApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -425,8 +432,10 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					"-all_load",
+					// "-all_load",
 					"$(inherited)",
+					"-Wl,-w",
+					"-Wl,-commons,use_dylibs",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.iiyotu.CSAApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -684,7 +693,28 @@
 				minimumVersion = 2.7.4;
 			};
 		};
+		2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2D5B0B582EDD54F7006E0601 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		2D5B0B5A2EDD550B006E0601 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2D50A1B72DF1B4230023643B /* Project object */;
 }

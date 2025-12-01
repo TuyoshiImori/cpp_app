@@ -3,13 +3,20 @@
 
 DEVICE_ID="00008130-00092DA400C1401C"
 BUNDLE_ID="com.iiyotu.CSAApp"
-APP_PATH="/Users/iimoritsuyoshi/projects/CSAApp/build/Debug-iphoneos/CSAApp.app"
+APP_PATH="/Users/iimoritsuyoshi/projects/CSAApp/build/Build/Products/Debug-iphoneos/CSAApp.app"
 
 set -e
 
-# 1. ビルド（署名付き）
+# 1. ビルド(署名付き) - xcworkspaceを使用してFirebaseパッケージを解決
+# 重複シンボルを抑制(-Wl,-w でリンカー警告を無視)
 echo "🔨 ビルド中..."
-xcodebuild -project CSAApp.xcodeproj -target CSAApp -configuration Debug -sdk iphoneos build
+xcodebuild -workspace CSAApp.xcworkspace \
+  -scheme CSAApp \
+  -configuration Debug \
+  -sdk iphoneos \
+  -derivedDataPath ./build \
+  OTHER_LDFLAGS='$(inherited) -Wl,-w' \
+  build
 
 # 2. インストール
 echo "📱 デバイスにインストール中..."
