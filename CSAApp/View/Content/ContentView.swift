@@ -18,13 +18,15 @@ struct ContentView: View {
   private func convertFirestoreSurveyToItem(_ survey: FirestoreSurveyDocument) -> Item {
     // FirestoreQuestionをQuestionTypeに変換
     let questionTypes: [QuestionType] = survey.questions.map { question in
+      let questionTitle = question.title ?? ""  // 設問タイトルを取得
+
       switch question.type {
       case .single:
-        return .single("", question.options ?? [])
+        return .single(questionTitle, question.options ?? [])
       case .multiple:
-        return .multiple("", question.options ?? [])
+        return .multiple(questionTitle, question.options ?? [])
       case .text:
-        return .text("")
+        return .text(questionTitle)
       case .info:
         // InfoFieldsをQuestionType.InfoFieldの配列に変換
         var infoFields: [QuestionType.InfoField] = []
@@ -37,7 +39,7 @@ struct ContentView: View {
           if fields.postalCode == true { infoFields.append(.zip) }
           if fields.address == true { infoFields.append(.address) }
         }
-        return .info("", infoFields)
+        return .info(questionTitle, infoFields)
       }
     }
 

@@ -153,6 +153,9 @@ class FirestoreService {
       throw FirestoreServiceError.invalidData
     }
 
+    // titleを取得(オプショナル)
+    let title = data["title"] as? String
+
     // optionsを取得(オプショナル)
     let options = data["options"] as? [String]
 
@@ -173,6 +176,7 @@ class FirestoreService {
     return FirestoreQuestion(
       index: index,
       type: type,
+      title: title,
       options: options,
       infoFields: infoFields
     )

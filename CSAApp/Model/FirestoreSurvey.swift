@@ -61,6 +61,9 @@ public struct FirestoreQuestion: Codable, Hashable {
   public let index: Int
   public let type: FirestoreQuestionType
 
+  /// 設問のタイトル（質問文）
+  public let title: String?
+
   /// 単一/複数選択の場合の選択肢
   public let options: [String]?
 
@@ -70,11 +73,13 @@ public struct FirestoreQuestion: Codable, Hashable {
   public init(
     index: Int,
     type: FirestoreQuestionType,
+    title: String? = nil,
     options: [String]? = nil,
     infoFields: InfoFields? = nil
   ) {
     self.index = index
     self.type = type
+    self.title = title
     self.options = options
     self.infoFields = infoFields
   }
@@ -82,6 +87,7 @@ public struct FirestoreQuestion: Codable, Hashable {
   enum CodingKeys: String, CodingKey {
     case index
     case type
+    case title
     case options
     case infoFields
   }
