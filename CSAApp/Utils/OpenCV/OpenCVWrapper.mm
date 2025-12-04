@@ -864,25 +864,21 @@ using namespace cv;
             @try {
               UIImage *ciImg = croppedImage;
               NSString *detectedOther = [self
-                  detectOtherFreeTextAtIndex:
+                  detectOtherFreeText:
                       [self prepareImageForProcessing:ciImg
                                             errorCode:NULL
                                            methodName:@"detectMultipleAnswer"
                                           originalMat:NULL]
-                                  checkboxes:
-                                      [self
-                                          detectCheckboxes:
-                                              [self
-                                                  prepareImageForProcessing:
-                                                      ciImg
-                                                                  errorCode:NULL
-                                                                 methodName:
-                                                                     @"detectMu"
+                           checkboxes:
+                               [self
+                                   detectCheckboxes:
+                                       [self
+                                           prepareImageForProcessing:ciImg
+                                                           errorCode:NULL
+                                                          methodName:@"detectMu"
                                                                      @"ltipleAn"
                                                                      @"swer"
-                                                                originalMat:
-                                                                    NULL]]
-                                       index:otherIndex];
+                                                         originalMat:NULL]]];
               if (detectedOther && ![detectedOther isEqualToString:@""]) {
                 @try {
                   NSDictionary *swiftResult = [OCRManager
@@ -1030,9 +1026,8 @@ using namespace cv;
       // 「その他」の選択肢があり、対応するチェックボックスが存在するため、自由回答を検出
 
       // 最後の選択肢（その他）のチェックボックス位置で自由記述を探す
-      NSString *otherText = [self detectOtherFreeTextAtIndex:gray
-                                                  checkboxes:checkboxes
-                                                       index:otherOptionIndex];
+      NSString *otherText = [self detectOtherFreeText:gray
+                                           checkboxes:checkboxes];
 
       if (otherText && ![otherText isEqualToString:@""]) {
         return otherText;
@@ -1115,13 +1110,10 @@ using namespace cv;
     }
   }
 
-  // 「その他」が選択肢にあれば、まず括弧内の文字列を検出する（single
-  // と同じ方法を使用）
+  // 「その他」が選択肢にあれば、まず自由記述テキストを検出する
   if (otherOptionIndex >= 0 && otherOptionIndex < checkboxes.size()) {
-    NSString *freeTextAtIndex =
-        [self detectOtherFreeTextAtIndex:gray
-                              checkboxes:checkboxes
-                                   index:otherOptionIndex];
+    NSString *freeTextAtIndex = [self detectOtherFreeText:gray
+                                               checkboxes:checkboxes];
     if (freeTextAtIndex && ![freeTextAtIndex isEqualToString:@""]) {
       // チェックが一つもない場合は単独で返す（single と同様の振る舞い）
       if ([checkedOptions count] == 0) {
@@ -1311,9 +1303,9 @@ using namespace cv;
     // 最後のチェックボックス（その他）を取得
     cv::Rect lastCheckbox = checkboxes.back();
 
-    // その他のチェックボックスから3つ分右の座標を計算
-    // チェックボックス幅の3倍分右にオフセット
-    int textStartX = lastCheckbox.x + (lastCheckbox.width * 3);
+    // その他のチェックボックスから右側の座標を計算
+    // チェックボックス幅の5倍分右にオフセット（括弧の後から検出を開始）
+    int textStartX = lastCheckbox.x + (lastCheckbox.width * 5);
     int textY = lastCheckbox.y - 5; // 上に少し
     int textHeight =
         lastCheckbox.height + 10; // チェックボックスの高さに少し余裕を加える
@@ -1353,7 +1345,8 @@ using namespace cv;
         NSNumber *confidence = swiftResult[@"confidence"];
 
         if (text && text.length > 0) {
-          return text;
+          // SwiftのOCR結果からも括弧を除去して返す
+          return [self removeParenthesesFromText:text];
         }
       } @catch (NSException *ex) {
       }
@@ -1369,130 +1362,29 @@ using namespace cv;
   }
 }
 
-// 指定したインデックスのチェックボックスでその他の自由回答テキストを検出
-// 使用StoredType: single, multiple
-+ (NSString *)detectOtherFreeTextAtIndex:(cv::Mat)gray
-                              checkboxes:(std::vector<cv::Rect>)checkboxes
-                                   index:(int)index {
-  @try {
-    if (checkboxes.empty() || index < 0 || index >= checkboxes.size()) {
-      return @"";
-    }
-
-    // 指定したインデックスのチェックボックスを取得
-    cv::Rect targetCheckbox = checkboxes[index];
-
-    // その他のチェックボックスから3つ分右の座標を計算
-    // チェックボックス幅の3倍分右にオフセット
-    int textStartX = targetCheckbox.x + (targetCheckbox.width * 3);
-    int textY = targetCheckbox.y - 5; // 上に少し
-    int textHeight = targetCheckbox.height + 10;
-    int textWidth = gray.cols - textStartX - 10;
-
-    // 範囲チェック
-    if (textStartX >= gray.cols || textY < 0 ||
-        textY + textHeight >= gray.rows || textWidth <= 0) {
-      return @"";
-    }
-
-    cv::Rect textRect(textStartX, textY, textWidth, textHeight);
-    cv::Mat textROI = gray(textRect);
-
-    cv::Mat processedTextROI =
-        [OpenCVWrapper prepareImageForOCRProcessingFromMat:textROI];
-
-    UIImage *textImage = MatToUIImage(processedTextROI);
-
-    NSString *recognizedText = [self recognizeTextFromImage:textImage];
-
-    if (recognizedText) {
-      NSString *extractedText =
-          [self extractTextFromParentheses:recognizedText];
-      return extractedText;
-    }
-
-    return @"";
-
-  } @catch (NSException *exception) {
-    return @"";
-  }
-}
-
 // 括弧を除去するヘルパーメソッド
+// 括弧の文字（（、）、(、)、[、]、【、】）だけを削除して、中身のテキストは残す
+// 対象: 全角/半角の丸括弧、角括弧、全角二重角括弧など。
 + (NSString *)removeParenthesesFromText:(NSString *)text {
   if (!text || [text length] == 0) {
     return @"";
   }
 
-  // 括弧とその中身を除去する正規表現
-  NSError *error = nil;
-  NSRegularExpression *regex = [NSRegularExpression
-      regularExpressionWithPattern:@"[（）()\\[\\]]"
-                           options:NSRegularExpressionCaseInsensitive
-                             error:&error];
-  if (error) {
-    return text;
-  }
-
+  // 括弧文字だけを削除する（中身は残す）
+  NSRegularExpression *regex =
+      [NSRegularExpression regularExpressionWithPattern:@"[（）()\\[\\]【】]"
+                                                options:0
+                                                  error:NULL];
   NSString *result =
       [regex stringByReplacingMatchesInString:text
                                       options:0
                                         range:NSMakeRange(0, [text length])
                                  withTemplate:@""];
 
-  // 前後の空白を削除
+  // 前後の空白を削除して返す
   return [result
       stringByTrimmingCharactersInSet:[NSCharacterSet
                                           whitespaceAndNewlineCharacterSet]];
-}
-
-// 括弧内の文字列のみを抽出するヘルパーメソッド
-+ (NSString *)extractTextFromParentheses:(NSString *)text {
-  if (!text || [text length] == 0) {
-    return @"";
-  }
-
-  // 「（」の位置を探す（日本語の括弧と英語の括弧の両方に対応）
-  NSRange openParenRange = [text rangeOfString:@"（"];
-  if (openParenRange.location == NSNotFound) {
-    openParenRange = [text rangeOfString:@"("];
-  }
-
-  if (openParenRange.location == NSNotFound) {
-    // 括弧が見つからない場合は空文字を返す
-    return @"";
-  }
-
-  // 「（」以降の文字列を取得
-  NSUInteger startIndex = openParenRange.location + openParenRange.length;
-  if (startIndex >= [text length]) {
-    return @"";
-  }
-
-  NSString *afterOpenParen = [text substringFromIndex:startIndex];
-
-  // 「）」を除去する
-  NSError *error = nil;
-  NSRegularExpression *regex = [NSRegularExpression
-      regularExpressionWithPattern:@"[）)]"
-                           options:NSRegularExpressionCaseInsensitive
-                             error:&error];
-  if (error) {
-    return afterOpenParen;
-  }
-
-  NSString *result = [regex
-      stringByReplacingMatchesInString:afterOpenParen
-                               options:0
-                                 range:NSMakeRange(0, [afterOpenParen length])
-                          withTemplate:@""];
-
-  // 前後の空白を削除
-  NSString *trimmedResult = [result
-      stringByTrimmingCharactersInSet:[NSCharacterSet
-                                          whitespaceAndNewlineCharacterSet]];
-
-  return trimmedResult;
 }
 
 // Vision APIを使用した文字認識

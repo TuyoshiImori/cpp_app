@@ -166,3 +166,37 @@ struct QrView: View {
     }
   }
 }
+
+// MARK: - カメラプレビュー用の UIViewRepresentable
+
+struct QrCameraPreview: UIViewRepresentable {
+  let session: AVCaptureSession
+
+  func makeUIView(context: Context) -> UIView {
+    let view = UIView(frame: .zero)
+
+    let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+    previewLayer.videoGravity = .resizeAspectFill
+    previewLayer.frame = view.bounds
+    view.layer.addSublayer(previewLayer)
+
+    // レイヤーを context に保存して後で更新できるようにする
+    context.coordinator.previewLayer = previewLayer
+
+    return view
+  }
+
+  func updateUIView(_ uiView: UIView, context: Context) {
+    DispatchQueue.main.async {
+      context.coordinator.previewLayer?.frame = uiView.bounds
+    }
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  class Coordinator {
+    var previewLayer: AVCaptureVideoPreviewLayer?
+  }
+}
