@@ -136,20 +136,25 @@ struct ContentView: View {
       }
       // バナー表示を分離したコンポーネントで表示
       .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
-      // 編集タイトル用の中央ダイアログ（別ファイルに切り出し）
+      // 編集タイトル用の中央ダイアログ（共通コンポーネント InputDialog を使用）
       .overlay {
-        EditTitleDialog(
+        InputDialog(
           isPresented: Binding(
             get: { viewModel.isShowingEditDialog }, set: { viewModel.isShowingEditDialog = $0 }),
-          titleText: Binding(
-            get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 })
-        ) { newTitle in
-          if let target = viewModel.editTargetItem {
-            target.title = newTitle
-            try? modelContext.save()
-            viewModel.dataVersion = UUID()
-          }
-        }
+          inputText: Binding(
+            get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 }),
+          onSubmit: { newTitle in
+            if let target = viewModel.editTargetItem {
+              target.title = newTitle
+              try? modelContext.save()
+              viewModel.dataVersion = UUID()
+            }
+          },
+          dialogTitle: "タイトルを編集",
+          placeholder: "タイトル",
+          cancelButtonText: "キャンセル",
+          submitButtonText: "保存"
+        )
       }
     }
     // QR画面をフルスクリーンで表示

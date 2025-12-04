@@ -6,6 +6,8 @@ import UIKit
 struct QrView: View {
   @StateObject private var viewModel = QrViewModel()
   @Environment(\.dismiss) private var dismiss
+  @State private var isShowingManualIdInput: Bool = false
+  @State private var manualInputId: String = ""
 
   // ContentViewModelからアンケート情報を渡すためのバインディング
   var onSurveyFetched: ((FirestoreSurveyDocument) -> Void)?
@@ -29,7 +31,7 @@ struct QrView: View {
         Spacer()
 
         // 説明テキスト
-        Text("QRコードを枠内に収めてください")
+        Text("QRコードを枠内に合わせてください")
           .font(.headline)
           .foregroundColor(.white)
           .padding()
@@ -87,6 +89,18 @@ struct QrView: View {
           .padding()
 
           Spacer()
+
+          // 右上: 手入力でIDを指定するボタン
+          Button(action: {
+            // 停止はせず、手入力シートを表示
+            isShowingManualIdInput = true
+          }) {
+            Image(systemName: "pencil.circle.fill")
+              .font(.system(size: 32))
+              .foregroundColor(.white)
+              .shadow(radius: 3)
+          }
+          .padding()
         }
         Spacer()
       }
@@ -131,6 +145,25 @@ struct QrView: View {
         dismiss()
       }
     }
+    // 手入力ダイアログを共通コンポーネントで表示
+    .overlay {
+      InputDialog(
+        isPresented: $isShowingManualIdInput,
+        inputText: $manualInputId,
+        onSubmit: { id in
+          // Firestore取得を開始する
+          let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !trimmed.isEmpty else { return }
+          viewModel.fetchSurveyFromFirestore(documentId: trimmed)
+        },
+        dialogTitle: "アンケートIDを入力",
+        placeholder: "アンケートID",
+        cancelButtonText: "キャンセル",
+        submitButtonText: "取得",
+        isSecureInput: true,  // IDを隠す（パスワード入力のような●表示）
+        showPasteButton: true  // ペーストボタンを表示
+      )
+    }
   }
 }
 
@@ -166,8 +199,4 @@ struct QrCameraPreview: UIViewRepresentable {
   class Coordinator {
     var previewLayer: AVCaptureVideoPreviewLayer?
   }
-}
-
-#Preview {
-  QrView()
 }
