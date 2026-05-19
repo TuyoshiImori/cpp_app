@@ -17,6 +17,7 @@ xcodebuild -workspace CSAApp.xcworkspace \
   -sdk iphoneos \
   -derivedDataPath ./build \
   OTHER_LDFLAGS='$(inherited) -Wl,-w' \
+  ENABLE_USER_SCRIPT_SANDBOXING=NO \
   build
 
 # 2. インストール
