@@ -3,7 +3,8 @@
 
 DEVICE_ID="00008130-00092DA400C1401C"
 BUNDLE_ID="com.iiyotu.CSAApp"
-APP_PATH="/Users/iimoritsuyoshi/projects/CSAApp/build/Build/Products/Debug-iphoneos/CSAApp.app"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_PATH="$SCRIPT_DIR/build/Build/Products/Debug-iphoneos/CSAApp.app"
 
 set -e
 

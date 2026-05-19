@@ -11,6 +11,8 @@ struct ContentView: View {
 
   // QR画面表示用の状態
   @State private var isShowingQrView: Bool = false
+  // OCRデバッグ画面表示用の状態
+  @State private var isShowingDebugOCR: Bool = false
 
   // MARK: - Helper Methods
 
@@ -127,6 +129,13 @@ struct ContentView: View {
       }
       // navigationPath の変更による副作用はここでは扱わない。
       .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button(action: {
+            isShowingDebugOCR = true
+          }) {
+            Image(systemName: "wrench.and.screwdriver")
+          }
+        }
         ToolbarItem(placement: .navigationBarTrailing) {
           Button(action: {
             viewModel.toggleEditMode()
@@ -156,6 +165,10 @@ struct ContentView: View {
           submitButtonText: "保存"
         )
       }
+    }
+    // OCRデバッグ画面をシートで表示
+    .sheet(isPresented: $isShowingDebugOCR) {
+      DebugOCRView()
     }
     // QR画面をフルスクリーンで表示
     .fullScreenCover(isPresented: $isShowingQrView) {

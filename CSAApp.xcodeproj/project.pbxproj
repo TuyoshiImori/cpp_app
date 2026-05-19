@@ -40,7 +40,7 @@
 		2D1E98412E266E88001B13E7 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		2D1E98432E266E91001B13E7 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
 		2D1E98452E266E99001B13E7 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = opencv2.xcframework; path = ../opencv/build_all/opencv2.xcframework; sourceTree = "<group>"; };
+		2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = opencv2.xcframework; path = ../../opencv/build_all/opencv2.xcframework; sourceTree = "<group>"; };
 		2D50A1BF2DF1B4230023643B /* CSAApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CSAApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1D02DF1B4250023643B /* CSAAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D50A1DA2DF1B4250023643B /* CSAAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CSAAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
