@@ -26,4 +26,7 @@
 + (NSString *)detectInfoAnswerFromImage:(UIImage *)image
                         withOptionArray:(NSArray<NSString *> *)optionArray;
 
+// デバッグ・汎用OCR用: 本番と同じ前処理を UIImage に適用して返す
++ (UIImage *)preprocessImageForOCR:(UIImage *)image;
+
 @end

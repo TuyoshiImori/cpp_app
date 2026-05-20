@@ -1,5 +1,6 @@
 import AVFoundation
 import Combine
+import FoundationModels
 import SwiftData
 import SwiftUI
 import UIKit
@@ -30,6 +31,8 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var scanState: ScanState = .possible
   /// 画像解析中かどうか（UI 側でローディングを表示するために使用）
   @Published var isProcessing: Bool = false
+  /// AI テキスト補正中かどうか
+  @Published var isAICorrectingText: Bool = false
 
   /// Analysis 用の NavigationLink をトリガーするためのフラグ
   @Published var isAnalysisActive: Bool = false
@@ -168,6 +171,9 @@ final class CameraViewModel: NSObject, ObservableObject {
         // OpenCV 呼び出しには今回解析対象のフル画像を渡す。
         let parsed = self.parseCroppedImagesWithStoredTypes(cropped, fullImage: gray)
         self.parsedAnswers = parsed
+
+        // text 設問の回答を AI で補正する（非同期・完了次第 parsedAnswers を更新）
+        Task { await self.correctTextAnswersWithAI() }
 
         // 解析結果が揃った後でグレースケール画像を publish して、View 側で UI 更新をトリガーする
         self.capturedImage = gray
@@ -532,6 +538,76 @@ extension CameraViewModel {
     withAnimation(.easeInOut(duration: 0.18)) {
       isPulseActive = false
     }
+  }
+}
+
+// MARK: - AI Text Correction
+extension CameraViewModel {
+  /// text 設問の OCR 結果を FoundationModels で補正する。
+  /// parsedAnswers のうち initialQuestionTypes が .text の箇所のみを対象とする。
+  @MainActor
+  func correctTextAnswersWithAI() async {
+    guard SystemLanguageModel.default.isAvailable else { return }
+
+    let textIndices = initialQuestionTypes.indices.filter {
+      if case .text(_) = initialQuestionTypes[$0] { return true }
+      return false
+    }
+    guard !textIndices.isEmpty else { return }
+
+    isAICorrectingText = true
+    defer { isAICorrectingText = false }
+
+    var updatedAnswers = parsedAnswers
+    for idx in textIndices {
+      guard idx < updatedAnswers.count, !updatedAnswers[idx].isEmpty else { continue }
+      let rawText = updatedAnswers[idx]
+      do {
+        let session = LanguageModelSession(
+          instructions: """
+            あなたは演奏会アンケートのOCR補正の専門家です。
+            補正後のテキストのみを出力してください。説明・前置き・引用符は一切不要です。
+            """
+        )
+        let prompt = """
+          手書きアンケートをOCRで読み取ったテキストを補正してください。
+
+          【OCRで起きやすい誤認識パターン】
+          1. 字形が似た漢字の混同（例：音→青、手→千、日→目、人→入）
+          2. カタカナの音が近い文字への変換（例：ヴァイオリン→ウェイオリン、チェロ→テエロ）
+          3. ひらがなの部分一致による誤変換（例：ここちよく→ここうまく、すばらしい→すばやしい）
+
+          【このアンケートに登場しやすい語彙】
+          楽器：ヴァイオリン・チェロ・ビオラ・コントラバス・ピアノ・フルート・クラリネット・オーボエ・トランペット・ホルン・ハープ
+          音楽用語：演奏・音色・旋律・ハーモニー・指揮・協奏曲・交響曲・作曲家・聴く
+          感想表現：心地よい・感動・素晴らしい・美しい・迫力・上手・素敵・楽しい・印象的・感銘・満足・よかった・面白い・興味深い
+          強調表現：大変・非常に・とても・大いに・誠に・まことに・本当に・すごく・たいへん
+
+          【誤認識の追加ヒント】
+          - 助詞が不自然に連続する場合（例：「を〜を」「が〜が」）は直前の単語が誤認識されている可能性が高い
+          - 文法的に意味をなさない単語が現れたら、前後の文脈から正しい語を推定する
+
+          【補正例1】
+          OCR：「ウェイオリンの青をここうまく聞かせていただきました」
+          正解：「ヴァイオリンの音をここちよく聞かせていただきました」
+
+          【補正例2】
+          OCR：「初めてでしたが文を興味を持ちました」
+          正解：「初めてでしたが大変興味を持ちました」
+          ※「文を興味を持ちました」は助詞「を」が不自然に連続しており、「文を」→「大変」と補正
+
+          上記の例のように、文法的な不自然さや文脈から正しい語を積極的に推定し、
+          最も自然な演奏会の感想文になるよう補正してください。補正後のテキストのみ出力してください。
+
+          OCRテキスト：\(rawText)
+          """
+        let response = try await session.respond(to: prompt)
+        updatedAnswers[idx] = response.content
+      } catch {
+        // 補正失敗時は元テキストのまま継続
+      }
+    }
+    parsedAnswers = updatedAnswers
   }
 }
 

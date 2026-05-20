@@ -2424,4 +2424,20 @@ using namespace cv;
   return lines;
 }
 
++ (UIImage *)preprocessImageForOCR:(UIImage *)image {
+  if (image == nil) {
+    return image;
+  }
+  cv::Mat mat;
+  UIImageToMat(image, mat);
+  if (mat.empty()) {
+    return image;
+  }
+  cv::Mat processed = [OpenCVWrapper prepareImageForOCRProcessingFromMat:mat];
+  if (processed.empty()) {
+    return image;
+  }
+  return MatToUIImage(processed);
+}
+
 @end
