@@ -1,7 +1,7 @@
 #!/bin/bash
 # コード修正後に一発でビルド→インストール→起動するスクリプト
 
-DEVICE_ID="00008130-00092DA400C1401C"
+DEVICE_ID="03176EB1-E7FB-59ED-9CDE-A6E5572F4317"
 BUNDLE_ID="com.iiyotu.CSAApp"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_PATH="$SCRIPT_DIR/build/Build/Products/Debug-iphoneos/CSAApp.app"

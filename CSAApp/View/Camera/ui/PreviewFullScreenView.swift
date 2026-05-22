@@ -27,9 +27,6 @@ struct PreviewFullScreenView: View {
   // 信頼度情報を格納するための配列（将来の実装用）
   let confidenceScores: [[Float]]?
 
-  // 分析画面の表示状態
-  // isAnalysisActive は ViewModel に移譲している
-
   // MARK: - Init
   init(
     isPreviewPresented: Binding<Bool>,

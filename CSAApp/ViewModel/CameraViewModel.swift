@@ -34,9 +34,6 @@ final class CameraViewModel: NSObject, ObservableObject {
   /// AI テキスト補正中かどうか
   @Published var isAICorrectingText: Bool = false
 
-  /// Analysis 用の NavigationLink をトリガーするためのフラグ
-  @Published var isAnalysisActive: Bool = false
-
   // MARK: - Data Management Properties
   /// キャプチャされた画像の配列
   @Published var capturedImages: [UIImage] = []

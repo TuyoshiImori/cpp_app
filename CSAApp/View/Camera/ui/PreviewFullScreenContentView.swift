@@ -17,11 +17,14 @@ struct PreviewFullScreenContentView: View {
   let item: Item?
   var onDelete: ((Int) -> Bool)? = nil
 
-  // 信頼度情報を格納するための配列（将来の実装用）
+  // 信頼度情報を格納するための配列
   let confidenceScores: [[Float]]?
 
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.modelContext) private var modelContext
+
+  // エクスポート画面の表示状態
+  @State private var isExportPresented: Bool = false
 
   private var previewCardBackground: Color {
     CardBackground.color(for: colorScheme)
@@ -69,14 +72,11 @@ struct PreviewFullScreenContentView: View {
 
           if item != nil {
             Button(action: {
-              // アクションを先に書く形式に変更（UI は元のまま）
-              if let vm = viewModel {
-                vm.isAnalysisActive = true
-              }
+              isExportPresented = true
             }) {
               HStack {
-                Image(systemName: "chart.bar.doc.horizontal")
-                Text("分析実行")
+                Image(systemName: "square.and.arrow.up")
+                Text("エクスポート")
                   .font(.headline)
               }
               .foregroundColor(ButtonForeground.color(for: colorScheme))
@@ -88,21 +88,6 @@ struct PreviewFullScreenContentView: View {
         }
         .padding(.horizontal, 20)
         Spacer()
-      }
-
-      if let it = item {
-        NavigationLink(
-          destination: AnalysisView(
-            item: it,
-            allCroppedImageSets: croppedImageSets,
-            allParsedAnswersSets: parsedAnswersSets,
-            allConfidenceScores: confidenceScores
-          ),
-          isActive: bindingForAnalysisActive()
-        ) {
-          EmptyView()
-        }
-        .hidden()
       }
 
       VStack {
@@ -125,14 +110,16 @@ struct PreviewFullScreenContentView: View {
         .padding(.trailing, 20)
       }
     }
-  }
-
-  // MARK: - Helpers
-  private func bindingForAnalysisActive() -> Binding<Bool> {
-    if let vm = viewModel {
-      return Binding(get: { vm.isAnalysisActive }, set: { vm.isAnalysisActive = $0 })
-    } else {
-      return .constant(false)
+    .sheet(isPresented: $isExportPresented) {
+      if let it = item, let vm = viewModel {
+        ExportView(
+          item: it,
+          croppedImageSets: croppedImageSets,
+          parsedAnswersSets: parsedAnswersSets,
+          confidenceScoreSets: confidenceScores ?? [],
+          questionTypes: vm.initialQuestionTypes
+        )
+      }
     }
   }
 }
