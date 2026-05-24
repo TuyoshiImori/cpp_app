@@ -6,6 +6,7 @@
 //
 
 import FirebaseCore
+import GoogleSignIn
 import SwiftData
 import SwiftUI
 
@@ -29,6 +30,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct CSAAppApp: App {
   // AppDelegateを登録
   @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+  @StateObject private var authService = AuthService.shared
   var sharedModelContainer: ModelContainer = {
     let schema = Schema([Item.self])
     let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -54,6 +56,10 @@ struct CSAAppApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView()
+        .environmentObject(authService)
+        .onOpenURL { url in
+          GIDSignIn.sharedInstance.handle(url)
+        }
     }
     .modelContainer(sharedModelContainer)
   }

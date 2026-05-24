@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct ContentView: View {
+  @EnvironmentObject private var auth: AuthService
   @StateObject private var viewModel = ContentViewModel()
   @Environment(\.modelContext) private var modelContext
   @Environment(\.editMode) private var editMode
@@ -9,10 +10,13 @@ struct ContentView: View {
   @Query private var items: [Item]
   // View 側で local に持っていた状態は ViewModel に移動済み
 
-  // QR画面表示用の状態
-  @State private var isShowingQrView: Bool = false
   // OCRデバッグ画面表示用の状態
   @State private var isShowingDebugOCR: Bool = false
+  // Firestoreから取得したアンケート一覧
+  @State private var firestoreSurveys: [FirestoreSurveyDocument] = []
+  @State private var isLoadingSurveys: Bool = false
+  // 表示用に変換したアイテム一覧（AccordionItem UIで利用）
+  @State private var displayItems: [Item] = []
 
   // MARK: - Helper Methods
 
@@ -65,60 +69,59 @@ struct ContentView: View {
   }
 
   var body: some View {
+    if !auth.isSignedIn {
+      LoginView()
+    } else {
+      mainContent
+    }
+  }
+
+  @ViewBuilder
+  private var mainContent: some View {
     NavigationStack(
       path: Binding(
         get: { viewModel.navigationPath },
         set: { viewModel.navigationPath = $0 }
       )
     ) {
-      ZStack {
-        // アイテム一覧部分を分割したサブビューへ移譲
-        ItemsListView(
-          viewModel: viewModel,
-          items: items,
-          expandedRowIDs: Binding(
-            get: { viewModel.expandedRowIDs }, set: { viewModel.expandedRowIDs = $0 }),
-          modelContext: modelContext,
-          onTap: { item, rowID in
-            // タップ時の動作は引き続き ContentView が保持
-            viewModel.handleItemTapped(item, rowID: rowID, modelContext: modelContext)
-            // 選択されたアイテムを currentItem にセットして CameraView に遷移
-            viewModel.currentItem = item
-            // 直前の選択画像があればクリアしておく
-            viewModel.selectedImage = nil
-            // プッシュ遷移でCameraViewに移動
-            viewModel.navigationPath.append("CameraView")
-          },
-          onEdit: { item, rowID in
-            // 編集ダイアログを表示する準備
-            viewModel.editTargetItem = item
-            viewModel.editTargetRowID = rowID
-            viewModel.editTitleText = item.title
-            viewModel.isShowingEditDialog = true
+      Group {
+        if isLoadingSurveys {
+          ProgressView("読み込み中...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if displayItems.isEmpty {
+          VStack(spacing: 16) {
+            Image(systemName: "doc.text")
+              .font(.system(size: 48))
+              .foregroundColor(.secondary.opacity(0.4))
+            Text("アンケートがありません")
+              .font(.headline)
+              .foregroundColor(.secondary)
+            Text("ブラウザでアンケートを作成して\nクラウドに保存してください")
+              .font(.subheadline)
+              .foregroundColor(.secondary)
+              .multilineTextAlignment(.center)
           }
-        )
-
-        // フローティングボタン（右下に配置）- ItemsListViewにのみ表示
-        VStack {
-          Spacer()
-          HStack {
-            Spacer()
-            Button(action: {
-              isShowingQrView = true
-            }) {
-              Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 56, height: 56)
-                .background(Color.blue)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
-          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+          ItemsListView(
+            viewModel: viewModel,
+            items: displayItems,
+            expandedRowIDs: Binding(
+              get: { viewModel.expandedRowIDs },
+              set: { viewModel.expandedRowIDs = $0 }
+            ),
+            modelContext: nil,
+            onTap: { item, _ in
+              if let survey = firestoreSurveys.first(where: { $0.id == item.surveyID }) {
+                openSurvey(survey)
+              }
+            },
+            onEdit: { _, _ in }
+          )
+          .refreshable { await loadSurveys() }
         }
       }
+      .task { await loadSurveys() }
       .navigationDestination(for: String.self) { destination in
         if destination == "CameraView" {
           CameraView(
@@ -130,68 +133,65 @@ struct ContentView: View {
       // navigationPath の変更による副作用はここでは扱わない。
       .toolbar {
         ToolbarItem(placement: .navigationBarLeading) {
-          Button(action: {
-            isShowingDebugOCR = true
-          }) {
-            Image(systemName: "wrench.and.screwdriver")
+          HStack(spacing: 8) {
+            // ユーザーメニュー（ログアウト）
+            Menu {
+              Button(role: .destructive) {
+                try? auth.signOut()
+              } label: {
+                Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
+              }
+            } label: {
+              HStack(spacing: 4) {
+                Image(systemName: "person.crop.circle")
+                Text(auth.displayName)
+                  .font(.caption)
+                  .lineLimit(1)
+              }
+            }
+            // デバッグ画面ボタン
+            Button(action: {
+              isShowingDebugOCR = true
+            }) {
+              Image(systemName: "wrench.and.screwdriver")
+            }
           }
         }
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button(action: {
-            viewModel.toggleEditMode()
-            if viewModel.isEditing { viewModel.slideAllItemsForEdit(items: items) }
-          }) { Text(viewModel.isEditing ? "完了" : "編集") }
-        }
-      }
-      // バナー表示を分離したコンポーネントで表示
-      .overlay(BannerView(show: viewModel.showBanner, title: viewModel.bannerTitle))
-      // 編集タイトル用の中央ダイアログ（共通コンポーネント InputDialog を使用）
-      .overlay {
-        InputDialog(
-          isPresented: Binding(
-            get: { viewModel.isShowingEditDialog }, set: { viewModel.isShowingEditDialog = $0 }),
-          inputText: Binding(
-            get: { viewModel.editTitleText }, set: { viewModel.editTitleText = $0 }),
-          onSubmit: { newTitle in
-            if let target = viewModel.editTargetItem {
-              target.title = newTitle
-              try? modelContext.save()
-              viewModel.dataVersion = UUID()
-            }
-          },
-          dialogTitle: "タイトルを編集",
-          placeholder: "タイトル",
-          cancelButtonText: "キャンセル",
-          submitButtonText: "保存"
-        )
       }
     }
     // OCRデバッグ画面をシートで表示
     .sheet(isPresented: $isShowingDebugOCR) {
       DebugOCRView()
     }
-    // QR画面をフルスクリーンで表示
-    .fullScreenCover(isPresented: $isShowingQrView) {
-      QrView(onSurveyFetched: { survey in
-        // 取得したアンケート情報をItemに変換して保存
-        let newItem = convertFirestoreSurveyToItem(survey)
-        modelContext.insert(newItem)
-        try? modelContext.save()
-
-        // ViewModelにも保存して表示用に使用
-        viewModel.fetchedSurvey = survey
-      })
-    }
     // アプリがフォアグラウンドから離れたときに編集状態を初期化
     .onChange(of: scenePhase) { (newPhase: ScenePhase) in
       if newPhase == .background || newPhase == .inactive {
-        // ViewModel 側で ViewModel 管理の状態を初期化
         viewModel.clearEditingState()
-
-        // View 側に残す view-local 状態はなし。ViewModel のプロパティをクリアしているため
-        // ここでは EditMode の解放だけを行う
         editMode?.wrappedValue = .inactive
       }
     }
+  }
+
+  // MARK: - Private Methods
+
+  private func loadSurveys() async {
+    guard let uid = auth.uid else { return }
+    isLoadingSurveys = firestoreSurveys.isEmpty
+    do {
+      firestoreSurveys = try await FirestoreService.shared.fetchUserSurveys(uid: uid)
+      displayItems = firestoreSurveys.map { convertFirestoreSurveyToItem($0) }
+    } catch {
+      print("サーベイ取得エラー: \(error)")
+    }
+    isLoadingSurveys = false
+  }
+
+  private func openSurvey(_ survey: FirestoreSurveyDocument) {
+    let newItem = convertFirestoreSurveyToItem(survey)
+    modelContext.insert(newItem)
+    try? modelContext.save()
+    viewModel.currentItem = newItem
+    viewModel.selectedImage = nil
+    viewModel.navigationPath.append("CameraView")
   }
 }

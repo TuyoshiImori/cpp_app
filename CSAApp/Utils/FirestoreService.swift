@@ -105,6 +105,40 @@ class FirestoreService {
     }
   }
 
+  // MARK: - User Surveys
+
+  /// ログインユーザーが作成したアンケート一覧を取得する
+  func fetchUserSurveys(uid: String) async throws -> [FirestoreSurveyDocument] {
+    let colRef = db.collection("users").document(uid).collection("surveys")
+    let snapshot = try await colRef.order(by: "updatedAt", descending: true).limit(to: 50).getDocuments()
+    return try snapshot.documents.compactMap { doc in
+      try? parseSurveyDocument(documentId: doc.documentID, data: doc.data())
+    }
+  }
+
+  // MARK: - Session Methods
+
+  /// セッションドキュメントに ZIP URL を書き込む
+  /// - Parameters:
+  ///   - sessionId: WebアプリがFirestoreに作成したセッションID
+  ///   - zipUrl: LocalHttpServerのURL
+  ///   - surveyTitle: アンケートタイトル
+  ///   - pageCount: ページ数
+  func updateSession(
+    sessionId: String,
+    zipUrl: String,
+    surveyTitle: String,
+    pageCount: Int
+  ) async throws {
+    let ref = db.collection("sessions").document(sessionId)
+    try await ref.updateData([
+      "zipUrl": zipUrl,
+      "surveyTitle": surveyTitle,
+      "pageCount": pageCount,
+      "status": "ready",
+    ])
+  }
+
   // MARK: - Private Methods
 
   /// FirestoreドキュメントデータをFirestoreSurveyDocumentに変換

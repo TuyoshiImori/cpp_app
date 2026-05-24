@@ -15,6 +15,8 @@
 		2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D29928A2E3B7FC300D4D49D /* opencv2.xcframework */; };
 		2D5B0B592EDD54F7006E0601 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5B0B582EDD54F7006E0601 /* FirebaseCore */; };
 		2D5B0B5B2EDD550B006E0601 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5B0B5A2EDD550B006E0601 /* FirebaseFirestore */; };
+		2D5B0B5D2EDD550B006E0601 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5B0B5C2EDD550B006E0601 /* FirebaseAuth */; };
+		2D5CF0FA2FC05DCF00125872 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 2D5CF0F92FC05DCF00125872 /* GoogleSignIn */; };
 		9D13808771CFA51272F8E5AD /* Pods_CSAAppTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCA567B1557FB0658F81CE6 /* Pods_CSAAppTests.framework */; };
 		B8A624244E84E59279520977 /* Pods_CSAApp_CSAAppUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BA3923D67B51D7E8445AEF5 /* Pods_CSAApp_CSAAppUITests.framework */; };
 /* End PBXBuildFile section */
@@ -93,6 +95,8 @@
 				2D5B0B592EDD54F7006E0601 /* FirebaseCore in Frameworks */,
 				2D29928B2E3B7FC300D4D49D /* opencv2.xcframework in Frameworks */,
 				2D5B0B5B2EDD550B006E0601 /* FirebaseFirestore in Frameworks */,
+				2D5B0B5D2EDD550B006E0601 /* FirebaseAuth in Frameworks */,
+				2D5CF0FA2FC05DCF00125872 /* GoogleSignIn in Frameworks */,
 				2D186C662DF6F7D7002C7BA0 /* CropViewController in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -173,6 +177,8 @@
 			name = CSAApp;
 			packageProductDependencies = (
 				2D186C652DF6F7D7002C7BA0 /* CropViewController */,
+				2D5B0B5C2EDD550B006E0601 /* FirebaseAuth */,
+				2D5CF0F92FC05DCF00125872 /* GoogleSignIn */,
 			);
 			productName = CSAApp;
 			productReference = 2D50A1BF2DF1B4230023643B /* CSAApp.app */;
@@ -279,6 +285,7 @@
 			packageReferences = (
 				2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */,
 				2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				2D5CF0F82FC05DCF00125872 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D50A1C02DF1B4230023643B /* Products */;
@@ -386,7 +393,6 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					// "-all_load",
 					"$(inherited)",
 					"-Wl,-w",
 					"-Wl,-commons,use_dylibs",
@@ -437,7 +443,6 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					// "-all_load",
 					"$(inherited)",
 					"-Wl,-w",
 					"-Wl,-commons,use_dylibs",
@@ -706,9 +711,22 @@
 				minimumVersion = 12.6.0;
 			};
 		};
+		2D5CF0F82FC05DCF00125872 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2D186C652DF6F7D7002C7BA0 /* CropViewController */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */;
+			productName = CropViewController;
+		};
 		2D5B0B582EDD54F7006E0601 /* FirebaseCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
@@ -719,10 +737,15 @@
 			package = 2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
 		};
-		2D186C652DF6F7D7002C7BA0 /* CropViewController */ = {
+		2D5B0B5C2EDD550B006E0601 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 2D186C642DF6F7D7002C7BA0 /* XCRemoteSwiftPackageReference "TOCropViewController" */;
-			productName = CropViewController;
+			package = 2D5B0B512EDD4EA1006E0601 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		2D5CF0F92FC05DCF00125872 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2D5CF0F82FC05DCF00125872 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -204,7 +204,7 @@ extension QrViewModel: AVCaptureMetadataOutputObjectsDelegate {
     // 既にダイアログ表示中なら無視
     guard !showResultDialog else { return }
 
-    // スキャンを停止してダイアログを表示
+    // アンケートQR（プレーンなUUID文字列）
     stopScanning()
     scannedCode = stringValue
     showResultDialog = true
