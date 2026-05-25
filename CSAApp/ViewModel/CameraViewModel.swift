@@ -21,9 +21,6 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var detectedFeature: RectangleFeature? = nil
   @Published var parsedAnswers: [String] = []
   @Published var lastCroppedImages: [UIImage] = []
-  @Published var confidenceScores: [Float] = []  // OCR信頼度スコア
-  // info設問向けに行単位の信頼度を保持する（各設問ごとに行が複数ある場合がある）
-  @Published var confidenceScores2D: [[Float]] = []
   @Published var isTorchOn: Bool = false
   @Published var isTargetBracesVisible: Bool = true
   @Published var isAutoCaptureEnabled: Bool = true
@@ -41,9 +38,6 @@ final class CameraViewModel: NSObject, ObservableObject {
   @Published var croppedImageSets: [[UIImage]] = []
   /// 各画像ごとの認識された文字列（2次元配列）
   @Published var recognizedTextsSets: [[String]] = []
-  /// 各キャプチャごとの信頼度スコアセット
-  @Published var confidenceScoreSets: [[Float]] = []
-
   // MARK: - UI State Properties
   /// プレビューが表示されているかどうか
   @Published var isPreviewPresented: Bool = false
@@ -71,37 +65,16 @@ final class CameraViewModel: NSObject, ObservableObject {
     self.initialQuestionTypes = questionTypes
   }
 
-  /// スキャン結果をItemに保存するメソッド（新しいScanResult構造を使用）
-  /// - Parameters:
-  ///   - item: 保存対象のItem
-  ///   - croppedImages: 切り取られた設問画像の配列
-  ///   - parsedAnswers: 解析された回答文字列の配列
-  ///   - confidenceScores: 信頼度スコアの配列
-  func saveResultsToItem(
-    _ item: Item, croppedImages: [UIImage], parsedAnswers: [String], confidenceScores: [Float]
-  ) {
-    // 切り取り画像をData形式に変換
-    let imageDataArray = croppedImages.map { image in
-      // JPEG形式で圧縮（品質0.8でバランスを取る）
-      return image.jpegData(compressionQuality: 0.8)
-    }
-
-    // 新しいScanResultを作成（2D信頼度も保存）
+  func saveResultsToItem(_ item: Item, croppedImages: [UIImage], parsedAnswers: [String]) {
+    let imageDataArray = croppedImages.map { $0.jpegData(compressionQuality: 0.8) }
     let scanResult = ScanResult(
       scanID: UUID().uuidString,
       timestamp: Date(),
-      confidenceScores: confidenceScores,
-      confidenceScores2D: self.confidenceScores2D,
       answerTexts: parsedAnswers,
       questionImageData: imageDataArray
     )
-
-    // ItemにScanResultを追加
     item.addScanResult(scanResult)
-
-    // 後方互換性のため、最新の結果を古いプロパティにも保存
     item.answerTexts = parsedAnswers
-    item.confidenceScores = confidenceScores
     item.questionImageData = imageDataArray
   }
 
@@ -220,81 +193,6 @@ final class CameraViewModel: NSObject, ObservableObject {
       withStoredTypes: types,
       withOptionTexts: optionTexts)
     guard let parsed = raw?["parsedAnswers"] as? [String] else { return [] }
-
-    // 信頼度スコアも取得して保存（OpenCV からのフラットな配列をまず格納）
-    if let scores = raw?["confidenceScores"] as? [NSNumber] {
-      self.confidenceScores = scores.map { $0.floatValue }
-    } else if let scores = raw?["confidenceScores"] as? [Float] {
-      self.confidenceScores = scores
-    } else {
-      self.confidenceScores = []
-    }
-
-    // OpenCV の parsedAnswers を利用して、info 設問については
-    // Vision(OCRManager) を使って行ごとの信頼度を再取得し、
-    // confidenceScores2D として格納する（UIでより詳細に表示するため）
-    var scores2D: [[Float]] = []
-    if let parsedFromRaw = raw?["parsedAnswers"] as? [NSString], parsedFromRaw.count == parsed.count
-    {
-      for (idx, parsedObj) in parsedFromRaw.enumerated() {
-        let parsedStr = parsedObj as String
-        // OpenCV 側で info の場合は改行で行が分かれて返ってくる想定
-        if types.count > idx && types[idx] == "info" {
-          let lines = parsedStr.components(separatedBy: "\n")
-          var lineScores: [Float] = []
-          for (lineIdx, line) in lines.enumerated() {
-            // 空行は 0 とする
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-              lineScores.append(0.0)
-              continue
-            }
-            // Vision を呼んで信頼度を取得
-            // OpenCV 側で行ごとの信頼度が返されていればそれを利用
-            // OpenCV からの rowConfidences を安全に取り出す。期待形式は
-            // NSArray of NSArray of NSNumber（Objective-C側から渡される）
-            if let rowConfsAny = raw?["rowConfidences"] as? [Any],
-              rowConfsAny.count > idx,
-              let confidencesForThisAny = rowConfsAny[idx] as? [Any]
-            {
-              // confidencesForThisAny の要素を NSNumber/Float に変換して扱う
-              if lineIdx < confidencesForThisAny.count {
-                let valAny = confidencesForThisAny[lineIdx]
-                if let num = valAny as? NSNumber {
-                  lineScores.append(num.floatValue)
-                } else if let f = valAny as? Float {
-                  lineScores.append(f)
-                } else if let d = valAny as? Double {
-                  lineScores.append(Float(d))
-                } else if let s = valAny as? String, let d = Double(s) {
-                  lineScores.append(Float(d))
-                } else {
-                  lineScores.append(0.0)
-                }
-              } else {
-                lineScores.append(0.0)
-              }
-            } else {
-              // フォールバック: ここでは OCRManager を呼んででも信頼度を取得したいが、
-              // そのためには行ごとの UIImage が必要。現状では OpenCV が行画像を
-              // 直接返してくれないため、0.0 を入れておく。将来的に OpenCV 側で
-              // 行ごとの UIImage を返すように拡張することを推奨。
-              lineScores.append(0.0)
-            }
-          }
-          scores2D.append(lineScores)
-        } else {
-          // info 以外は単一の値で扱う（既存の confidenceScores から補う）
-          if idx < self.confidenceScores.count {
-            scores2D.append([self.confidenceScores[idx]])
-          } else {
-            scores2D.append([0.0])
-          }
-        }
-      }
-      self.confidenceScores2D = scores2D
-    }
-
     return parsed
   }
 
@@ -337,60 +235,31 @@ extension CameraViewModel {
   /// 保存されたスキャンデータを復元してUIに表示する
   func loadExistingData(for item: Item?) {
     guard let item = item else { return }
-    // 既存のUI配列をクリアしてから復元する（重複追加防止）
     croppedImageSets = []
     recognizedTextsSets = []
-    confidenceScoreSets = []
 
-    // 保存されたすべてのScanResultを復元してUI配列に追加する
     var allCroppedSets: [[UIImage]] = []
     var allRecognized: [[String]] = []
-    var allConfidences: [[Float]] = []
 
-    // まず新しいScanResult配列から復元
     for scan in item.scanResults {
       let imgs = scan.getAllQuestionImages().compactMap { $0 }
       if !imgs.isEmpty {
         allCroppedSets.append(imgs)
         allRecognized.append(scan.answerTexts)
-        // 2D信頼度が存在する場合は設問ごとの平均値を計算して使用
-        if !scan.confidenceScores2D.isEmpty {
-          let flattenedConfidences = scan.confidenceScores2D.map { rows -> Float in
-            if rows.isEmpty { return 0.0 }
-            let sum = rows.reduce(0.0, +)
-            return sum / Float(rows.count)
-          }
-          allConfidences.append(flattenedConfidences)
-        } else {
-          allConfidences.append(scan.confidenceScores)
-        }
       }
     }
 
-    // 新しい構造が空の場合は古いプロパティから復元しておく（後方互換）
     if allCroppedSets.isEmpty {
       let savedImages = item.getAllQuestionImages().compactMap { $0 }
       if !savedImages.isEmpty && !item.answerTexts.isEmpty {
         allCroppedSets = [savedImages]
         allRecognized = [item.answerTexts]
-        allConfidences = [item.confidenceScores]
       }
     }
 
-    // UI配列に反映（空でなければ上書き）
     if !allCroppedSets.isEmpty {
       croppedImageSets = allCroppedSets
       recognizedTextsSets = allRecognized
-      confidenceScoreSets = allConfidences
-
-      // ViewModelの2D信頼度も最新のScanResultから復元（PreviewFullScreenViewでの表示用）
-      if let latestScan = item.scanResults.max(by: { $0.timestamp < $1.timestamp }),
-        !latestScan.confidenceScores2D.isEmpty
-      {
-        confidenceScores2D = latestScan.confidenceScores2D
-      }
-
-      // 代表画像を先頭の最初の画像にする
       if let firstImg = allCroppedSets.first?.first {
         capturedImages = [firstImg]
       }
@@ -433,7 +302,6 @@ extension CameraViewModel {
     // UI側配列を更新
     croppedImageSets.remove(at: index)
     recognizedTextsSets.remove(at: index)
-    confidenceScoreSets.remove(at: index)
 
     // ItemのscanResultsから対応する ScanResult を削除する
     if let item = item {
@@ -477,16 +345,9 @@ extension CameraViewModel {
     capturedImages.append(image)
     croppedImageSets.append(croppedImages)
     recognizedTextsSets.append(texts)
-    confidenceScoreSets.append(confidenceScores)
 
-    // スキャン結果をItemに保存（Itemが存在する場合）
     if let item = item {
-      saveResultsToItem(
-        item,
-        croppedImages: croppedImages,
-        parsedAnswers: parsedAnswers,
-        confidenceScores: confidenceScores
-      )
+      saveResultsToItem(item, croppedImages: croppedImages, parsedAnswers: parsedAnswers)
 
       // SwiftDataで変更を永続化
       if let context = modelContext as? ModelContext {

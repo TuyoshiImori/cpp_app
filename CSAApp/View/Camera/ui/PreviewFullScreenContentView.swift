@@ -17,9 +17,6 @@ struct PreviewFullScreenContentView: View {
   let item: Item?
   var onDelete: ((Int) -> Bool)? = nil
 
-  // 信頼度情報を格納するための配列
-  let confidenceScores: [[Float]]?
-
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.modelContext) private var modelContext
 
@@ -52,8 +49,7 @@ struct PreviewFullScreenContentView: View {
       if !croppedImageSets.isEmpty {
         PreviewFullScreenImagesTabView(
           previewIndex: $previewIndex, croppedImageSets: croppedImageSets,
-          parsedAnswersSets: parsedAnswersSets, viewModel: viewModel,
-          confidenceScores: confidenceScores)
+          parsedAnswersSets: parsedAnswersSets, viewModel: viewModel)
       }
 
       VStack {
@@ -116,7 +112,6 @@ struct PreviewFullScreenContentView: View {
           item: it,
           croppedImageSets: croppedImageSets,
           parsedAnswersSets: parsedAnswersSets,
-          confidenceScoreSets: confidenceScores ?? [],
           questionTypes: vm.initialQuestionTypes
         )
       }

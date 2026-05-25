@@ -18,14 +18,8 @@ struct PreviewFullScreenView: View {
   let parsedAnswersSets: [[String]]
   // ViewModel を注入してフォーマット関数を利用できるようにする
   var viewModel: CameraViewModel? = nil
-  // 分析画面に渡すItem
   let item: Item?
-  // プレビュー中のセットが削除されたときに呼ばれるクロージャ
-  // 戻り値は「モーダルを閉じるべきか」を示す Bool
   var onDelete: ((Int) -> Bool)? = nil
-
-  // 信頼度情報を格納するための配列（将来の実装用）
-  let confidenceScores: [[Float]]?
 
   // MARK: - Init
   init(
@@ -33,10 +27,8 @@ struct PreviewFullScreenView: View {
     previewIndex: Binding<Int>,
     croppedImageSets: [[UIImage]],
     parsedAnswersSets: [[String]],
-    // 分析画面に渡すItemを追加
     item: Item? = nil,
     viewModel: CameraViewModel? = nil,
-    confidenceScores: [[Float]]? = nil,
     onDelete: ((Int) -> Bool)? = nil
   ) {
     self._isPreviewPresented = isPreviewPresented
@@ -45,7 +37,6 @@ struct PreviewFullScreenView: View {
     self.parsedAnswersSets = parsedAnswersSets
     self.item = item
     self.viewModel = viewModel
-    self.confidenceScores = confidenceScores
     self.onDelete = onDelete
   }
 
@@ -88,8 +79,7 @@ struct PreviewFullScreenView: View {
         parsedAnswersSets: parsedAnswersSets,
         viewModel: viewModel,
         item: item,
-        onDelete: onDelete,
-        confidenceScores: confidenceScores
+        onDelete: onDelete
       )
     }
   }

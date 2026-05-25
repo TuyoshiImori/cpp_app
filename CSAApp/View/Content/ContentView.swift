@@ -62,7 +62,6 @@ struct ContentView: View {
       isNew: true,  // Firestoreから取得したアイテムは新規扱い
       optionTexts: optionTexts,
       scanResults: [],
-      confidenceScores: [],
       answerTexts: [],
       questionImageData: []
     )

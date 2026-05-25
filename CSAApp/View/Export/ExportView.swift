@@ -9,7 +9,6 @@ struct ExportView: View {
   let item: Item
   let croppedImageSets: [[UIImage]]
   let parsedAnswersSets: [[String]]
-  let confidenceScoreSets: [[Float]]
   let questionTypes: [QuestionType]
 
   @Environment(\.colorScheme) private var colorScheme
@@ -290,7 +289,6 @@ struct ExportView: View {
     for (pageIndex, croppedImages) in croppedImageSets.enumerated() {
       let pageFolder = String(format: "page_%03d", pageIndex + 1)
       let answers = pageIndex < parsedAnswersSets.count ? parsedAnswersSets[pageIndex] : []
-      let scores = pageIndex < confidenceScoreSets.count ? confidenceScoreSets[pageIndex] : []
 
       // answers.json
       var answersArray: [[String: Any]] = []
@@ -298,7 +296,6 @@ struct ExportView: View {
         var entry: [String: Any] = [
           "questionIndex": qIndex,
           "answer": qIndex < answers.count ? answers[qIndex] : "",
-          "confidence": qIndex < scores.count ? Double(scores[qIndex]) : 0.0,
         ]
         switch qt {
         case .single(let q, let opts):

@@ -17,7 +17,7 @@ struct DebugOCRView: View {
             croppedImageSection
           }
           ocrRunButton
-          if !viewModel.isProcessing && (viewModel.confidence > 0 || !viewModel.recognizedText.isEmpty) {
+          if !viewModel.isProcessing && !viewModel.recognizedText.isEmpty {
             resultSection
           }
         }
@@ -226,18 +226,6 @@ struct DebugOCRView: View {
 
       Text("認識結果")
         .font(.headline)
-
-      HStack {
-        Text("信頼度")
-          .foregroundColor(.secondary)
-        Spacer()
-        Text(String(format: "%.1f%%", viewModel.confidence))
-          .fontWeight(.semibold)
-          .foregroundColor(ConfidenceColor.color(for: viewModel.confidence))
-      }
-      .padding()
-      .background(Color.secondary.opacity(0.08))
-      .cornerRadius(8)
 
       VStack(alignment: .leading, spacing: 8) {
         HStack {

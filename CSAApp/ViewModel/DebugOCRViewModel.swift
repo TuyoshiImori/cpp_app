@@ -9,7 +9,6 @@ final class DebugOCRViewModel: ObservableObject {
   @Published var selectedImage: UIImage? = nil
   @Published var croppedImage: UIImage? = nil
   @Published var recognizedText: String = ""
-  @Published var confidence: Float = 0.0
   @Published var isProcessing: Bool = false
 
   // AI補正用
@@ -59,7 +58,6 @@ final class DebugOCRViewModel: ObservableObject {
     }.value
 
     recognizedText = result["text"] as? String ?? ""
-    confidence = result["confidence"] as? Float ?? 0.0
     editableText = recognizedText
     correctedText = ""
     aiError = nil
@@ -129,7 +127,6 @@ final class DebugOCRViewModel: ObservableObject {
 
   private func resetOCRResult() {
     recognizedText = ""
-    confidence = 0.0
     editableText = ""
     correctedText = ""
     aiError = nil

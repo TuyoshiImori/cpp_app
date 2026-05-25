@@ -9,23 +9,17 @@ import SwiftData
 public final class ScanResult {
   public var scanID: String  // 固有のスキャンID
   public var timestamp: Date  // スキャン実行時刻
-  public var confidenceScores: [Float]  // 各設問の信頼度スコア
-  public var confidenceScores2D: [[Float]]  // info設問など行ごとの信頼度スコア
   public var answerTexts: [String]  // 各設問の回答文
   public var questionImageData: [Data?]  // 各設問の切り取り画像データ
 
   public init(
     scanID: String = UUID().uuidString,
     timestamp: Date = Date(),
-    confidenceScores: [Float] = [],
-    confidenceScores2D: [[Float]] = [],
     answerTexts: [String] = [],
     questionImageData: [Data?] = []
   ) {
     self.scanID = scanID
     self.timestamp = timestamp
-    self.confidenceScores = confidenceScores
-    self.confidenceScores2D = confidenceScores2D
     self.answerTexts = answerTexts
     self.questionImageData = questionImageData
   }
@@ -198,7 +192,6 @@ public final class Item {
   public var scanResults: [ScanResult]
 
   // 後方互換性のための一時的なプロパティ（将来的には削除予定）
-  public var confidenceScores: [Float]
   public var answerTexts: [String]
   public var questionImageData: [Data?]
 
@@ -206,7 +199,7 @@ public final class Item {
     timestamp: Date, questionTypes: [QuestionType] = [], surveyID: String = "",
     title: String = "", isNew: Bool = false, optionTexts: [[String]] = [],
     scanResults: [ScanResult] = [],
-    confidenceScores: [Float] = [], answerTexts: [String] = [], questionImageData: [Data?] = []
+    answerTexts: [String] = [], questionImageData: [Data?] = []
   ) {
     self.timestamp = timestamp
     self.questionTypes = questionTypes
@@ -215,7 +208,6 @@ public final class Item {
     self.isNew = isNew
     self.optionTexts = optionTexts
     self.scanResults = scanResults
-    self.confidenceScores = confidenceScores
     self.answerTexts = answerTexts
     self.questionImageData = questionImageData
   }

@@ -223,7 +223,6 @@ public struct CameraView: View {
         parsedAnswersSets: viewModel.recognizedTextsSets,
         item: item,
         viewModel: viewModel,
-        confidenceScores: viewModel.confidenceScoreSets,
         onDelete: { index in
           return viewModel.deleteDataSet(at: index, item: item, modelContext: modelContext)
         }

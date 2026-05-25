@@ -10,20 +10,17 @@ struct PreviewFullScreenImagesTabView: View {
   let croppedImageSets: [[UIImage]]
   let parsedAnswersSets: [[String]]
   var viewModel: CameraViewModel?
-  let confidenceScores: [[Float]]?
 
   @Environment(\.colorScheme) private var colorScheme
 
   init(
     previewIndex: Binding<Int>, croppedImageSets: [[UIImage]] = [],
-    parsedAnswersSets: [[String]] = [], viewModel: CameraViewModel? = nil,
-    confidenceScores: [[Float]]? = nil
+    parsedAnswersSets: [[String]] = [], viewModel: CameraViewModel? = nil
   ) {
     self._previewIndex = previewIndex
     self.croppedImageSets = croppedImageSets
     self.parsedAnswersSets = parsedAnswersSets
     self.viewModel = viewModel
-    self.confidenceScores = confidenceScores
   }
 
   var body: some View {
