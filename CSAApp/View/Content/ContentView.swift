@@ -187,10 +187,17 @@ struct ContentView: View {
   }
 
   private func openSurvey(_ survey: FirestoreSurveyDocument) {
-    let newItem = convertFirestoreSurveyToItem(survey)
-    modelContext.insert(newItem)
-    try? modelContext.save()
-    viewModel.currentItem = newItem
+    // 既存のItemがあればスキャン結果を保持したまま再利用
+    let targetItem: Item
+    if let existing = items.first(where: { $0.surveyID == survey.id }) {
+      targetItem = existing
+    } else {
+      let newItem = convertFirestoreSurveyToItem(survey)
+      modelContext.insert(newItem)
+      try? modelContext.save()
+      targetItem = newItem
+    }
+    viewModel.currentItem = targetItem
     viewModel.selectedImage = nil
     viewModel.navigationPath.append("CameraView")
   }
